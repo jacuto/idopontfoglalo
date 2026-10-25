@@ -406,12 +406,22 @@ const server = http.createServer(async (req, res) => {
     json(400, { error: e.message });
   }
 });
-if (require.main === module) {
+// Passenger loads the startup file with require(), rather than as the main module.
+const underPassenger = typeof PhusionPassenger !== "undefined";
+if (require.main === module || underPassenger) {
   console.log(
     "Szolgáltatói jelszó helye: data/admin-password (vagy ADMIN_PASSWORD környezeti változó).",
   );
-  server.listen(process.env.PORT || 3000, "0.0.0.0", () =>
-    console.log("Időpontfoglaló elindult, port: " + (process.env.PORT || 3000)),
-  );
+  if (underPassenger) {
+    server.listen("passenger", () =>
+      console.log("Időpontfoglaló elindult Passenger alatt."),
+    );
+  } else {
+    server.listen(process.env.PORT || 3000, "0.0.0.0", () =>
+      console.log(
+        "Időpontfoglaló elindult, port: " + (process.env.PORT || 3000),
+      ),
+    );
+  }
 }
 module.exports = { occupied, validate, server };

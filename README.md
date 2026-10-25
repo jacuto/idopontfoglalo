@@ -56,3 +56,17 @@ npm test
 ```
 
 A tesztek külön ideiglenes adatbázison futnak, nem módosítják a bemutató adatait. Ellenőrzik a hozzáférésvédelmet, a jóváhagyást, az ütközést, a szabad időpontokat, a módosítást/lemondást, a hatóidős párhuzamosságot és a több szolgáltatásos automatikus megerősítést.
+
+## Tárhely.eu / cPanel Passenger
+
+A `server.js` támogatja a Passenger által `require()`-rel történő betöltést is. Az alkalmazás root a tárhely saját könyvtárához viszonyított útvonal, például `idopontfoglalo-app` (nem URL). Közvetlenül ebben legyen a `server.js`, a `package.json` és a `public` mappa. A könyvtár legyen a nyilvános dokumentumgyökéren kívül.
+
+- Node.js: 24 vagy újabb; mód: Production.
+- Indítófájl: `server.js`.
+- URL: a külön létrehozott aldomain, például `foglalo.digitmarketing.hu`, üres útvonallal.
+- Környezeti változók: saját `ADMIN_PASSWORD`, valamint `TZ=Europe/Budapest`.
+- Feltöltés vagy frissítés után Mentés, majd Restart szükséges. Nincs telepítendő külső NPM-függőség.
+- „It works!”: a szolgáltató tesztalkalmazása fut; ellenőrizd a rootot és az indítófájlt.
+- Elhúzódó betöltés: ellenőrizd a Passenger-naplót. A korai változat Passenger alatt nem kezdett figyelni; a friss `server.js` ezt javítja.
+
+A Passenger indítási módját automatizált szimuláció ellenőrzi; ez nem helyettesíti a tárhelyen végzett ellenőrzést.
