@@ -2,7 +2,7 @@ let state,
   view = "calendar",
   offset = 0,
   filter = "",
-  isPublic = location.pathname === "/foglalas",
+  isPublic = location.pathname.replace(/\/+$/, "") === "/foglalas",
   manageToken = new URLSearchParams(location.search).get("token");
 const $ = (s) => document.querySelector(s),
   esc = (s) =>
@@ -26,14 +26,26 @@ const localdt = (d) =>
   String(d.getHours()).padStart(2, "0") +
   ":" +
   String(d.getMinutes()).padStart(2, "0");
+let csrfToken;
 const api = async (url, method = "GET", body) => {
+  if (method !== "GET" && !csrfToken) {
+    const response = await fetch("/api/csrf", {
+      headers: { Accept: "application/json" },
+    });
+    const csrf = await response.json();
+    csrfToken = csrf.token;
+  }
   const r = await fetch(url, {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      ...(csrfToken ? { "X-CSRF-TOKEN": csrfToken } : {}),
+    },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   const d = await r.json();
-  if (!r.ok) throw Error(d.error || "Sikertelen művelet");
+  if (!r.ok) throw Error(d.error || d.message || "Sikertelen művelet");
   return d;
 };
 const toast = (t) => {
@@ -68,11 +80,11 @@ function render() {
     )
       .map(
         ([id, name], i) =>
-          `<button class="${view === id ? "active" : ""}" data-nav="${id}"><i>${["▦", "♧", "☷", "♙", "⚙", "▱", "◉"][i]}</i><span>${name}</span></button>`,
+          `<button class="${view === id ? "active" : ""}" data-nav="${id}" aria-label="${name}" title="${name}"><i aria-hidden="true">${["▦", "♧", "☷", "♙", "⚙", "▱", "◉"][i]}</i><span>${name}</span></button>`,
       )
       .join(
         "",
-      )}</nav><div class="trial"><strong>Teret adunk az indulásnak.</strong>2 hónap ingyenes próbaidő<div class="bar"></div>Alapcsomag · 4 000 Ft / hó<br>Kártyaadatok nélkül kipróbálható</div><div class="profile"><div class="avatar">HS</div><div>${esc(state.settings.name)}<small>Bemutató munkaterület</small></div></div></aside><main><header class="topbar"><div class="crumb">Munkaterület <span style="margin:0 12px">/</span> <b>${labels[view]}</b></div><div class="top-actions"><span class="badge">ELSŐ VÁLTOZAT</span><button onclick="window.open('/foglalas','_blank')">↗ Foglalási oldalam</button></div></header><div class="intro"><div><h1>${view === "calendar" ? "Minden időpont a helyén." : labels[view]}</h1><p>${view === "calendar" ? "Kevesebb szervezés. Több idő a vendégeidre." : "A szalonodhoz igazítva, egyszerűen."}</p></div>${["calendar", "clients", "services", "staff"].includes(view) ? `<button class="primary" onclick="${view === "calendar" ? "bookingForm()" : view === "clients" ? "clientForm()" : view === "services" ? "serviceForm()" : "staffForm()"}">＋ ${view === "calendar" ? "Új időpont" : view === "clients" ? "Új vendég" : view === "services" ? "Új szolgáltatás" : "Új munkatárs"}</button>` : ""}</div><div id="content"></div></main></div>`;
+      )}</nav><div class="trial"><strong>Teret adunk az indulásnak.</strong>2 hónap ingyenes próbaidő<div class="bar"></div>Alapcsomag · 4 000 Ft / hó<br>Kártyaadatok nélkül kipróbálható</div><div class="profile"><div class="avatar">HS</div><div>${esc(state.settings.name)}<small>Bemutató munkaterület</small></div></div></aside><main><header class="topbar"><div class="crumb">Munkaterület <span style="margin:0 12px">/</span> <b>${labels[view]}</b></div><div class="top-actions"><span class="badge">PHP VÁLTOZAT</span><button onclick="logout()">Kilépés</button><button onclick="window.open('/foglalas','_blank')">↗ Foglalási oldalam</button></div></header><div class="intro"><div><h1>${view === "calendar" ? "Minden időpont a helyén." : labels[view]}</h1><p>${view === "calendar" ? "Kevesebb szervezés. Több idő a vendégeidre." : "A szalonodhoz igazítva, egyszerűen."}</p></div>${["calendar", "clients", "services", "staff"].includes(view) ? `<button class="primary" onclick="${view === "calendar" ? "bookingForm()" : view === "clients" ? "clientForm()" : view === "services" ? "serviceForm()" : "staffForm()"}">＋ ${view === "calendar" ? "Új időpont" : view === "clients" ? "Új vendég" : view === "services" ? "Új szolgáltatás" : "Új munkatárs"}</button>` : ""}</div><div id="content"></div></main></div>`;
   document.querySelectorAll("[data-nav]").forEach(
     (b) =>
       (b.onclick = () => {
@@ -493,7 +505,7 @@ if (manageToken) managePage();
 else
   refresh().catch((e) => {
     $("#app").innerHTML =
-      `<div class="public card item"><h2>Szolgáltatói belépés</h2><p>A jelszó az indító terminálban található.</p><form id="login"><label>Jelszó</label><input type="password" name="password" required><div class="buttons"><button class="primary">Belépés</button></div><p id="login-error" class="error"></p></form></div>`;
+      `<div class="public card item"><h2>Szolgáltatói belépés</h2><p>A telepítéskor beállított szolgáltatói jelszavaddal lépj be.</p><form id="login"><label>Jelszó</label><input type="password" name="password" required><div class="buttons"><button class="primary">Belépés</button></div><p id="login-error" class="error"></p></form></div>`;
     $("#login").onsubmit = async (e) => {
       e.preventDefault();
       try {
@@ -578,4 +590,9 @@ function activityPage() {
         )
         .join("") || '<tr><td colspan="4">Még nincs foglalás.</td></tr>'
     }</tbody></table></div><div class="notice">Itt követheted a változásokat. Külső e-mail- és SMS-értesítés még nincs.</div>`;
+}
+
+async function logout() {
+  await api("/api/logout", "POST", {});
+  location.reload();
 }

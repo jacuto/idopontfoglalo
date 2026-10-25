@@ -1,0 +1,2 @@
+# Only public/ may be a web document root. Protect accidental root uploads.
+Require all denied
