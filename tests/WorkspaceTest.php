@@ -588,4 +588,21 @@ class WorkspaceTest extends TestCase
             $this->state()["invoiceRequests"][0]["status"],
         );
     }
+
+    public function test_reminder_preference_change_does_not_drop_unsent_booking_email(): void
+    {
+        Mail::fake();
+        app(Connections::class)->save([
+            "smtp_host" => "smtp.example.com",
+            "mail_from" => "sender@example.com",
+        ]);
+        $this->settings(["notifyGuest" => true]);
+        $this->postJson("/api/bookings", $this->booking())->assertCreated();
+        $this->admin();
+        $settings = $this->state()["settings"];
+        $settings["reminder"] = 48;
+        $this->putJson("/api/config", ["settings" => $settings])->assertOk();
+        $r = app(Notifications::class)->run();
+        $this->assertSame(1, $r["sent"]);
+    }
 }

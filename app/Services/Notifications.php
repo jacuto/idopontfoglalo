@@ -165,8 +165,9 @@ class Notifications
                             ] ?? false;
                 if (
                     !$b ||
-                    ($p["settingsVersion"] ?? 1) !==
-                        ($s["settings"]["notificationVersion"] ?? 1) ||
+                    ($p["event"] === "reminder" &&
+                        ($p["settingsVersion"] ?? 1) !==
+                            ($s["settings"]["notificationVersion"] ?? 1)) ||
                     $b["updatedAt"] !== $p["version"] ||
                     !$enabled ||
                     ($p["event"] === "reminder" && $b["status"] !== "confirmed")
