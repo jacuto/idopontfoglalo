@@ -10,8 +10,17 @@ return Application::configure(basePath: dirname(__DIR__))
         health: "/up",
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->prepend(\App\Http\Middleware\EmbedCors::class);
         // Public booking and secret-link management also work in embedded frames.
-        $middleware->validateCsrfTokens(except: ["api/bookings", "api/manage"]);
+        $middleware->validateCsrfTokens(
+            except: [
+                "api/bookings",
+                "api/manage",
+                "api/manage/checkout",
+                "api/stripe/webhook",
+                "api/platform-stripe/webhook",
+            ],
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

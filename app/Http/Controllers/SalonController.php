@@ -26,7 +26,8 @@ class SalonController
                 $origin = $request->header("Origin");
                 if (
                     $origin &&
-                    rtrim($origin, "/") !== $request->getSchemeAndHttpHost()
+                    rtrim($origin, "/") !== $request->getSchemeAndHttpHost() &&
+                    !$request->attributes->get("embedAllowed", false)
                 ) {
                     return response()->json(
                         ["error" => "Tiltott kérésforrás."],
@@ -60,24 +61,101 @@ class SalonController
             $public =
                 in_array(
                     $path,
-                    ["/api/public", "/api/slots", "/api/manage"],
+                    [
+                        "/api/public",
+                        "/api/slots",
+                        "/api/manage",
+                        "/api/manage/checkout",
+                    ],
                     true,
                 ) ||
                 ($path === "/api/bookings" && $method === "POST");
-            $admin = $request->session()->get("admin", false) === true;
+            $admin =
+                !$request->attributes->get("embedAllowed", false) &&
+                $request->session()->get("admin", false) === true;
             if (!$public && !$admin) {
                 return response()->json(
                     ["error" => "Bejelentkezés szükséges."],
                     401,
                 );
             }
+            if ($path === "/api/manage/checkout" && $method === "POST") {
+                $token = $request->input("token");
+                if (
+                    !is_string($token) ||
+                    !preg_match('/^[a-f0-9]{48}$/', $token)
+                ) {
+                    abort(404);
+                }
+                $b = collect($this->store->read()["bookings"])->firstWhere(
+                    "token",
+                    $token,
+                );
+                if (!$b) {
+                    abort(404);
+                }
+                if (
+                    RateLimiter::tooManyAttempts(
+                        "checkout:" . $request->ip(),
+                        10,
+                    )
+                ) {
+                    abort(429);
+                }
+                RateLimiter::hit("checkout:" . $request->ip(), 60);
+                return response()->json(
+                    app(\App\Services\Payments::class)->checkout($b["id"]),
+                );
+            }
             if ($path === "/api/public" && $method === "GET") {
                 $s = $this->store->read();
                 return response()->json([
-                    "settings" => ["name" => $s["settings"]["name"]],
-                    "services" => $s["services"],
-                    "staff" => $s["staff"],
+                    "settings" => array_intersect_key(
+                        $s["settings"],
+                        array_flip([
+                            "name",
+                            "businessMode",
+                            "primaryStaffId",
+                            "googleAnalyticsId",
+                            "googleTagManagerId",
+                            "googleAdsId",
+                            "googleAdsLabel",
+                            "facebookPixelId",
+                        ]),
+                    ),
+                    "services" => array_values(
+                        array_filter(
+                            $s["services"],
+                            fn($v) => empty($v["archived"]) &&
+                                count(
+                                    array_intersect(
+                                        $v["staff"],
+                                        array_column(
+                                            \App\Services\Settings::activeStaff(
+                                                $s,
+                                            ),
+                                            "id",
+                                        ),
+                                    ),
+                                ) > 0,
+                        ),
+                    ),
+                    "staff" => array_map(
+                        fn($p) => array_intersect_key(
+                            $p,
+                            array_flip(["id", "name", "role"]),
+                        ),
+                        \App\Services\Settings::activeStaff($s),
+                    ),
                 ]);
+            }
+            if (
+                preg_match(
+                    "#^/api/(clients|staff|imports|payments|connections|deliveries|invoices|checkout|subscription)(/|$)#",
+                    $path,
+                )
+            ) {
+                return app(WorkspaceController::class)->handle($request);
             }
             if ($path === "/api/state" && $method === "GET") {
                 return response()->json($this->store->read());
@@ -142,6 +220,7 @@ class SalonController
                         fn($id) => $this->rules->service($s["services"], $id),
                         $b["services"],
                     );
+                    $b["guestId"] = $request->session()->get("guest_id");
                     $b["status"] = $b["public"]
                         ? $this->rules->status($b["services"], $s)
                         : "confirmed";
@@ -164,6 +243,11 @@ class SalonController
                             "email" => $b["email"],
                         ];
                     }
+                    app(\App\Services\Notifications::class)->enqueue(
+                        $b,
+                        $s,
+                        "created",
+                    );
                     return $b;
                 });
                 return response()->json($b, 201);
@@ -198,6 +282,17 @@ class SalonController
                                 $this->rules->validate($next, $s, $b["id"]);
                             }
                             $b = $next;
+                            app(\App\Services\Notifications::class)->enqueue(
+                                $b,
+                                $s,
+                                in_array(
+                                    $b["status"],
+                                    ["cancelled", "rejected"],
+                                    true,
+                                )
+                                    ? "cancelled"
+                                    : "updated",
+                            );
                             return $b;
                         }
                     }
@@ -225,6 +320,27 @@ class SalonController
                         if (hash_equals($b["token"], $token)) {
                             return response()->json([
                                 "booking" => $b,
+                                "paymentReady" => !empty(
+                                    app(
+                                        \App\Services\Connections::class,
+                                    )->all()["stripe_key"]
+                                ),
+                                "balance" => max(
+                                    0,
+                                    array_sum(
+                                        array_column(
+                                            $b["serviceSnapshot"],
+                                            "price",
+                                        ),
+                                    ) -
+                                        collect($s["payments"])
+                                            ->where("bookingId", $b["id"])
+                                            ->where("status", "paid")
+                                            ->sum(
+                                                fn($p) => $p["amount"] -
+                                                    ($p["refundedAmount"] ?? 0),
+                                            ),
+                                ),
                                 "services" =>
                                     $b["serviceSnapshot"] ?? $s["services"],
                                 "staff" => $s["staff"],
@@ -273,6 +389,13 @@ class SalonController
                             $b["updatedAt"] = CarbonImmutable::now()
                                 ->utc()
                                 ->toISOString();
+                            app(\App\Services\Notifications::class)->enqueue(
+                                $b,
+                                $s,
+                                $request->boolean("cancel")
+                                    ? "cancelled"
+                                    : "updated",
+                            );
                             return $b;
                         }
                     }
@@ -283,11 +406,48 @@ class SalonController
             if ($path === "/api/config" && $method === "PUT") {
                 $data = $request->validate([
                     "settings" => "sometimes|array",
+                    "settings.openingTime" => "sometimes|date_format:H:i",
+                    "settings.closingTime" => "sometimes|date_format:H:i",
+                    "settings.businessMode" => "sometimes|in:solo,team",
+                    "settings.primaryStaffId" => "sometimes|string",
+                    "settings.providerEmail" => "nullable|email|max:200",
+                    "settings.notifyGuest" => "sometimes|boolean",
+                    "settings.notifyProvider" => "sometimes|boolean",
+                    "settings.reminderGuest" => "sometimes|boolean",
+                    "settings.billingName" => "nullable|string|max:200",
+                    "settings.billingTaxNumber" => "nullable|string|max:30",
+                    "settings.billingCountry" => "sometimes|string|size:2",
+                    "settings.billingZip" => "nullable|string|max:20",
+                    "settings.billingCity" => "nullable|string|max:100",
+                    "settings.billingAddress" => "nullable|string|max:250",
+                    "settings.invoiceProvider" =>
+                        "sometimes|in:none,billingo,szamlazz",
+                    "settings.autoInvoice" => "sometimes|boolean",
+                    "settings.invoiceVat" => "sometimes|in:AAM,27%,18%,5%,0%",
+                    "settings.googleAnalyticsId" => [
+                        "nullable",
+                        "regex:/^G-[A-Z0-9]+$/",
+                    ],
+                    "settings.googleTagManagerId" => [
+                        "nullable",
+                        "regex:/^GTM-[A-Z0-9]+$/",
+                    ],
+                    "settings.googleAdsId" => [
+                        "nullable",
+                        "regex:/^AW-[0-9]+$/",
+                    ],
+                    "settings.googleAdsLabel" => "nullable|string|max:100",
+                    "settings.facebookPixelId" => [
+                        "nullable",
+                        "regex:/^[0-9]{5,30}$/",
+                    ],
+                    "settings.embedOrigins" => "sometimes|array|max:30",
+                    "settings.embedOrigins.*" =>
+                        "required|url:http,https|max:250",
+
                     "settings.name" => "required_with:settings|string|max:150",
-                    "settings.open" =>
-                        "required_with:settings|integer|between:0,23",
-                    "settings.close" =>
-                        "required_with:settings|integer|between:1,24",
+                    "settings.open" => "sometimes|numeric|between:0,23.99",
+                    "settings.close" => "sometimes|numeric|between:0.01,24",
                     "settings.confirmation" => "required_with:settings|boolean",
                     "settings.profession" =>
                         "required_with:settings|string|max:80",
@@ -299,6 +459,9 @@ class SalonController
                     "staff.*.id" => "required|string|max:80|distinct",
                     "staff.*.name" => "required|string|max:150",
                     "staff.*.role" => "required|string|max:80",
+                    "staff.*.email" => "nullable|email|max:200",
+                    "staff.*.phone" => "nullable|string|max:40",
+                    "staff.*.archived" => "sometimes|boolean",
                     "services" => "sometimes|array|max:500",
                     "services.*.id" => "required|string|max:80|distinct",
                     "services.*.name" => "required|string|max:150",
@@ -319,7 +482,20 @@ class SalonController
                 $this->store->mutate(function (&$s) use ($data) {
                     if (
                         isset($data["settings"]) &&
-                        $data["settings"]["open"] >= $data["settings"]["close"]
+                        \App\Services\Settings::minutes(
+                            $data["settings"]["openingTime"] ??
+                                sprintf(
+                                    "%02d:00",
+                                    $data["settings"]["open"] ?? 8,
+                                ),
+                        ) >=
+                            \App\Services\Settings::minutes(
+                                $data["settings"]["closingTime"] ??
+                                    sprintf(
+                                        "%02d:00",
+                                        $data["settings"]["close"] ?? 20,
+                                    ),
+                            )
                     ) {
                         throw new InvalidArgumentException(
                             "A zárás legyen a nyitás után.",
@@ -372,12 +548,71 @@ class SalonController
                             }
                         }
                     }
+                    $notificationChanged = false;
+                    if (isset($data["settings"])) {
+                        foreach (
+                            [
+                                "reminder",
+                                "channel",
+                                "notifyGuest",
+                                "notifyProvider",
+                                "providerEmail",
+                                "reminderGuest",
+                            ]
+                            as $k
+                        ) {
+                            if (
+                                array_key_exists($k, $data["settings"]) &&
+                                $data["settings"][$k] !== $s["settings"][$k]
+                            ) {
+                                $notificationChanged = true;
+                            }
+                        };
+                    }
                     foreach (
                         ["settings", "staff", "services", "clients"]
                         as $key
                     ) {
                         if (isset($data[$key])) {
-                            $s[$key] = $data[$key];
+                            $s[$key] =
+                                $key === "settings"
+                                    ? array_replace($s["settings"], $data[$key])
+                                    : $data[$key];
+                        }
+                    }
+                    if (
+                        isset($data["settings"]) &&
+                        $s["settings"]["businessMode"] === "solo" &&
+                        !in_array(
+                            $s["settings"]["primaryStaffId"],
+                            array_column(
+                                array_filter(
+                                    $s["staff"],
+                                    fn($p) => empty($p["archived"]),
+                                ),
+                                "id",
+                            ),
+                            true,
+                        )
+                    ) {
+                        throw new InvalidArgumentException(
+                            "Válassz aktív elsődleges munkatársat.",
+                        );
+                    }
+                    if ($notificationChanged) {
+                        $s["settings"]["notificationVersion"] =
+                            ($s["settings"]["notificationVersion"] ?? 1) + 1;
+                        foreach ($s["bookings"] as $b) {
+                            if (
+                                $b["status"] === "confirmed" &&
+                                \Carbon\CarbonImmutable::parse(
+                                    $b["start"],
+                                )->isFuture()
+                            ) {
+                                app(
+                                    \App\Services\Notifications::class,
+                                )->enqueue($b, $s, "reminder");
+                            }
                         }
                     }
                     foreach ($s["clients"] as &$c) {
@@ -461,12 +696,15 @@ class SalonController
         $s = $this->store->read();
         $slots = [];
         for (
-            $minute = $s["settings"]["open"] * 60;
-            $minute < $s["settings"]["close"] * 60;
+            $minute = \App\Services\Settings::minutes(
+                $s["settings"]["openingTime"],
+            );
+            $minute <
+            \App\Services\Settings::minutes($s["settings"]["closingTime"]);
             $minute += 15
         ) {
             $start = $day->addMinutes($minute)->utc()->toISOString();
-            foreach ($s["staff"] as $p) {
+            foreach (\App\Services\Settings::activeStaff($s) as $p) {
                 if ($person && $person !== "any" && $p["id"] !== $person) {
                     continue;
                 }

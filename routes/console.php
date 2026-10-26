@@ -119,3 +119,13 @@ Artisan::command("raero:check", function () {
         "Adatbázis elérhető. Szolgáltatások: " . count($state["services"]),
     );
 })->purpose("A telepített adatbázis ellenőrzése");
+
+Artisan::command("raero:deliver {--limit=50}", function () {
+    $result = app(\App\Services\Notifications::class)->run(
+        min(200, max(1, (int) $this->option("limit"))),
+    );
+    $this->info(json_encode($result, JSON_UNESCAPED_UNICODE));
+})->purpose("Foglalási értesítők és esedékes emlékeztetők küldése");
+\Illuminate\Support\Facades\Schedule::command("raero:deliver")
+    ->everyMinute()
+    ->withoutOverlapping();

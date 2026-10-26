@@ -45,6 +45,7 @@ class BookingRules
         array $booking,
         array $state,
         ?string $ignore = null,
+        bool $historical = false,
     ): void {
         if (
             !trim($booking["name"] ?? "") ||
@@ -70,7 +71,12 @@ class BookingRules
         if (
             !in_array(
                 $booking["staff"] ?? "",
-                array_column($state["staff"], "id"),
+                array_column(
+                    $historical
+                        ? $state["staff"]
+                        : Settings::activeStaff($state),
+                    "id",
+                ),
                 true,
             )
         ) {
@@ -79,6 +85,11 @@ class BookingRules
         $duration = 0;
         foreach ($booking["services"] as $id) {
             $service = $this->service($state["services"], $id);
+            if (!empty($service["archived"]) && !$ignore && !$historical) {
+                throw new InvalidArgumentException(
+                    "Archivált szolgáltatás nem foglalható.",
+                );
+            }
             if (!in_array($booking["staff"], $service["staff"], true)) {
                 throw new InvalidArgumentException(
                     "A munkatárs nem végzi az összes kiválasztott szolgáltatást.",
@@ -103,15 +114,23 @@ class BookingRules
         } catch (\Exception) {
             throw new InvalidArgumentException("Érvénytelen időpont.");
         }
-        if ($start->getTimestamp() < time() - 60) {
+        if (!$historical && $start->getTimestamp() < time() - 60) {
             throw new InvalidArgumentException(
                 "Múltbeli időpontra nem lehet foglalni.",
             );
         }
         $minutes = $start->hour * 60 + $start->minute;
         if (
-            $minutes < ($state["settings"]["open"] ?? 8) * 60 ||
-            $minutes + $duration > ($state["settings"]["close"] ?? 20) * 60
+            $minutes <
+                Settings::minutes(
+                    $state["settings"]["openingTime"] ??
+                        sprintf("%02d:00", $state["settings"]["open"] ?? 8),
+                ) ||
+            $minutes + $duration >
+                Settings::minutes(
+                    $state["settings"]["closingTime"] ??
+                        sprintf("%02d:00", $state["settings"]["close"] ?? 20),
+                )
         ) {
             throw new InvalidArgumentException(
                 "Az időpont nem fér a nyitvatartásba.",
@@ -133,7 +152,7 @@ class BookingRules
                             "Ez az időpont már foglalt. Válassz másikat.",
                         );
                     }
-                };
+                }
             }
         }
     }

@@ -2,6 +2,8 @@
 
 **PHP 8.2 + Laravel 12**, MySQL/MariaDB adatbázissal. A Node.js-változatot váltja fel; a naptár és a vendégoldali felület megmaradt. Nem szükséges Node.js, Passenger vagy JavaScript-build. Egyetlen szalon kipróbálható prototípusa, nem kész többvállalkozásos SaaS.
 
+**Már telepítetted a PHP-s változatot?** A frissítési lépések: [FRISSITES.md](FRISSITES.md).
+
 ## Telepítés Tárhely.eu cPanelen
 
 ### 1. Külön mappa és adatbázis
@@ -95,34 +97,30 @@ php artisan optimize:clear
 php artisan raero:check
 ```
 
-## Kipróbálható funkciók
+## Újdonságok és kapcsolatok
 
-- Heti naptár, munkatársszűrés, gyors időpontfelvitel üres cellára kattintva.
-- Jóváhagyás, elutasítás, időpontmódosítás, lemondás.
-- Szolgáltatások ára, időtartama, munkatársai, automatikus megerősítése szerkeszthető.
-- Fodrászati munka–hatóidő–munka szakaszok, párhuzamos foglalás a szabad hatóidőben.
-- Több szolgáltatás egy foglalásban, ugyanannál a szakembernél egymás után.
-- Munkatársak felvétele; vendégoldalon konkrét szakember vagy „Bárki megfelel”.
-- Valós szabadidőpont-lista, budapesti időzónában; az ütközést mentéskor újra ellenőrzi.
-- Titkos hivatkozással vendég általi módosítás és lemondás, regisztráció nélkül.
-- Vendégtörzs, szolgáltatói keresés/autokitöltés, CSV-import/export (`name;phone;email`).
-- Nyitás/zárás, foglalási szabályok, emlékeztető-preferenciák mentése, beágyazókód.
-- Session alapú belépés/kilépés, CSRF-védelem az adminműveleteknél, belépési próbálkozások korlátozása.
-- MySQL-tranzakció és szalonsor-zárolás az egyidejű foglalási ütközések megelőzésére.
+A működő PHP-s verzió frissítése, az SMTP/cron, az SMS, a közösségi belépés, a számlázás, a Stripe és a webkomponens beállítása: **[FRISSITES.md](FRISSITES.md)**.
 
-Az árakat és időtartamokat a foglalás rögzítéskor pillanatképként megőrzi. A szabad időpontok Budapest szerint számolódnak; a szolgáltatói dátummezőket magyarországi időzónájú böngészővel használd.
+- Kontrasztosabb, reszponzív felület; több sorba rendezett munkatárs- és szolgáltatáskártyák, középre rendezett avatarok.
+- Napi/heti/havi naptár, gyors időpontfelvitel, munkatársszűrés, percre pontos nyitás és zárás.
+- Egyéni vagy csapatműködés, egyéni módban rejtett munkatársmenü és szűrő.
+- Vendégadatok szerkesztése; munkatársak szerkesztése és archiválása, történeti adatok megtartásával.
+- Vendég-, munkatárs- és foglalás-CSV import/export; atomi, ellenőrzött import, kezelőtokenek exportja nélkül.
+- Tényleges befizetések készpénzzel/kártyával/átutalással; időszakszűrős bevételi kördiagram, szolgáltatásonkénti felosztással.
+- E-mail a vendégnek és a szolgáltatónak külön kapcsolóval; időzített e-mail/SMS emlékeztető, tartós küldési sorral és újrapróbálással.
+- SMTP, Twilio, Stripe vendégfizetés és aláírt webhook, Billingo és Számlázz.hu számlakiállítási kapcsolatok. Valódi használathoz saját hozzáférés és szolgáltatói beállítás szükséges.
+- Google/Facebook vendégregisztráció és belépés; adminbelépés csak engedélyezett fiókoknak. A jelszavas adminbelépés megmaradt.
+- Számlázási adatok, titkosított kapcsolati kulcsok; az admin API nem adja vissza a titkos kulcsértékeket.
+- Iframe nélküli, Shadow DOM-os foglaló webkomponens, engedélyezett gazdaoldalakkal és harmadik fél sütije nélkül.
+- Google Analytics, Tag Manager, Ads és Meta Pixel azonosítók; a saját foglalóoldalon csak hozzájárulás után induló mérés.
 
-## Még nem megvalósított funkciók
+Megmaradt a több szolgáltatásos foglalás, az eltérő ár/időtartam, a hatóidős párhuzamosság, a jóváhagyás és a titkos linkes vendégmódosítás/lemondás. A MySQL-tranzakció a párhuzamos foglalást ellenőrzi.
 
-- Több vállalkozás regisztrációja és adatelkülönítése, saját aldomainek, vendégfiókok.
-- Stripe, átutalás-egyeztetés, Billingo és Számlázz.hu.
-- Tényleges előfizetés, 2 hónapos próbaidő számlálása, csomagkorlátozások. A 4 000 Ft/hó ár üzleti tervként látható.
-- E-mail, SMS, meghívó és emlékeztető **küldése**. A beállítások mentése nem jelent üzenetküldést.
-- Heti munkarend, szabadság, puffer, lemondási határidő, teljes auditnapló.
-- Módosítási kérés alatt az eredeti időpont fenntartása; jelenleg az időpont átíródik, és szükség esetén jóváhagyásra kerül.
-- A régi Node.js SQLite-adatainak automatikus átvétele; azok megmaradnak a régi mappában.
+## Még nem teljes termék
 
-Cron most nem szükséges a kipróbáláshoz. A későbbi emlékeztetőknek Laravel ütemezett feladat és valódi küldőkapcsolat kell; jelenleg nincs üzenetküldő cronfeladat. Valós szolgáltatásként indulás előtt további fejlesztés és üzemeltetési/adatvédelmi ellenőrzés szükséges.
+Egy szalon munkaterülete működik. A több önálló vállalkozás regisztrációja/adatelkülönítése, wildcard aldomainek, központi csomagkorlátozás, két hónapos próbaidő-kezelés, átutalásos előfizetés és a platform előfizetési Billingo-számlái további fejlesztést igényelnek. A közösségi vendégregisztráció nem hoz létre új vállalkozást. Előlegszámla, automatikus sztornó, szabadság- és heti munkarend-kezelés sincs ebben a változatban.
+
+A külső API-kat HTTP-tesztválaszokkal ellenőrizzük; az éles Google/Facebook/Stripe/számlázó fiókot a saját hozzáférésekkel kell hitelesíteni és végigpróbálni. Ez nem jelenti azt, hogy a távoli fiókok már össze vannak kapcsolva.
 
 ## Fejlesztés és tesztelés
 
@@ -131,14 +129,12 @@ composer install
 php vendor/bin/phpunit
 ```
 
-A tesztek külön, memóriában lévő SQLite-adatbázissal működnek. PHP 8.2 alatt SQLite-tal és külön MariaDB-tesztadatbázissal is sikeresen lefutottak; ellenőrzik a bejelentkezést, jogosultságokat, foglalásokat, hatóidős párhuzamosságot, szabad időpontokat és a vendégoldali módosítást/lemondást.
+A tesztek külön SQLite-adatbázissal futnak; ellenőrzik a foglalási szabályokat, szerkesztést/archiválást, importot, pénzügyi műveleteket, outboxot, OAuth-jogosultságokat, CORS-t és API-kapcsolatokat. SMTP-küldést külön helyi tesztszerverrel, böngészős folyamatokat Chromiumban, valamint webkomponenst eltérő weboldalról is ellenőriztünk.
 
-Helyi futtatásra SQLite is választható: `.env`-ben `DB_CONNECTION=sqlite`, `DB_DATABASE` egy meglévő üres SQLite-fájl abszolút útvonala, `APP_URL=http://localhost:8000`, `SESSION_SECURE_COOKIE=false`. Utána `php artisan raero:install` és:
+Helyi SQLite: a `.env` fájlban `DB_CONNECTION=sqlite`, `DB_DATABASE` egy meglévő üres SQLite-fájl abszolút útvonala, `APP_URL=http://localhost:8000`, `SESSION_SECURE_COOKIE=false`. Utána `php artisan raero:install`, majd:
 
 ```sh
 php -S localhost:8000 -t public public/index.php
 ```
 
-A beépített PHP-kiszolgáló fejlesztési eszköz; tárhelyen Apache/PHP szolgálja ki az alkalmazást.
-
-A párhuzamos foglalási próbán öt külön PHP-folyamat ugyanazt a MySQL/MariaDB-időpontot kérte: egy foglalás létrejött, négy ütközési hibát kapott. A tényleges Tárhely.eu telepítést a felhasználó végzi; azon a gépen még nem történt ellenőrzés.
+A beépített PHP-kiszolgáló csak fejlesztéshez való. A szolgáltatói dátummezőket magyarországi időzónájú böngészőben használd. A valódi tárhelyhez MySQL/MariaDB és HTTPS szükséges.

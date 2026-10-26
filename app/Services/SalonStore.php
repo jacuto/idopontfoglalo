@@ -60,7 +60,9 @@ class SalonStore
                 "Az adatbázis nincs előkészítve. Futtasd: php artisan raero:install",
             );
         }
-        return json_decode($row->data, true, 512, JSON_THROW_ON_ERROR);
+        return Settings::upgrade(
+            json_decode($row->data, true, 512, JSON_THROW_ON_ERROR),
+        );
     }
     public function mutate(callable $callback): mixed
     {
@@ -73,7 +75,9 @@ class SalonStore
             if (!$row) {
                 throw new \RuntimeException("Hiányzik a szalon kezdeti adata.");
             }
-            $state = json_decode($row->data, true, 512, JSON_THROW_ON_ERROR);
+            $state = Settings::upgrade(
+                json_decode($row->data, true, 512, JSON_THROW_ON_ERROR),
+            );
             $result = $callback($state);
             DB::table("salon_state")
                 ->where("id", 1)

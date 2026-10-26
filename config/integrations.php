@@ -1,0 +1,33 @@
+<?php
+return [
+    "path" => storage_path("app/private/connections.enc"),
+    "connections" => [
+        "smtp_host" => env("MAIL_HOST"),
+        "smtp_port" => env("MAIL_PORT", 587),
+        "smtp_username" => env("MAIL_USERNAME"),
+        "smtp_password" => env("MAIL_PASSWORD"),
+        "mail_from" => env("MAIL_FROM_ADDRESS"),
+        "mail_name" => env("MAIL_FROM_NAME", "Ráérő"),
+        "billingo_key" => env("BILLINGO_API_KEY"),
+        "billingo_block" => env("BILLINGO_BLOCK_ID"),
+        "szamlazz_key" => env("SZAMLAZZ_AGENT_KEY"),
+        "stripe_key" => env("STRIPE_SECRET_KEY"),
+        "stripe_webhook_secret" => env("STRIPE_WEBHOOK_SECRET"),
+        "stripe_price_id" => env("STRIPE_PRICE_ID"),
+        "twilio_sid" => env("TWILIO_ACCOUNT_SID"),
+        "twilio_token" => env("TWILIO_AUTH_TOKEN"),
+        "twilio_from" => env("TWILIO_FROM"),
+        "google_client_id" => env("GOOGLE_CLIENT_ID"),
+        "google_client_secret" => env("GOOGLE_CLIENT_SECRET"),
+        "facebook_client_id" => env("FACEBOOK_CLIENT_ID"),
+        "facebook_client_secret" => env("FACEBOOK_CLIENT_SECRET"),
+        "admin_google_emails" => env("ADMIN_GOOGLE_EMAILS", ""),
+        "admin_facebook_ids" => env("ADMIN_FACEBOOK_IDS", ""),
+    ],
+    "facebook_version" => env("FACEBOOK_GRAPH_VERSION", "v23.0"),
+    "platform_stripe" => [
+        "key" => env("PLATFORM_STRIPE_SECRET_KEY"),
+        "price" => env("PLATFORM_STRIPE_PRICE_ID"),
+        "webhook_secret" => env("PLATFORM_STRIPE_WEBHOOK_SECRET"),
+    ],
+];
