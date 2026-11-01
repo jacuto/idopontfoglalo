@@ -18,6 +18,15 @@ class FeaturesTest extends TestCase {
   DB::table('guest_accounts')->insertOrIgnore(['id'=>$id,'name'=>'Vendég','email'=>'guest@example.com','email_verified'=>true,'provider'=>'google','subject'=>(string)$id,'created_at'=>now(),'updated_at'=>now()]);
   $this->withSession(['guest_id'=>$id,'admin'=>false]);
  }
+ public function test_guest_account_loads_without_avatar_column_during_upgrade():void {
+  $this->guest();
+  \Illuminate\Support\Facades\Schema::table('guest_accounts', fn($table) => $table->dropColumn('avatar'));
+  try {
+   $this->getJson('/api/guest')->assertOk()->assertJsonPath('id',10)->assertJsonPath('avatar',null)->assertJsonCount(0,'bookings');
+  } finally {
+   \Illuminate\Support\Facades\Schema::table('guest_accounts', fn($table) => $table->string('avatar')->nullable());
+  }
+ }
  public function test_imported_client_search_is_normalized_and_scoped():void {
   $this->provider();$this->postJson('/api/imports/clients',['records'=>[['id'=>'imported','name'=>'Kiss Anna','phone'=>'+36 30 123-4567','email'=>'anna@example.com']]])->assertOk();
   $this->getJson('/api/clients/search?q=12')->assertExactJson([]);

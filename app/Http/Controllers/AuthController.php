@@ -243,7 +243,7 @@ class AuthController
                 return collect($s['clients'])->contains(fn($c) => (int) ($c['guestId'] ?? 0) === (int) $account->id) || collect($s['bookings'])->contains(fn($b) => (int) ($b['guestId'] ?? 0) === (int) $account->id);
             })->map(fn($row) => ['id' => $row->id, 'name' => json_decode($row->data, true)['settings']['name']])->values(),
             "id" => $account->id,
-            "avatar" => $account->avatar ? "/api/guest/avatar/" . $account->id : null,
+            "avatar" => !empty($account->avatar) ? "/api/guest/avatar/" . $account->id : null,
             "name" => $account->name,
             "email" => $account->contact_email ?? $account->email,
             "phone" => $account->phone ?? "",
