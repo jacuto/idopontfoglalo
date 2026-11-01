@@ -134,7 +134,7 @@ class AuthController
                 $user = Http::timeout(15)
                     ->withToken($token["access_token"])
                     ->get($base . "/me", [
-                        "fields" => "id,name,email",
+                        "fields" => "id,name,email,picture.type(large)",
                         "appsecret_proof" => hash_hmac(
                             "sha256",
                             $token["access_token"],
@@ -216,6 +216,8 @@ class AuthController
             }
             $r->session()->regenerate();
             $r->session()->put("guest_id", $account->id);
+            $picture = $provider === 'google' ? ($user['picture'] ?? null) : (empty($user['picture']['data']['is_silhouette']) ? ($user['picture']['data']['url'] ?? null) : null);
+            app(\App\Services\SocialAvatar::class)->import((int) $account->id, $provider, $picture);
             $tenant = app(\App\Services\Tenant::class)->id;
             if (($saved['returnTo'] ?? null) === 'booking') return redirect('/foglalas?provider=' . $tenant . '#public-form');
             if (in_array($saved['returnTo'] ?? null, ['messages', 'operatorMessages'], true)) return redirect('/uzenetek?provider=' . $tenant . ($saved['returnTo'] === 'operatorMessages' ? '&platformMessages=1' : ''));

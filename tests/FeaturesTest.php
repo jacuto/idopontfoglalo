@@ -360,4 +360,47 @@ class FeaturesTest extends TestCase {
   $this->getJson('/api/guest?provider=2')->assertJsonCount(2,'allBookings')->assertJsonPath('bookings.0.id',$two['id']);
   $this->withSession(['guest_id'=>null]);$this->getJson('/api/guest')->assertUnauthorized();
  }
+ public function test_social_login_imports_google_and_facebook_photos_privately():void {
+  Storage::fake('local');
+  app(\App\Services\Connections::class)->save(['google_client_id'=>'client','google_client_secret'=>'secret','facebook_client_id'=>'client','facebook_client_secret'=>'secret']);
+  $png=base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aY1cAAAAASUVORK5CYII=');
+  \Illuminate\Support\Facades\Http::preventStrayRequests();
+  \Illuminate\Support\Facades\Http::fake([
+   'oauth2.googleapis.com/*'=>\Illuminate\Support\Facades\Http::response(['access_token'=>'token']),
+   'openidconnect.googleapis.com/*'=>\Illuminate\Support\Facades\Http::response(['sub'=>'google-photo','name'=>'Képes Vendég','picture'=>'https://lh3.googleusercontent.com/test-photo']),
+   'graph.facebook.com/*/oauth/access_token'=>\Illuminate\Support\Facades\Http::response(['access_token'=>'token']),
+   'graph.facebook.com/*/me*'=>\Illuminate\Support\Facades\Http::response(['id'=>'facebook-photo','name'=>'Képes Vendég','picture'=>['data'=>['url'=>'https://example.fbcdn.net/test-photo','is_silhouette'=>false]]]),
+   'lh3.googleusercontent.com/*'=>\Illuminate\Support\Facades\Http::response($png,200,['Content-Type'=>'image/png']),
+   'example.fbcdn.net/*'=>\Illuminate\Support\Facades\Http::response($png,200,['Content-Type'=>'image/png']),
+  ]);
+  foreach(['google','facebook'] as $social){
+   $r=$this->get('/auth/'.$social);parse_str(parse_url($r->headers->get('Location'),PHP_URL_QUERY),$q);
+   $this->get('/auth/'.$social.'/callback?state='.$q['state'].'&code=code')->assertRedirect('/fiokom');
+   $guest=$this->getJson('/api/guest')->assertOk()->json();
+   $this->assertSame('/api/guest/avatar/'.$guest['id'],$guest['avatar']);
+   $path=DB::table('guest_accounts')->where('id',$guest['id'])->value('avatar');Storage::disk('local')->assertExists($path);
+   $this->assertSame($png,Storage::disk('local')->get($path));$this->get($guest['avatar'])->assertOk();
+  }
+  $this->withSession(['guest_id'=>null]);$this->get($guest['avatar'])->assertNotFound();
+ }
+ public function test_social_avatar_never_overwrites_uploaded_picture_or_fetches_untrusted_urls():void {
+  Storage::fake('local');$this->guest();\Illuminate\Support\Facades\Http::fake();
+  $service=app(\App\Services\SocialAvatar::class);
+  foreach(['http://lh3.googleusercontent.com/a','https://127.0.0.1/a','https://lh3.googleusercontent.com.evil.invalid/a','https://user:pass@lh3.googleusercontent.com/a','https://lh3.googleusercontent.com:8080/a'] as $url)$service->import(10,'google',$url);
+  DB::table('guest_accounts')->where('id',10)->update(['avatar'=>'avatars/own.png']);Storage::disk('local')->put('avatars/own.png','own');
+  $service->import(10,'google','https://lh3.googleusercontent.com/photo');
+  \Illuminate\Support\Facades\Http::assertNothingSent();$this->assertSame('avatars/own.png',DB::table('guest_accounts')->where('id',10)->value('avatar'));Storage::disk('local')->assertExists('avatars/own.png');
+ }
+ public function test_social_avatar_rejects_invalid_large_or_redirecting_images_and_network_failure():void {
+  Storage::fake('local');$this->guest();
+  $responses=[\Illuminate\Support\Facades\Http::response('<svg></svg>',200),\Illuminate\Support\Facades\Http::response(str_repeat('x',2097153),200),\Illuminate\Support\Facades\Http::response('',302,['Location'=>'http://127.0.0.1/private'])];
+  \Illuminate\Support\Facades\Http::fake(function()use(&$responses){if(!$responses)throw new \Illuminate\Http\Client\ConnectionException('Unavailable');return array_shift($responses);});
+  for($i=0;$i<3;$i++){
+   app(\App\Services\SocialAvatar::class)->import(10,'google','https://lh3.googleusercontent.com/photo');
+   $this->assertNull(DB::table('guest_accounts')->where('id',10)->value('avatar'));
+  }
+  app(\App\Services\SocialAvatar::class)->import(10,'google','https://lh3.googleusercontent.com/photo');
+  $this->getJson('/api/guest')->assertOk()->assertJsonPath('avatar',null);
+  $this->assertSame([],Storage::disk('local')->allFiles('avatars'));
+ }
 }

@@ -85,3 +85,9 @@ Ellenőrzés: JavaScript szintaxis; a meglévő `tests/refinements.cjs` böngés
 - Értékelés a megfelelő szolgáltatóhoz küldve; üzenetértesítések külön, megnevezett címzetthez tartozó beszélgetési oldalon.
 
 Ellenőrzés: teljes PHPUnit SQLite-csomag 72 teszt, 418 ellenőrzés, 2 kihagyott InnoDB-párhuzamossági teszt. Az új tesztek Google- és Facebook-kapcsolatot szimulálva ellenőrzik a biztonságos visszairányítást, a saját elérhetőségek megőrzését és más vendégek adatainak kizárását a több szolgáltatós előzményekből. A `tests/guest-flow.cjs` Playwright-ellenőrzés szimulált közösségi belépéssel vizsgálja a visszatérést, az űrlap visszaállítását, az automatikus kitöltést, a telefonszám megjegyzését, a több szolgáltatós listát, a megfelelő szolgáltatóhoz küldött értékelést, a külön üzenetoldalt és a mobilos szélességet. A valódi külső Google-/Facebook-hitelesítést ez a teszt nem végzi el.
+
+## Közösségi profilkép
+
+Google- és Facebook-belépéskor az átadott profilkép is elmenthető, ha a fióknak még nincs képe. Saját feltöltést nem ír felül, képhiba esetén a belépés folytatódik. A helyben tárolt képet továbbra is csak a vendég és a hozzá kapcsolódó, jogosult szolgáltató láthatja. Nincs új migráció vagy `.env`-változó.
+
+Új tesztek: mindkét közösségi szolgáltató képadatának feldolgozása szimulált HTTP-válaszokkal, privát képmegjelenítés, meglévő feltöltés megőrzése, nem engedélyezett képcímek kizárása, hibás/túl nagy kép és átirányítás elutasítása, hálózati hiba melletti fiókbetöltés. Valós külső fiókkal történő belépés és képletöltés nincs éles környezeten tesztelve.
