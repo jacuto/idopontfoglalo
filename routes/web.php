@@ -22,6 +22,7 @@ Route::get("/auth/{provider}", [
     \App\Http\Controllers\AuthController::class,
     "start",
 ])->whereIn("provider", ["google", "facebook"]);
+Route::match(["GET", "PUT"], "/api/availability", [\App\Http\Controllers\AvailabilityController::class, "handle"])->middleware(ApiHeaders::class);
 Route::view("/fiokom", "app");
 Route::view("/uzenetek", "app");
 Route::view("/foadmin", "app");

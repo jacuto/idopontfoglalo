@@ -15,7 +15,7 @@ const base=process.env.RAERO_TEST_URL || 'http://127.0.0.1:8088';
  await page.locator('[name=phone]').press('Escape');assert.equal(await page.locator('#modal').isVisible(),false);await page.getByRole('button',{name:'＋ Új időpont'}).click();
  await name.fill('Import');await page.locator('#client-results [role=option]').first().waitFor();await name.press('ArrowUp');await name.press('Enter');assert.equal(await page.locator('[name=clientId]').inputValue(),'import-browser2');
  await page.getByRole('button',{name:'Mégse',exact:true}).click();
- await page.locator('[data-nav=clients]').click();await page.getByRole('button',{name:'Adatlap',exact:true}).first().click();await page.getByRole('heading',{name:'Importált Anna',exact:true}).waitFor();
+ await page.locator('[data-nav=clients]').click();await page.locator('#client-rows a[href^="#vendeg-"]').first().click();await page.getByRole('heading',{name:'Importált Anna',exact:true}).waitFor();
  await page.getByRole('button',{name:'Bezárás',exact:true}).click();
  await page.setViewportSize({width:390,height:844});await page.locator('[data-nav=calendar]').click();await page.getByRole('button',{name:'＋ Új időpont'}).waitFor();
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));

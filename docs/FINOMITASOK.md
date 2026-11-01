@@ -68,9 +68,9 @@ A gombokhoz alkalmazásazonosító és titkos alkalmazáskulcs kell, nem személ
 
 A korábbi [FRISSITES.md](../FRISSITES.md) adatmegőrző lépései érvényesek. Minden programfájlt, köztük a `public/refinements.js` fájlt is másold át, majd futtasd a `php artisan raero:upgrade` parancsot. Az új migráció nullable kapcsolattartási és tranzakció-metaadatmezőket ad hozzá; nem töröl korábbi adatot, és nem változtatja meg az APP_KEY-t vagy a feltöltéseket. A havi díjtételek a meglévő vállalkozási adatállapotban tárolódnak.
 
-## Naptár: pontosabb célzás és képernyőhöz igazítás
+## Naptár: pontosabb célzás és olvasható idősávok
 
-A napi és heti naptár alapnézete a képernyőn rendelkezésre álló magassághoz igazodik. A **Nagyobb idősávok** gomb visszakapcsolja a részletes, görgethető nézetet. Nagyon kis képernyőn vagy szokatlanul hosszú napnál továbbra is szükség lehet görgetésre. A havi nézet változatlanul elérhető.
+A napi és heti naptár megőrzi a könnyen eltalálható idősávokat; a teljes napot nem zsugorítja egy képernyőre. A látható naptárterület magassága a képernyőhöz igazodik, benne függőlegesen lehet görgetni. Mobilon napi nézet az alapértelmezés, a normál félórás sáv 48 px magas. A **Tágas idősávok** gombbal tovább növelhető a méret, a **Normál idősávok** gombbal visszaállítható. A havi nézet változatlanul elérhető.
 
 A napokat erősebb oszlopvonalak, az órákat váltakozó háttér és hangsúlyosabb egészórás vonalak választják el. Egérmozgatáskor a teljes naposzlop és az idősáv sora együtt színeződik, a metszéspont külön keretet kap. A kiemelt dátum és időtartomány szövegesen is látható a naptár felett. A billentyűzettel fókuszált idősáv is kiemelést kap. A percre pontos nyitás/zárás megmarad; a részórás nyitást követő sávok egész és fél óráknál kezdődnek.
 
@@ -91,3 +91,15 @@ Ellenőrzés: teljes PHPUnit SQLite-csomag 72 teszt, 418 ellenőrzés, 2 kihagyo
 Google- és Facebook-belépéskor az átadott profilkép is elmenthető, ha a fióknak még nincs képe. Saját feltöltést nem ír felül, képhiba esetén a belépés folytatódik. A helyben tárolt képet továbbra is csak a vendég és a hozzá kapcsolódó, jogosult szolgáltató láthatja. Nincs új migráció vagy `.env`-változó.
 
 Új tesztek: mindkét közösségi szolgáltató képadatának feldolgozása szimulált HTTP-válaszokkal, privát képmegjelenítés, meglévő feltöltés megőrzése, nem engedélyezett képcímek kizárása, hibás/túl nagy kép és átirányítás elutasítása, hálózati hiba melletti fiókbetöltés. Valós külső fiókkal történő belépés és képletöltés nincs éles környezeten tesztelve.
+
+## Listák, naptár és kivételes időbeosztás
+
+- Foglalási események: a névre kattintva a foglalás részletei nyílnak meg. A külön Részletek gomb és a kiírt telefonszám megszűnt; a sor végén Üzenet és Hívás akció van.
+- Vendégek: az adatlap a névre kattintva nyílik meg, nincs ismételt Adatlap gomb. Szerkeszt és Üzenet gomb, valamint feliratozott X eltávolítás érhető el; a telefonszám gombként hívható. A gombok között térköz van. Az eltávolítás továbbra is csak a saját nyilvántartásra vonatkozik.
+- A naptár nem zsugorítja olvashatatlanra a napot. Normál és tágas idősávok választhatók. Mobilon napi nézet, a naptárhoz igazított fejléc és normál félórás sávonként 48 px méret segíti a használatot. Az összesítők egy sorban, értékkel együtt jelennek meg.
+- A bevételi diagram teljes időtartománya elfér vízszintes csúszka nélkül. A napi összegek táblázata kihagyja a nulla összegű napokat; a diagram ezeknél is mutatja a folytonos időtávot.
+- Beállításfülek: Alapvető beállítások, Kuponok és bérletek, Nyilvános adatlap, Integrációk.
+- A szolgáltatás kiválasztásakor megjelenő dátum alapból ma, a nyilvános oldalon és a beágyazható modulban is. Az időpontot továbbra is a vendég választja ki.
+- Napi nyitvatartási kivételek, teljes vagy részleges szabadság, munkatársra vagy egész vállalkozásra vonatkozó kieső idő és heti ismétlődő ebédszünet. Részletes használat: [IDOBEOSZTAS.md](IDOBEOSZTAS.md).
+
+Ellenőrzés: a teljes PHPUnit-csomag MariaDB 11.4-en 78 teszt, 484 ellenőrzés, kihagyás nélkül; SQLite-on 78 teszt, 473 ellenőrzés, 2 kihagyott InnoDB-párhuzamossági teszttel. Az új tesztek a percre pontos, kibővített nyitvatartást, zárt napot, szüneten átnyúló foglalást, szünet pontos határait, munkatársankénti kiesést, többnapos szabadságot, adatelkülönítést, validálást és a meglévő foglalások megőrzését vizsgálják. A `tests/usability.cjs`, `tests/calendar.cjs`, `tests/refinements.cjs` és `tests/guest-flow.cjs` böngészős ellenőrzések sikeresek. A tesztek külön adatbázison és mesterséges helyi adatokkal futottak; az éles tárhelyhez és adatokhoz nem nyúltunk.

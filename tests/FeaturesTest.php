@@ -403,4 +403,40 @@ class FeaturesTest extends TestCase {
   $this->getJson('/api/guest')->assertOk()->assertJsonPath('avatar',null);
   $this->assertSame([],Storage::disk('local')->allFiles('avatars'));
  }
+ private function availability():array {return \App\Services\Availability::defaults();}
+ public function test_exceptional_opening_hours_extend_slots_and_closed_days_reject_api_bookings():void {
+  $this->provider();$a=$this->availability();$a['overrides']=[['date'=>'2035-03-12','closed'=>false,'openingTime'=>'06:17','closingTime'=>'22:43']];
+  $this->putJson('/api/availability',$a)->assertOk()->assertJsonCount(0,'conflicts');
+  $this->getJson('/api/slots?date=2035-03-12&services=cut&staff=anna')->assertOk()->assertJsonPath('0.time','06:17');
+  $this->postJson('/api/bookings',$this->booking(['start'=>'2035-03-12T06:17:00+01:00']))->assertCreated();
+  $a['overrides'][]=['date'=>'2035-03-13','closed'=>true,'openingTime'=>'08:00','closingTime'=>'20:00'];$this->putJson('/api/availability',$a)->assertOk();
+  $this->getJson('/api/slots?date=2035-03-13&services=cut&staff=anna')->assertExactJson([]);
+  $this->postJson('/api/bookings',$this->booking(['start'=>'2035-03-13T09:00:00+01:00']))->assertUnprocessable();
+  $this->getJson('/api/public')->assertJsonMissingPath('availability');
+ }
+ public function test_lunch_specific_staff_blocks_and_holidays_apply_to_entire_booking_with_exact_boundaries():void {
+  $this->provider();$a=$this->availability();$a['lunch']=['enabled'=>true,'from'=>'12:10','to'=>'12:50','weekdays'=>[1,2,3,4,5,6,7],'staffId'=>null];
+  $a['blocks']=[['id'=>(string)\Illuminate\Support\Str::uuid(),'fromDate'=>'2035-03-12','toDate'=>'2035-03-12','fromTime'=>'13:00','toTime'=>'14:00','allDay'=>false,'staffId'=>'anna','label'=>'Ügyintézés'],['id'=>(string)\Illuminate\Support\Str::uuid(),'fromDate'=>'2035-03-13','toDate'=>'2035-03-15','fromTime'=>'00:00','toTime'=>'23:59','allDay'=>true,'staffId'=>null,'label'=>'Szabadság']];
+  $this->putJson('/api/availability',$a)->assertOk();
+  $this->postJson('/api/bookings',$this->booking(['start'=>'2035-03-12T11:50:00+01:00']))->assertUnprocessable();
+  $this->postJson('/api/bookings',$this->booking(['start'=>'2035-03-12T11:25:00+01:00']))->assertCreated();
+  $this->postJson('/api/bookings',$this->booking(['start'=>'2035-03-12T13:00:00+01:00']))->assertUnprocessable();
+  $this->postJson('/api/bookings',$this->booking(['start'=>'2035-03-12T13:00:00+01:00','staff'=>'eszter','services'=>['massage']]))->assertCreated();
+  $this->postJson('/api/bookings',$this->booking(['start'=>'2035-03-12T14:00:00+01:00']))->assertCreated();
+  $this->getJson('/api/slots?date=2035-03-14&services=cut&staff=anna')->assertExactJson([]);
+  $this->provider(2);$this->postJson('/api/bookings?provider=2',$this->booking(['start'=>'2035-03-14T09:00:00+01:00']))->assertCreated();
+ }
+ public function test_availability_is_private_scoped_validated_and_preserves_existing_conflicting_bookings():void {
+  $this->getJson('/api/availability')->assertUnauthorized();$this->putJson('/api/availability',$this->availability())->assertUnauthorized();
+  $this->provider();$b=$this->postJson('/api/bookings',$this->booking())->assertCreated()->json();
+  $a=$this->availability();$a['overrides']=[['date'=>'2035-03-12','closed'=>true,'openingTime'=>'08:00','closingTime'=>'20:00']];
+  $this->putJson('/api/availability',$a)->assertOk()->assertJsonPath('conflicts.0.id',$b['id']);
+  $this->getJson('/api/state')->assertJsonCount(1,'bookings')->assertJsonPath('bookings.0.id',$b['id']);
+  $this->getJson('/api/availability?provider=2')->assertForbidden();$this->putJson('/api/availability?provider=2',$a)->assertForbidden();
+  $bad=$a;$bad['overrides'][0]['closed']=false;$bad['overrides'][0]['openingTime']='21:00';$this->putJson('/api/availability',$bad)->assertUnprocessable();
+  $bad=$a;$bad['overrides'][]=$bad['overrides'][0];$this->putJson('/api/availability',$bad)->assertUnprocessable();
+  $bad=$a;$bad['lunch']['enabled']=true;$bad['lunch']['staffId']='foreign-staff';$this->putJson('/api/availability',$bad)->assertUnprocessable();
+  $this->getJson('/api/availability')->assertJsonPath('overrides.0.closed',true);
+  $this->provider(2);$this->getJson('/api/availability?provider=2')->assertJsonCount(0,'overrides');
+ }
 }

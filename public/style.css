@@ -1489,3 +1489,40 @@ body:has(.calendar-card) .intro p,body:has(.calendar-card) .intro .eyebrow{displ
 @media(max-width:650px){.calendar-view-options{align-items:flex-start;gap:8px}.calendar-view-options span{font-size:11px}.calendar-tools{padding:8px}.calendar-scroll{max-height:calc(100dvh - 240px)}}
 .calendar-dense .time-rail .half-hour{visibility:hidden}
 .calendar-dense .time-rail .guided-time{visibility:visible;z-index:1}
+
+/* Napi használat: egyszerű akciók és nagy, eltalálható naptárrács. */
+.table-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;min-width:150px}
+.call-action{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:36px;padding:7px 11px;border:1px solid #a8c4b9;border-radius:8px;color:#125c48;background:#edf7f2;text-decoration:none;white-space:nowrap;font-weight:600}
+.call-action:hover{background:#d5eddf}.remove-client{font-size:22px;line-height:1;min-width:36px;min-height:36px;padding:6px}
+.calendar-summary{gap:8px;margin-bottom:8px}
+.calendar-summary .stat{min-height:0;padding:7px 12px;display:flex;align-items:center;justify-content:center;border-radius:9px}
+.calendar-summary .stat>div:first-child{display:flex;align-items:center;gap:8px;flex-wrap:nowrap}
+.calendar-summary .stat small{font-size:12px;white-space:nowrap}.calendar-summary .stat strong{font-size:18px;line-height:1.2;margin:0;white-space:nowrap}
+.calendar-summary .symbol,.calendar-summary .stat em{display:none}
+body:has(.calendar-card) .intro{margin:10px 0}body:has(.calendar-card) .intro h1{font-size:22px}
+body:has(.calendar-card) .topbar{height:auto;min-height:42px;padding:0 0 8px}
+body:has(.calendar-card) .sample-banner{padding:5px 10px;margin:5px 0;font-size:11px}
+.calendar-view-options{flex-wrap:wrap;gap:6px}.calendar-view-options #calendar-guide{font-size:11px}
+.calendar-view-options button{min-height:32px}.calendar-scroll{touch-action:pan-x pan-y;scrollbar-gutter:stable}
+.day-hours{display:inline-flex;align-items:center;justify-content:center;padding:0;min-width:30px;height:26px;margin-top:2px;background:transparent;border-color:#aec2d0;color:#234c68}
+.day-track .time-slot{min-height:0}.time-slot:disabled{opacity:1;cursor:not-allowed;background:#a8b5c126}
+.calendar-block{position:absolute;left:0;right:0;z-index:1;pointer-events:none;background:repeating-linear-gradient(135deg,#d0d9e5a6,#d0d9e5a6 5px,#e8edf3bf 5px,#e8edf3bf 10px);border-block:1px solid #8295a9;overflow:hidden}
+.calendar-block span{display:block;font-size:10px;font-weight:600;color:#344c62;padding:2px 4px}
+.trend-scroll{overflow:hidden}.revenue-trend{width:100%;min-width:0!important;height:auto;max-height:280px}
+.settings-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.settings-tabs button{min-height:40px}.settings-tabs .selected{background:#16664f;color:white;border-color:#16664f}.settings-help{margin-bottom:16px}.settings-layout{display:block}.settings-layout>.card{margin-bottom:16px}.settings-layout>.card[hidden]{display:none!important}
+.availability-section{border-top:1px solid #d1dfe7;padding-top:16px;margin-top:20px}.availability-section h3{margin-bottom:12px}.availability-section button.primary{margin-top:10px}.weekday-checks{display:flex;gap:6px 14px;flex-wrap:wrap}.availability-entry{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #d9e3ec;font-size:12px}.availability-block-list{max-height:240px;overflow:auto;margin-top:12px}
+@media(max-width:650px){
+ body:has(.calendar-card) .sidebar{padding:5px 8px;position:static}
+ body:has(.calendar-card) .sidebar .profile,body:has(.calendar-card) .sidebar>.brand,body:has(.calendar-card) .topbar{display:none}
+ body:has(.calendar-card) main{padding:8px}
+ body:has(.calendar-card) .intro{margin:3px 0 7px}body:has(.calendar-card) .intro h1{font-size:18px}
+ body:has(.calendar-card) .intro .primary{min-height:40px;padding:8px 12px}
+ .calendar-summary{gap:4px;margin-bottom:6px}.calendar-summary .stat{padding:6px 3px;min-height:32px}.calendar-summary .stat>div:first-child{gap:4px}.calendar-summary .stat small{font-size:9px}.calendar-summary .stat strong{font-size:13px}
+ .calendar-tools{gap:5px;padding:6px}.calendar-tools h3{font-size:14px}.calendar-tools .row{gap:4px}.calendar-tools .row button{padding:5px 10px;min-height:34px}.calendar-tools select{max-width:150px}.calendar-view-options #calendar-guide{flex-basis:100%;line-height:1.2}.calendar-view-options button{font-size:10px;padding:4px 7px}
+ .timeline{grid-template-columns:48px repeat(var(--cols),minmax(135px,1fr));min-width:calc(48px + var(--cols)*135px)}
+ .time-rail span{font-size:11px}.calendar-event{font-size:12px}.calendar-fit .calendar-event{padding:4px;line-height:17px}.calendar-fit .calendar-event span{line-height:15px;font-size:11px}
+ .settings-tabs{gap:5px}.settings-tabs button{font-size:12px;padding:8px}.table-actions{gap:8px}.legend{font-size:9px;padding:6px}
+}
+@media(max-width:650px){body:has(.calendar-card) .sidebar nav button{padding:7px;font-size:11px}body:has(.calendar-card) .sidebar{padding-block:4px}}
+@media(max-width:650px){.calendar-view-options #calendar-guide{display:none}.timeline-heading{padding:4px}.timeline-heading strong{display:inline-block;margin:0 6px;font-size:16px}.day-hours{margin:0;vertical-align:middle}}
+.calendar-summary .stat>div:first-child{min-width:0;max-width:100%}.calendar-summary .stat small{min-width:0;overflow:hidden;text-overflow:ellipsis}.calendar-summary .stat strong{flex-shrink:0}

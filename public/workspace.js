@@ -69,7 +69,7 @@ function render() {
       )
       .join(
         "",
-      )}</nav><button class="profile" onclick="view='settings';render()" aria-label="Vállalkozás beállításai"><div class="avatar">${esc(initials(state.settings.name))}</div><div><strong>${esc(state.settings.name)}</strong><small>Beállítások megnyitása</small></div></button></aside><main><header class="topbar"><div class="crumb">Munkaterület / <b>${labels[view] || ({offers:"Kuponok és bérletek",profile:"Nyilvános adatlap"}[view])}</b></div><div class="top-actions"><button onclick="window.open('/foglalas?provider='+providerId(),'_blank')">↗ Foglalási oldalam</button><button onclick="logout()">Kilépés</button></div></header><div class="intro"><div><span class="eyebrow">${view === "calendar" ? "A NAPOD, ÁTLÁTHATÓAN" : "RÁÉRŐ MUNKATÉR"}</span><h1>${view === "calendar" ? "Minden időpont a helyén." : (labels[view] || ({offers:"Kuponok és bérletek",profile:"Nyilvános adatlap"}[view]))}</h1><p>${view === "calendar" ? "Kevesebb szervezés. Több idő a vendégeidre." : "Minden fontos adat, egy helyen."}</p></div>${["calendar", "clients", "services", "staff"].includes(view) ? `<button class="primary" onclick="${{ calendar: "bookingForm()", clients: "clientForm()", services: "serviceForm()", staff: "staffForm()" }[view]}">＋ ${view === "calendar" ? "Új időpont" : view === "clients" ? "Új vendég" : view === "services" ? "Új szolgáltatás" : "Új munkatárs"}</button>` : ""}</div><div id="content"></div></main></div>`;
+      )}</nav><button class="profile" onclick="view='settings';render()" aria-label="Vállalkozás beállításai"><div class="avatar">${esc(initials(state.settings.name))}</div><div><strong>${esc(state.settings.name)}</strong><small>Beállítások megnyitása</small></div></button></aside><main><header class="topbar"><div class="crumb">Munkaterület / <b>${labels[view] || ({offers:"Kuponok és bérletek",profile:"Nyilvános adatlap"}[view])}</b></div><div class="top-actions"><button onclick="window.open('/foglalas?provider='+providerId(),'_blank')">↗ Foglalási oldalam</button><button onclick="logout()">Kilépés</button></div></header><div class="intro"><div><span class="eyebrow">${view === "calendar" ? "A NAPOD, ÁTLÁTHATÓAN" : "RÁÉRŐ MUNKATÉR"}</span><h1>${view === "calendar" ? "Naptár" : (labels[view] || ({offers:"Kuponok és bérletek",profile:"Nyilvános adatlap"}[view]))}</h1><p>${view === "calendar" ? "Kevesebb szervezés. Több idő a vendégeidre." : "Minden fontos adat, egy helyen."}</p></div>${["calendar", "clients", "services", "staff"].includes(view) ? `<button class="primary" onclick="${{ calendar: "bookingForm()", clients: "clientForm()", services: "serviceForm()", staff: "staffForm()" }[view]}">＋ ${view === "calendar" ? "Új időpont" : view === "clients" ? "Új vendég" : view === "services" ? "Új szolgáltatás" : "Új munkatárs"}</button>` : ""}</div><div id="content"></div></main></div>`;
   document.querySelectorAll("[data-nav]").forEach(
     (b) =>
       (b.onclick = () => {
@@ -105,7 +105,7 @@ function calendarMove(direction) {
     );
   calendarPage();
 }
-let calendarDetailed = false;
+let calendarDetailed = false, calendarWasMobile = window.innerWidth < 650;
 function calendarPage() {
   const today = datekey(new Date()),
     active = state.bookings.filter(
@@ -179,7 +179,7 @@ function calendarPage() {
     return;
   }
   const tools = document.querySelector(".calendar-tools");
-  tools.insertAdjacentHTML("beforeend", `<div class="calendar-view-options"><button aria-pressed="${calendarDetailed}" onclick="calendarDetailed=!calendarDetailed;calendarPage()">${calendarDetailed ? "Képernyőhöz igazítás" : "Nagyobb idősávok"}</button><span id="calendar-guide" role="status">Mutass egy idősávra: a napot és az időt együtt kiemeljük.</span></div>`);
+  tools.insertAdjacentHTML("beforeend", `<div class="calendar-view-options"><button aria-pressed="${calendarDetailed}" onclick="calendarDetailed=!calendarDetailed;calendarPage()">${calendarDetailed ? "Normál idősávok" : "Tágas idősávok"}</button><button onclick="availabilityDialog(datekey(calendarAnchor))">Nyitvatartás és szünetek</button><span id="calendar-guide" role="status">Mutass egy idősávra: a napot és az időt együtt kiemeljük.</span></div>`);
   const dayKeys = days.map(datekey),
     visible = filtered.filter((b) =>
       dayKeys.includes(datekey(new Date(b.start))),
@@ -198,18 +198,20 @@ function calendarPage() {
   );
   const open = Math.min(
       timeMinutes(state.settings.openingTime || "08:00"),
+      ...days.map(d => calendarHours(datekey(d))[0]).filter(n => n !== null),
       ...starts,
     ),
     close = Math.max(
       timeMinutes(state.settings.closingTime || "20:00"),
+      ...days.map(d => calendarHours(datekey(d))[1]).filter(n => n !== null),
       ...ends,
     ),
-    scale = calendarDetailed ? 1.4 : Math.max(0.32, Math.min(1.4, (window.innerHeight - document.querySelector("#calendar-body").getBoundingClientRect().top - 95) / Math.max(1, close - open))),
+    scale = window.innerWidth < 650 ? (calendarDetailed ? 2 : 1.6) : (calendarDetailed ? 1.8 : 1.2),
     height = (close - open) * scale;
   const ticks = [];
   for (let m = open; m < close; m = (Math.floor(m / 30) + 1) * 30) ticks.push(m);
   $("#calendar-body").innerHTML =
-    `<div class="calendar-scroll ${calendarDetailed ? "calendar-detailed" : "calendar-fit"} ${scale < 0.42 ? "calendar-dense" : ""}"><div class="timeline" style="--cols:${days.length};--track-height:${height}px"><div class="timeline-heading"></div>${days.map((d) => `<div data-date="${datekey(d)}" class="timeline-heading ${datekey(d) === today ? "today" : ""}">${d.toLocaleDateString("hu-HU", { weekday: "short" })}<strong>${d.getDate()}</strong></div>`).join("")}<div class="time-rail">${ticks.map((m) => `<span data-minute="${m}" class="${m % 60 ? "half-hour" : "whole-hour"}" style="top:${(m - open) * scale}px">${minutesTime(m)}</span>`).join("")}</div>${days
+    `<div class="calendar-scroll ${calendarDetailed ? "calendar-detailed" : "calendar-fit"} ${scale < 0.42 ? "calendar-dense" : ""}"><div class="timeline" style="--cols:${days.length};--track-height:${height}px"><div class="timeline-heading"></div>${days.map((d) => `<div data-date="${datekey(d)}" class="timeline-heading ${datekey(d) === today ? "today" : ""}">${d.toLocaleDateString("hu-HU", { weekday: "short" })}<strong>${d.getDate()}</strong><button class="day-hours" aria-label="${datekey(d)} időbeosztása" onclick="availabilityDialog('${datekey(d)}')">⚙</button></div>`).join("")}<div class="time-rail">${ticks.map((m) => `<span data-minute="${m}" class="${m % 60 ? "half-hour" : "whole-hour"}" style="top:${(m - open) * scale}px">${minutesTime(m)}</span>`).join("")}</div>${days
       .map((d) => {
         const bookings = filtered
           .filter((b) => datekey(new Date(b.start)) === datekey(d))
@@ -228,9 +230,11 @@ function calendarPage() {
           return { b, start, duration, lane };
         });
         const lanes = Math.max(1, ends.length);
-        return `<div class="day-track" data-date="${datekey(d)}">${ticks.map((m, i) => `<button data-minute="${m}" class="time-slot ${m % 60 ? "" : "hour-start"} ${Math.floor(m / 60) % 2 ? "hour-shade" : ""}" aria-label="Időpont felvétele: ${datekey(d)} ${minutesTime(m)}" style="top:${(m - open) * scale}px;height:${((ticks[i + 1] ?? close) - m) * scale}px" onclick="bookingForm('${datekey(d)}T${minutesTime(m)}')"></button>`).join("")}${placed.map(({ b, start, duration, lane }) => `<button data-minute="${ticks.filter(m => m <= start).at(-1) ?? open}" class="calendar-event ${b.status === "pending" ? "pending" : ""}" style="top:${Math.max(0, start - open) * scale}px;height:${Math.max(calendarDetailed ? 24 : 14, Math.min(duration, close - start) * scale)}px;left:calc(${(lane / lanes) * 100}% + 3px);width:calc(${100 / lanes}% - 6px)" title="${esc(b.name + " · " + serviceNames(b))}" onclick="bookingDetails('${b.id}')"><strong>${new Date(b.start).toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" })} · ${esc(b.name)}</strong><span>${esc(serviceNames(b))}</span>${state.settings.businessMode !== "solo" ? `<small>${esc(state.staff.find((p) => p.id === b.staff)?.name || "")}</small>` : ""}</button>`).join("")}</div>`;
+        return `<div class="day-track" data-date="${datekey(d)}">${ticks.map((m, i) => `<button data-minute="${m}" class="time-slot ${calendarSlotBlocked(datekey(d), m) ? "unavailable" : ""} ${m % 60 ? "" : "hour-start"} ${Math.floor(m / 60) % 2 ? "hour-shade" : ""}" ${calendarSlotBlocked(datekey(d), m) ? 'disabled title="Nem foglalható idő"' : ""} aria-label="Időpont felvétele: ${datekey(d)} ${minutesTime(m)}" style="top:${(m - open) * scale}px;height:${((ticks[i + 1] ?? close) - m) * scale}px" onclick="bookingForm('${datekey(d)}T${minutesTime(m)}')"></button>`).join("")}${calendarBlockedBands(datekey(d), open, close, scale)}${placed.map(({ b, start, duration, lane }) => `<button data-minute="${ticks.filter(m => m <= start).at(-1) ?? open}" class="calendar-event ${b.status === "pending" ? "pending" : ""}" style="top:${Math.max(0, start - open) * scale}px;height:${Math.max(24, Math.min(duration, close - start) * scale)}px;left:calc(${(lane / lanes) * 100}% + 3px);width:calc(${100 / lanes}% - 6px)" title="${esc(b.name + " · " + serviceNames(b))}" onclick="bookingDetails('${b.id}')"><strong>${new Date(b.start).toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" })} · ${esc(b.name)}</strong><span>${esc(serviceNames(b))}</span>${state.settings.businessMode !== "solo" ? `<small>${esc(state.staff.find((p) => p.id === b.staff)?.name || "")}</small>` : ""}</button>`).join("")}</div>`;
       })
       .join("")}</div></div>`;
+  const scroller = document.querySelector(".calendar-scroll");
+  scroller.style.maxHeight = Math.max(180, window.innerHeight - scroller.getBoundingClientRect().top - 65) + "px";
   const grid = document.querySelector(".timeline");
   const clearGuide = () => {
     grid.querySelectorAll(".guided-day,.guided-time").forEach(el => el.classList.remove("guided-day", "guided-time"));
@@ -262,7 +266,7 @@ function calendarPage() {
 let calendarResizeTimer;
 window.addEventListener("resize", () => {
   clearTimeout(calendarResizeTimer);
-  calendarResizeTimer = setTimeout(() => { if (document.querySelector(".timeline") && !document.querySelector("dialog[open]")) calendarPage(); }, 150);
+  calendarResizeTimer = setTimeout(() => { const mobile = innerWidth < 650; if (mobile && !calendarWasMobile && calendarMode === "week") calendarMode = "day"; calendarWasMobile = mobile; if (document.querySelector(".timeline") && !document.querySelector("dialog[open]")) calendarPage(); }, 150);
 });
 function clientsPage() {
   $("#content").innerHTML =
@@ -277,7 +281,7 @@ function clientRows(query) {
       )
       .map(
         (c) =>
-          `<tr><td><a href="#vendeg-${c.id}" onclick="event.preventDefault();clientDetail('${c.id}')"><strong>${esc(c.name)}</strong></a></td><td>${phoneLink(c.phone)}</td><td>${esc(c.email) || "—"}</td><td><button onclick="clientDetail('${c.id}')">Adatlap</button><button onclick="clientForm('${c.id}')">Szerkesztés</button><button onclick="clientMessage('${c.id}')">Üzenet</button><button class="danger" onclick="removeClientForm('${c.id}')">Eltávolítás</button></td></tr>`,
+          `<tr><td><a href="#vendeg-${c.id}" onclick="event.preventDefault();clientDetail('${c.id}')"><strong>${esc(c.name)}</strong></a></td><td>${phoneAction(c.phone, c.phone)}</td><td>${esc(c.email) || "—"}</td><td><div class="table-actions"><button onclick="clientForm('${c.id}')">Szerkeszt</button><button onclick="clientMessage('${c.id}')">Üzenet</button><button class="danger remove-client" aria-label="${esc(c.name)} eltávolítása" title="Eltávolítás a saját listából" onclick="removeClientForm('${c.id}')">×</button></div></td></tr>`,
       )
       .join("") ||
     (query ? '<tr><td colspan="4">Nincs találat. Próbálj másik nevet vagy elérhetőséget, vagy válaszd az Új vendég gombot.</td></tr>' : '<tr><td colspan="4">Még nincs vendéged. Az Új vendég gombbal felveheted az elsőt, az Importálással pedig meglévő listát hozhatsz be.</td></tr>');
@@ -523,7 +527,7 @@ function activityPage() {
         )
         .map(
           (b) =>
-            `<tr><td>${bookingGuestLink(b)}<br>${phoneLink(bookingContact(b).phone)}</td><td>${new Date(b.start).toLocaleString("hu-HU")}</td><td>${(b.serviceSnapshot || []).map(s => `<a class="text-link" href="#szolgaltatas-${esc(s.id)}" onclick="event.preventDefault();serviceDetail('${esc(s.id)}')">${esc(s.name)}</a>`).join(" + ")}</td><td><span class="status ${b.status}">${statusName[b.status]}</span></td><td><button onclick="bookingDetails('${b.id}')">Részletek</button><button onclick="bookingMessage('${b.id}')">Üzenet</button></td></tr>`,
+            `<tr><td><a href="#foglalas-${esc(b.id)}" onclick="event.preventDefault();bookingDetails('${b.id}')"><strong>${esc(b.name)}</strong></a></td><td>${new Date(b.start).toLocaleString("hu-HU")}</td><td>${(b.serviceSnapshot || []).map(s => `<a class="text-link" href="#szolgaltatas-${esc(s.id)}" onclick="event.preventDefault();serviceDetail('${esc(s.id)}')">${esc(s.name)}</a>`).join(" + ")}</td><td><span class="status ${b.status}">${statusName[b.status]}</span></td><td><div class="table-actions"><button onclick="bookingMessage('${b.id}')">Üzenet</button>${phoneAction(bookingContact(b).phone, "Hívás")}</div></td></tr>`,
         )
         .join("") || '<tr><td colspan="5">Még nincs foglalás.</td></tr>'
     }</tbody></table></div>`;

@@ -63,9 +63,10 @@ test -f /home/digitmar/raero-frissites/artisan
 test -f /home/digitmar/raero-frissites/app/Services/Tenant.php
 test -f /home/digitmar/raero-frissites/public/features.js
 test -f /home/digitmar/raero-frissites/public/refinements.js
+test -f /home/digitmar/raero-frissites/public/availability.js
 ```
 
-Mind a négy parancsnak hiba nélkül kell lefutnia. Ezután:
+Mind az öt parancsnak hiba nélkül kell lefutnia. Ezután:
 
 ```sh
 cp -a /home/digitmar/raero-frissites/app /home/digitmar/idopontfoglalo-php/

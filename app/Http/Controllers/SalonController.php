@@ -726,14 +726,9 @@ class SalonController
         }
         $s = $this->store->read();
         $slots = [];
-        for (
-            $minute = \App\Services\Settings::minutes(
-                $s["settings"]["openingTime"],
-            );
-            $minute <
-            \App\Services\Settings::minutes($s["settings"]["closingTime"]);
-            $minute += 15
-        ) {
+        [$open, $close] = \App\Services\Availability::hours($s, $date);
+        if ($open === null) return [];
+        for ($minute = $open; $minute < $close; $minute += 15) {
             $start = $day->addMinutes($minute)->utc()->toISOString();
             foreach (\App\Services\Settings::activeStaff($s) as $p) {
                 if ($person && $person !== "any" && $p["id"] !== $person) {

@@ -13,6 +13,7 @@
     <script src="/app.js?v={{ filemtime(public_path('app.js')) }}" defer></script>
     <script src="/workspace.js?v={{ filemtime(public_path('workspace.js')) }}" defer></script>
     <script src="/features.js?v={{ filemtime(public_path('features.js')) }}" defer></script>
+    <script src="/availability.js?v={{ filemtime(public_path('availability.js')) }}" defer></script>
     <script src="/refinements.js?v={{ filemtime(public_path('refinements.js')) }}" defer></script>
   </body>
 </html>

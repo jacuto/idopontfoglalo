@@ -67,7 +67,7 @@
       ].map((e) => e.value);
     }
     update() {
-      this.shadowRoot.querySelector("[name=date]").value="";
+      if(!this.shadowRoot.querySelector("[name=date]").value)this.shadowRoot.querySelector("[name=date]").value=this.shadowRoot.querySelector("[name=date]").min;
       const ids = this.selected(),
         people = this.data.staff.filter((p) =>
           ids.every((id) =>

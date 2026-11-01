@@ -119,23 +119,7 @@ class BookingRules
                 "Múltbeli időpontra nem lehet foglalni.",
             );
         }
-        $minutes = $start->hour * 60 + $start->minute;
-        if (
-            $minutes <
-                Settings::minutes(
-                    $state["settings"]["openingTime"] ??
-                        sprintf("%02d:00", $state["settings"]["open"] ?? 8),
-                ) ||
-            $minutes + $duration >
-                Settings::minutes(
-                    $state["settings"]["closingTime"] ??
-                        sprintf("%02d:00", $state["settings"]["close"] ?? 20),
-                )
-        ) {
-            throw new InvalidArgumentException(
-                "Az időpont nem fér a nyitvatartásba.",
-            );
-        }
+        if (!$historical) Availability::validate($booking, $state, $duration);
         $ranges = $this->occupied($booking, $state);
         foreach ($state["bookings"] as $old) {
             if (
