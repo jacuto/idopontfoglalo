@@ -53,7 +53,7 @@ calendarPage=function(){if(state.subscription?.calendarBlocked){$('#content').in
 const formBeforeLock=bookingForm;
 bookingForm=function(dt){if(state.subscription?.calendarBlocked){view='billing';render();toast('A naptár használatához előbb rendezd a lejárt havi díjat.');return;}formBeforeLock(dt);};
 const renderBeforeSampleBanner=render;
-render=function(){renderBeforeSampleBanner();if(!isPublic&&state.sampleData&&$('.intro')){const banner=document.createElement('p');banner.className='notice sample-banner';banner.setAttribute('role','status');banner.textContent='Tesztpéldány · mesterséges mintaadatok, nem valódi befizetések.';$('.intro').before(banner);}};
+render=function(){renderBeforeSampleBanner();if(!isPublic&&state.sampleData&&$('.intro')){const banner=document.createElement('p');banner.className='notice sample-banner';banner.setAttribute('role','status');banner.textContent='Tesztpéldány · mesterséges mintaadatok, nem valódi befizetések.';$('.intro').before(banner);if(document.querySelector('.timeline'))calendarPage();}};
 // All extensions are registered before the first request renders a page.
 if(location.pathname==='/foadmin') platformPage();
 else if(manageToken) managePage();

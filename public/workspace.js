@@ -105,6 +105,7 @@ function calendarMove(direction) {
     );
   calendarPage();
 }
+let calendarDetailed = false;
 function calendarPage() {
   const today = datekey(new Date()),
     active = state.bookings.filter(
@@ -177,6 +178,8 @@ function calendarPage() {
       ).join("")}</div>`;
     return;
   }
+  const tools = document.querySelector(".calendar-tools");
+  tools.insertAdjacentHTML("beforeend", `<div class="calendar-view-options"><button aria-pressed="${calendarDetailed}" onclick="calendarDetailed=!calendarDetailed;calendarPage()">${calendarDetailed ? "Képernyőhöz igazítás" : "Nagyobb idősávok"}</button><span id="calendar-guide" role="status">Mutass egy idősávra: a napot és az időt együtt kiemeljük.</span></div>`);
   const dayKeys = days.map(datekey),
     visible = filtered.filter((b) =>
       dayKeys.includes(datekey(new Date(b.start))),
@@ -201,12 +204,12 @@ function calendarPage() {
       timeMinutes(state.settings.closingTime || "20:00"),
       ...ends,
     ),
-    scale = 1.4,
+    scale = calendarDetailed ? 1.4 : Math.max(0.32, Math.min(1.4, (window.innerHeight - document.querySelector("#calendar-body").getBoundingClientRect().top - 95) / Math.max(1, close - open))),
     height = (close - open) * scale;
   const ticks = [];
-  for (let m = open; m < close; m += 30) ticks.push(m);
+  for (let m = open; m < close; m = (Math.floor(m / 30) + 1) * 30) ticks.push(m);
   $("#calendar-body").innerHTML =
-    `<div class="calendar-scroll"><div class="timeline" style="--cols:${days.length};--track-height:${height}px"><div class="timeline-heading"></div>${days.map((d) => `<div class="timeline-heading ${datekey(d) === today ? "today" : ""}">${d.toLocaleDateString("hu-HU", { weekday: "short" })}<strong>${d.getDate()}</strong></div>`).join("")}<div class="time-rail">${ticks.map((m) => `<span style="top:${(m - open) * scale}px">${minutesTime(m)}</span>`).join("")}</div>${days
+    `<div class="calendar-scroll ${calendarDetailed ? "calendar-detailed" : "calendar-fit"} ${scale < 0.42 ? "calendar-dense" : ""}"><div class="timeline" style="--cols:${days.length};--track-height:${height}px"><div class="timeline-heading"></div>${days.map((d) => `<div data-date="${datekey(d)}" class="timeline-heading ${datekey(d) === today ? "today" : ""}">${d.toLocaleDateString("hu-HU", { weekday: "short" })}<strong>${d.getDate()}</strong></div>`).join("")}<div class="time-rail">${ticks.map((m) => `<span data-minute="${m}" class="${m % 60 ? "half-hour" : "whole-hour"}" style="top:${(m - open) * scale}px">${minutesTime(m)}</span>`).join("")}</div>${days
       .map((d) => {
         const bookings = filtered
           .filter((b) => datekey(new Date(b.start)) === datekey(d))
@@ -225,10 +228,42 @@ function calendarPage() {
           return { b, start, duration, lane };
         });
         const lanes = Math.max(1, ends.length);
-        return `<div class="day-track">${ticks.map((m) => `<button class="time-slot" aria-label="Időpont felvétele: ${datekey(d)} ${minutesTime(m)}" style="top:${(m - open) * scale}px;height:${Math.min(30, close - m) * scale}px" onclick="bookingForm('${datekey(d)}T${minutesTime(m)}')"></button>`).join("")}${placed.map(({ b, start, duration, lane }) => `<button class="calendar-event ${b.status === "pending" ? "pending" : ""}" style="top:${Math.max(0, start - open) * scale}px;height:${Math.max(36, Math.min(duration, close - start) * scale)}px;left:calc(${(lane / lanes) * 100}% + 3px);width:calc(${100 / lanes}% - 6px)" title="${esc(b.name + " · " + serviceNames(b))}" onclick="bookingDetails('${b.id}')"><strong>${new Date(b.start).toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" })} · ${esc(b.name)}</strong><span>${esc(serviceNames(b))}</span>${state.settings.businessMode !== "solo" ? `<small>${esc(state.staff.find((p) => p.id === b.staff)?.name || "")}</small>` : ""}</button>`).join("")}</div>`;
+        return `<div class="day-track" data-date="${datekey(d)}">${ticks.map((m, i) => `<button data-minute="${m}" class="time-slot ${m % 60 ? "" : "hour-start"} ${Math.floor(m / 60) % 2 ? "hour-shade" : ""}" aria-label="Időpont felvétele: ${datekey(d)} ${minutesTime(m)}" style="top:${(m - open) * scale}px;height:${((ticks[i + 1] ?? close) - m) * scale}px" onclick="bookingForm('${datekey(d)}T${minutesTime(m)}')"></button>`).join("")}${placed.map(({ b, start, duration, lane }) => `<button data-minute="${ticks.filter(m => m <= start).at(-1) ?? open}" class="calendar-event ${b.status === "pending" ? "pending" : ""}" style="top:${Math.max(0, start - open) * scale}px;height:${Math.max(calendarDetailed ? 24 : 14, Math.min(duration, close - start) * scale)}px;left:calc(${(lane / lanes) * 100}% + 3px);width:calc(${100 / lanes}% - 6px)" title="${esc(b.name + " · " + serviceNames(b))}" onclick="bookingDetails('${b.id}')"><strong>${new Date(b.start).toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" })} · ${esc(b.name)}</strong><span>${esc(serviceNames(b))}</span>${state.settings.businessMode !== "solo" ? `<small>${esc(state.staff.find((p) => p.id === b.staff)?.name || "")}</small>` : ""}</button>`).join("")}</div>`;
       })
       .join("")}</div></div>`;
+  const grid = document.querySelector(".timeline");
+  const clearGuide = () => {
+    grid.querySelectorAll(".guided-day,.guided-time").forEach(el => el.classList.remove("guided-day", "guided-time"));
+    document.querySelector("#calendar-guide").textContent = "Mutass egy idősávra: a napot és az időt együtt kiemeljük.";
+  };
+  let guidedKey = "";
+  const guide = (track, minute) => {
+    const key = track.dataset.date + ":" + minute;
+    if (key === guidedKey) return;
+    clearGuide(); guidedKey = key;
+    grid.querySelectorAll(`[data-date="${track.dataset.date}"]`).forEach(el => el.classList.add("guided-day"));
+    grid.querySelectorAll(`[data-minute="${minute}"]`).forEach(el => el.classList.add("guided-time"));
+    const next = ticks[ticks.indexOf(minute) + 1] ?? close;
+    document.querySelector("#calendar-guide").textContent = new Date(track.dataset.date + "T12:00").toLocaleDateString("hu-HU", {month:"long",day:"numeric",weekday:"long"}) + " · " + minutesTime(minute) + "–" + minutesTime(next);
+  };
+  grid.addEventListener("pointermove", e => {
+    const track = e.target.closest(".day-track");
+    if (!track) { clearGuide(); guidedKey = ""; return; }
+    const minute = open + (e.clientY - track.getBoundingClientRect().top) / scale;
+    guide(track, ticks.filter(m => m <= minute).at(-1) ?? open);
+  });
+  grid.addEventListener("pointerleave", () => { clearGuide(); guidedKey = ""; });
+  grid.addEventListener("focusin", e => {
+    const track = e.target.closest(".day-track");
+    if (track && e.target.dataset.minute) guide(track, Number(e.target.dataset.minute));
+  });
+  grid.addEventListener("focusout", e => { if (!grid.contains(e.relatedTarget)) { clearGuide(); guidedKey = ""; } });
 }
+let calendarResizeTimer;
+window.addEventListener("resize", () => {
+  clearTimeout(calendarResizeTimer);
+  calendarResizeTimer = setTimeout(() => { if (document.querySelector(".timeline") && !document.querySelector("dialog[open]")) calendarPage(); }, 150);
+});
 function clientsPage() {
   $("#content").innerHTML =
     `<div class="toolbar"><input id="search" placeholder="Keresés név, telefonszám vagy e-mail alapján…" oninput="clientRows(this.value)"><button onclick="exportData('clients')">↓ Exportálás</button><button onclick="importPicker('clients')">↑ Importálás</button></div><div class="card table-scroll"><table><thead><tr><th>Név</th><th>Telefonszám</th><th>E-mail</th><th></th></tr></thead><tbody id="client-rows"></tbody></table></div>`;

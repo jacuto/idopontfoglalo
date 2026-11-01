@@ -1457,3 +1457,35 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible 
 .settings-shortcuts{margin-bottom:20px;}
 input[readonly]{background:#eef3f1;color:#425b50;}
 @media(max-width:650px){.calendar-summary{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}.calendar-summary .stat{padding:9px;min-height:70px;}.calendar-summary .stat strong{font-size:20px;}.calendar-summary .stat small{font-size:10px;}.calendar-summary .symbol,.calendar-summary em{display:none;}.sidebar .profile{display:flex;padding:8px;font-size:11px;margin:6px 0 0;}.sidebar .profile .avatar{width:28px;height:28px;}.sidebar .profile small{display:none;}}
+
+/* A naptárban a nap és az óra együtt követhető, tömör alapnézettel. */
+.calendar-view-options{display:flex;align-items:center;gap:12px;flex-basis:100%;font-size:12px;color:#31536b}
+.calendar-tools{flex-wrap:wrap;gap:8px;padding:10px 14px}
+.calendar-view-options button{padding:5px 10px;font-size:12px;white-space:nowrap}
+.calendar-scroll{max-height:calc(100dvh - 230px);overscroll-behavior:contain}
+.timeline-heading{padding:5px 8px;border-left:2px solid #b4c7d4}
+.timeline-heading strong{font-size:17px;margin-top:1px}
+.day-track{border-left:2px solid #b4c7d4;background:#fff}
+.day-track:nth-child(even){background:#f4f8fc}
+.time-slot{border-bottom:1px solid #d0dce6}
+.time-slot.hour-start{border-top:1px solid #9ab0c3}
+.time-slot.hour-shade{background:#3b658308}
+.day-track.guided-day{background:#dceafc}
+.time-slot.guided-time{background:#d8e7fc;box-shadow:inset 0 1px #8badd9,inset 0 -1px #8badd9}
+.guided-day .time-slot.guided-time{background:#95bef4;box-shadow:inset 0 0 0 2px #1c529e}
+.timeline-heading.guided-day{background:#1c529e;color:#fff}
+.timeline-heading.guided-day strong{color:#fff}
+.time-rail{position:sticky;left:0;z-index:3;border-right:1px solid #b4c7d4}
+.time-rail span{left:3px;right:2px;font-size:10px;line-height:12px;padding:1px 3px;transform:none}
+.time-rail .whole-hour{font-weight:700;color:#223f55}
+.time-rail .guided-time{background:#1c529e;color:white;border-radius:3px}
+.timeline-heading:first-child{left:0;z-index:6}
+.calendar-fit .calendar-event{padding:1px 4px;line-height:14px}
+.calendar-fit .calendar-event span,.calendar-fit .calendar-event small{font-size:10px;line-height:12px}
+.calendar-fit .time-rail .half-hour{opacity:.7}
+body:has(.calendar-card) .intro{margin-bottom:12px}
+body:has(.calendar-card) .intro h1{font-size:24px;margin:0}
+body:has(.calendar-card) .intro p,body:has(.calendar-card) .intro .eyebrow{display:none}
+@media(max-width:650px){.calendar-view-options{align-items:flex-start;gap:8px}.calendar-view-options span{font-size:11px}.calendar-tools{padding:8px}.calendar-scroll{max-height:calc(100dvh - 240px)}}
+.calendar-dense .time-rail .half-hour{visibility:hidden}
+.calendar-dense .time-rail .guided-time{visibility:visible;z-index:1}

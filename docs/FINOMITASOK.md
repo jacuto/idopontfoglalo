@@ -67,3 +67,11 @@ A gombokhoz alkalmazásazonosító és titkos alkalmazáskulcs kell, nem személ
 ## Frissítés
 
 A korábbi [FRISSITES.md](../FRISSITES.md) adatmegőrző lépései érvényesek. Minden programfájlt, köztük a `public/refinements.js` fájlt is másold át, majd futtasd a `php artisan raero:upgrade` parancsot. Az új migráció nullable kapcsolattartási és tranzakció-metaadatmezőket ad hozzá; nem töröl korábbi adatot, és nem változtatja meg az APP_KEY-t vagy a feltöltéseket. A havi díjtételek a meglévő vállalkozási adatállapotban tárolódnak.
+
+## Naptár: pontosabb célzás és képernyőhöz igazítás
+
+A napi és heti naptár alapnézete a képernyőn rendelkezésre álló magassághoz igazodik. A **Nagyobb idősávok** gomb visszakapcsolja a részletes, görgethető nézetet. Nagyon kis képernyőn vagy szokatlanul hosszú napnál továbbra is szükség lehet görgetésre. A havi nézet változatlanul elérhető.
+
+A napokat erősebb oszlopvonalak, az órákat váltakozó háttér és hangsúlyosabb egészórás vonalak választják el. Egérmozgatáskor a teljes naposzlop és az idősáv sora együtt színeződik, a metszéspont külön keretet kap. A kiemelt dátum és időtartomány szövegesen is látható a naptár felett. A billentyűzettel fókuszált idősáv is kiemelést kap. A percre pontos nyitás/zárás megmarad; a részórás nyitást követő sávok egész és fél óráknál kezdődnek.
+
+Ellenőrzés: JavaScript szintaxis; a meglévő `tests/refinements.cjs` böngészős ellenőrzés; célzott Playwright-ellenőrzés a sor/oszlop kiemelésre, billentyűzetes fókuszra, képernyőhöz igazításra, nagyításra, idősávból foglalási ablak nyitására és 390 px mobilos szélességre. Külső Google-/Facebook-belépés éles kulcsokkal és Meta-hitelesítés nélkül nem lett végigtesztelve. E változtatás nem érint adatbázist vagy migrációt.

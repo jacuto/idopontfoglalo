@@ -55,3 +55,40 @@ Beállított kapcsolatnál **Google / Gmail-fiókkal belépés / regisztráció*
 Hiányzó kapcsolatnál a megfelelő gomb látható, de **„még nincs beállítva”** jelzéssel nem kattintható. A foglalás belépés nélkül továbbra is működik. Nem jelenítünk meg látszólag működő közösségi gombot beállítatlan kapcsolathoz.
 
 A titkos kulcs a szolgáltató saját, titkosított kapcsolati fájljába kerül. A mentési űrlap nem olvassa vissza a titkos értéket, a nyilvános GitHub-forrás pedig nem tartalmazza. Az alkalmazásadatok megadása miatt önmagában nem kell megváltoztatnod a személyes Google- vagy Facebook-jelszavadat.
+
+## Beállítás a meglévő .env fájlban
+
+cPanel → Fájlkezelő → Beállítások → Rejtett fájlok megjelenítése. Nyisd meg a **`/home/digitmar/idopontfoglalo-php/.env`** fájlt. Az alábbi változókat módosítsd, ha már léteznek; ne hozz létre belőlük második sort. A helyőrzők helyére a saját Google Client ID / Client secret és Facebook App ID / App secret értékeid kerülnek. A titkos értékek csak a tárhelyen legyenek, a GitHubon ne.
+
+```dotenv
+APP_URL=https://foglalo.digitmarketing.hu
+GOOGLE_CLIENT_ID=SAJAT_GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET=SAJAT_GOOGLE_CLIENT_SECRET
+FACEBOOK_CLIENT_ID=SAJAT_FACEBOOK_APP_ID
+FACEBOOK_CLIENT_SECRET=SAJAT_FACEBOOK_APP_SECRET
+FACEBOOK_GRAPH_VERSION=v23.0
+```
+
+Nem kell külön redirect-változót felvenni: a rendszer az APP_URL alapján képezi a visszahívási címeket. A meglévő APP_KEY, adatbázis-, email- és egyéb beállításokat hagyd meg. Ne másold rá a teljes `.env.example` fájlt.
+
+Google → Clients → webalkalmazás:
+
+- Authorized JavaScript origins: `https://foglalo.digitmarketing.hu`
+- Authorized redirect URIs: `https://foglalo.digitmarketing.hu/auth/google/callback`
+
+Meta → Facebook Login → Valid OAuth Redirect URIs:
+
+- `https://foglalo.digitmarketing.hu/auth/facebook/callback`
+
+Mentés után SSH-ban (PowerShellből SSH-val belépve már a tárhely parancssorában vagy):
+
+```sh
+cd /home/digitmar/idopontfoglalo-php
+php artisan config:clear
+```
+
+Ez csak a konfigurációs gyorsítótárat üríti. Ezután próbáld ki a saját nyilvános foglalóoldalon a belépést. A Beállításokban korábban elmentett kapcsolati értékek elsőbbséget élveznek az `.env`-vel szemben; ha ott már másik alkalmazást állítottál be, ugyanott frissítsd az azonosítót és a kulcsot. A titkosított kapcsolati fájlt ne töröld.
+
+Az `.env`-alapú közösségi kapcsolat a meglévő, első szolgáltatóhoz tartozik. Más szolgáltatók saját kapcsolatukat a Beállításokban adhatják meg. Az `ADMIN_GOOGLE_EMAILS` és `ADMIN_FACEBOOK_IDS` külön szolgáltatói hozzáférési engedélylisták: vendégbelépéshez nem szükségesek, és a Facebook App ID **nem** személyes felhasználói azonosító. A közösségi belépés önmagában nem ad adminjogot.
+
+A Meta által kért személyazonosság- vagy üzleti ellenőrzést az alkalmazás kódja nem helyettesíti. Mintaadatokkal létrehozott fiók helyett a Meta szabályainak megfelelő, valós üzemeltetői fiók szükséges; az ellenőrzést a Meta felületén kell befejezni. Addig a fejlesztői módban engedélyezett tesztelők használhatják a belépést.
