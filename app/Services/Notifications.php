@@ -162,7 +162,7 @@ class Notifications
                 app(Tenant::class)->id = (int) $job->provider_id;
                 if (($p['kind'] ?? '') === 'platform_message') {
                     if (!app(Newsletters::class)->ready()) { $this->finish($job->id, 'blocked', ['error' => 'Hiányzó központi SMTP-kapcsolat.', 'available_at' => now()->addMinutes(5)]); $counts['blocked']++; continue; }
-                    $url = rtrim(config('app.url'), '/') . ($p['platformRecipient'] ? '/foadmin' : ($p['recipientType'] === 'guest' ? '/fiokom' : '/')) . '?provider=' . ($p['recipientType'] === 'provider' ? $p['recipientId'] : 1) . '&platformMessages=1';
+                    $url = rtrim(config('app.url'), '/') . ($p['platformRecipient'] ? '/foadmin' : ($p['recipientType'] === 'guest' ? '/uzenetek' : '/')) . '?provider=' . ($p['recipientType'] === 'provider' ? $p['recipientId'] : 1) . '&platformMessages=1';
                     app(Newsletters::class)->send($p['recipient'], 'Új üzemeltetői üzenet — Ráérő', 'Új belső üzeneted érkezett. Beszélgetés: ' . $url);
                     $this->finish($job->id, 'sent', ['attempts' => $job->attempts + 1]); $counts['sent']++; continue;
                 }
@@ -172,7 +172,7 @@ class Notifications
                     if (!$message) { $this->finish($job->id, 'skipped'); $counts['skipped']++; continue; }
                     if (!$this->connections->mailReady()) { $this->finish($job->id, 'blocked', ['error' => 'Hiányzó küldőkapcsolat.', 'available_at' => now()->addMinutes(5)]); $counts['blocked']++; continue; }
                     $this->sendMail($this->connections->all(), $p['recipient'], 'Új belső üzenet — Ráérő',
-                        'Új üzeneted érkezett. Beszélgetés: ' . rtrim(config('app.url'), '/') . ($p['guest'] ? '/fiokom' : '/') . '?provider=' . app(Tenant::class)->id . '&messages=1');
+                        'Új üzeneted érkezett. Beszélgetés: ' . rtrim(config('app.url'), '/') . ($p['guest'] ? '/uzenetek' : '/') . '?provider=' . app(Tenant::class)->id . '&messages=1');
                     $this->finish($job->id, 'sent', ['attempts' => $job->attempts + 1]); $counts['sent']++; continue;
                 }
                 $b = collect($s["bookings"])->firstWhere("id", $p["bookingId"]);

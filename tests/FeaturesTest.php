@@ -329,4 +329,35 @@ class FeaturesTest extends TestCase {
   app(SalonStore::class)->mutate(function(&$s){$s['subscription']=['trialStartedAt'=>'2026-11-01T10:00:00+01:00','trialEndsAt'=>'2027-01-01T10:00:00+01:00'];});
   \Illuminate\Support\Facades\Http::fake();$this->postJson('/api/subscription/checkout')->assertUnprocessable();\Illuminate\Support\Facades\Http::assertNothingSent();
  }
+ public function test_social_login_returns_to_selected_provider_and_remembers_owned_contacts():void {
+  \Illuminate\Support\Facades\Http::preventStrayRequests();
+  app(Tenant::class)->run(2,fn()=>app(\App\Services\Connections::class)->save(['google_client_id'=>'client','google_client_secret'=>'secret','facebook_client_id'=>'client','facebook_client_secret'=>'secret']));
+  \Illuminate\Support\Facades\Http::fake([
+   'oauth2.googleapis.com/*'=>\Illuminate\Support\Facades\Http::response(['access_token'=>'token']),
+   'openidconnect.googleapis.com/*'=>\Illuminate\Support\Facades\Http::response(['sub'=>'owned-google','name'=>'Közösségi Vendég','email'=>'social@example.com','email_verified'=>true]),
+   'graph.facebook.com/*/oauth/access_token'=>\Illuminate\Support\Facades\Http::response(['access_token'=>'token']),
+   'graph.facebook.com/*/me*'=>\Illuminate\Support\Facades\Http::response(['id'=>'owned-facebook','name'=>'Közösségi Vendég','email'=>'social@example.com']),
+  ]);
+  foreach(['google','facebook'] as $social){
+   $r=$this->get('/auth/'.$social.'?provider=2&returnTo=booking');parse_str(parse_url($r->headers->get('Location'),PHP_URL_QUERY),$q);
+   $this->get('/auth/'.$social.'/callback?state='.$q['state'].'&code=code')->assertRedirect('/foglalas?provider=2#public-form');
+   $this->getJson('/api/guest?provider=2')->assertOk()->assertJsonPath('name','Közösségi Vendég')->assertJsonPath('email','social@example.com')->assertJsonPath('phone','');
+   $this->patchJson('/api/guest/profile?provider=2',['email'=>'contact@example.com','phone'=>'+36 30 111 2222'])->assertOk();
+   $r=$this->get('/auth/'.$social.'?provider=2&returnTo=https://example.org');parse_str(parse_url($r->headers->get('Location'),PHP_URL_QUERY),$q);
+   $this->get('/auth/'.$social.'/callback?state='.$q['state'].'&code=code')->assertRedirect('/fiokom?provider=2');
+   $this->getJson('/api/guest?provider=2')->assertJsonPath('phone','+36 30 111 2222')->assertJsonPath('email','contact@example.com');
+   $this->getJson('/api/state?provider=2')->assertUnauthorized();
+  }
+ }
+ public function test_guest_history_lists_own_bookings_across_providers_without_other_guest_data():void {
+  $this->guest();$one=$this->postJson('/api/bookings',$this->booking())->assertCreated()->json();
+  $two=$this->postJson('/api/bookings?provider=2',$this->booking())->assertCreated()->json();
+  $this->guest(11);$other=$this->postJson('/api/bookings?provider=2',$this->booking(['start'=>'2035-03-13T09:00:00Z']))->assertCreated()->json();
+  $this->withSession(['guest_id'=>10]);
+  $result=$this->getJson('/api/guest')->assertOk()->assertJsonCount(2,'allBookings')->assertJsonCount(1,'bookings')->assertJsonCount(2,'providers')->json();
+  $this->assertEqualsCanonicalizing([$one['id'],$two['id']],array_column($result['allBookings'],'id'));
+  $this->assertStringNotContainsString($other['token'],json_encode($result));
+  $this->getJson('/api/guest?provider=2')->assertJsonCount(2,'allBookings')->assertJsonPath('bookings.0.id',$two['id']);
+  $this->withSession(['guest_id'=>null]);$this->getJson('/api/guest')->assertUnauthorized();
+ }
 }

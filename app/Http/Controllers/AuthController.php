@@ -38,6 +38,7 @@ class AuthController
             "state" => $state,
             "verifier" => $verifier,
             "mode" => $mode,
+            "returnTo" => $mode === "guest" && in_array($r->query("returnTo"), ["booking", "messages", "operatorMessages"], true) ? $r->query("returnTo") : null,
             "tenant" => app(\App\Services\Tenant::class)->id,
             "expires" => time() + 600,
         ]);
@@ -215,7 +216,10 @@ class AuthController
             }
             $r->session()->regenerate();
             $r->session()->put("guest_id", $account->id);
-            return redirect(app(\App\Services\Tenant::class)->id === 1 ? "/fiokom" : "/fiokom?provider=" . app(\App\Services\Tenant::class)->id);
+            $tenant = app(\App\Services\Tenant::class)->id;
+            if (($saved['returnTo'] ?? null) === 'booking') return redirect('/foglalas?provider=' . $tenant . '#public-form');
+            if (in_array($saved['returnTo'] ?? null, ['messages', 'operatorMessages'], true)) return redirect('/uzenetek?provider=' . $tenant . ($saved['returnTo'] === 'operatorMessages' ? '&platformMessages=1' : ''));
+            return redirect($tenant === 1 ? '/fiokom' : '/fiokom?provider=' . $tenant);
         } catch (\Throwable) {
             return redirect($target . "?authError=provider");
         }
@@ -237,11 +241,23 @@ class AuthController
                 fn($b) => (int) ($b["guestId"] ?? 0) === (int) $account->id,
             ),
         );
+        $providers = [];
+        $allBookings = [];
+        foreach (DB::table('salon_state')->get() as $row) {
+            $salon = json_decode($row->data, true, 512, JSON_THROW_ON_ERROR);
+            $own = array_values(array_filter($salon['bookings'] ?? [], fn($b) => (int) ($b['guestId'] ?? 0) === (int) $account->id));
+            $linked = collect($salon['clients'] ?? [])->contains(fn($c) => (int) ($c['guestId'] ?? 0) === (int) $account->id);
+            if (!$own && !$linked) continue;
+            $provider = ['id' => $row->id, 'name' => $salon['settings']['name'] ?? 'Szolgáltató'];
+            $providers[] = $provider;
+            foreach ($own as $booking) {
+                $allBookings[] = array_merge(array_intersect_key($booking, array_flip(['id','start','status','attendance','token','serviceSnapshot','pricing'])), ['provider' => $provider]);
+            }
+        }
+        usort($allBookings, fn($a, $b) => strcmp($a['start'], $b['start']));
         return response()->json([
-            "providers" => \Illuminate\Support\Facades\DB::table('salon_state')->get()->filter(function($row) use ($account) {
-                $s = json_decode($row->data, true);
-                return collect($s['clients'])->contains(fn($c) => (int) ($c['guestId'] ?? 0) === (int) $account->id) || collect($s['bookings'])->contains(fn($b) => (int) ($b['guestId'] ?? 0) === (int) $account->id);
-            })->map(fn($row) => ['id' => $row->id, 'name' => json_decode($row->data, true)['settings']['name']])->values(),
+            "providers" => $providers,
+            "allBookings" => $allBookings,
             "id" => $account->id,
             "avatar" => !empty($account->avatar) ? "/api/guest/avatar/" . $account->id : null,
             "name" => $account->name,

@@ -92,3 +92,17 @@ Ez csak a konfigurációs gyorsítótárat üríti. Ezután próbáld ki a sajá
 Az `.env`-alapú közösségi kapcsolat a meglévő, első szolgáltatóhoz tartozik. Más szolgáltatók saját kapcsolatukat a Beállításokban adhatják meg. Az `ADMIN_GOOGLE_EMAILS` és `ADMIN_FACEBOOK_IDS` külön szolgáltatói hozzáférési engedélylisták: vendégbelépéshez nem szükségesek, és a Facebook App ID **nem** személyes felhasználói azonosító. A közösségi belépés önmagában nem ad adminjogot.
 
 A Meta által kért személyazonosság- vagy üzleti ellenőrzést az alkalmazás kódja nem helyettesíti. Mintaadatokkal létrehozott fiók helyett a Meta szabályainak megfelelő, valós üzemeltetői fiók szükséges; az ellenőrzést a Meta felületén kell befejezni. Addig a fejlesztői módban engedélyezett tesztelők használhatják a belépést.
+
+## Belépés után a foglalás folytatása
+
+A szolgáltató nyilvános foglalóoldalának belépési hivatkozásáról indított Google- vagy Facebook-belépés után a vendég ugyanennek a szolgáltatónak a foglalóoldalára tér vissza. A közösségi szolgáltató által átadott név és email már a fiókban tárolódik, és bejelentkezés után automatikusan kitöltjük a foglalási űrlapon. A Facebook csak akkor ad emailcímet, ha az elérhető és a vendég engedélyezi. A szokásos Google-/Facebook-belépés telefonszámot nem ad át; ezt a vendég egyszer adhatja meg.
+
+A bejelentkezett vendég foglalásánál az **Elérhetőségeim megjegyzése sikeres foglalás után** jelölőnégyzet szabályozza a saját email/telefonszám mentését. Másnak történő foglaláskor ezt ki lehet kapcsolni. A mentés a vendég saját, CSRF-védett profilvégpontján történik, és nem változtatja meg a Google-/Facebook-belépési azonosítót. A foglalás sikere és az elérhetőségek mentésének sikere külön visszajelzést kap. A saját fiókban továbbra is szerkeszthetők az elérhetőségek.
+
+Belépés idejére ugyanabban a böngészőfülben megőrizzük a kiválasztott szolgáltatást, munkatársat, napot és idősávot, legfeljebb 20 percig. Ezek a böngésző munkamenettárába kerülnek; nevet, telefonszámot vagy emailcímet nem mentünk ide. Visszatéréskor az idősávokat újra lekérjük, a kiválasztás csak akkor áll vissza, ha az adott időpont még elérhető. A végleges foglalást továbbra is a szerver ellenőrzi.
+
+Közvetlenül a `/fiokom` oldalról indított belépés után a saját fiók nyílik meg. Itt az összes saját, fiókazonosítóhoz kapcsolt foglalás szerepel, szolgáltatóval, szolgáltatásokkal, időponttal és állapottal, közelgő és lezárt csoportban. A szolgáltató és a szolgáltatás hivatkozása a megfelelő vállalkozás oldalára vezet. Név vagy email egyezése nem kapcsol hozzá automatikusan idegen foglalást.
+
+A saját adatlapról az általános üzenetküldő és a szolgáltató nélküli Új foglalás hivatkozás kikerült. Az üzenetértesítések külön `/uzenetek?provider=AZONOSITO` oldalra vezetnek, a szolgáltató nevével. Az üzemeltetői üzenetek külön beszélgetésként nyílnak meg. Az értesítési levelek régi, saját fiókra mutató üzenethivatkozásai is átirányítanak erre a külön oldalra.
+
+Ehhez a frissítéshez nem kell új `.env`-változó vagy új OAuth-visszahívási cím. A meglévő adatbázis-frissítéseket továbbra is futtatni kell a FRISSITES.md szerint; a kódfeltöltés után `php artisan optimize:clear` szükséges az új útvonalhoz is.

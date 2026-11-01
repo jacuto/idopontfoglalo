@@ -75,3 +75,13 @@ A napi és heti naptár alapnézete a képernyőn rendelkezésre álló magassá
 A napokat erősebb oszlopvonalak, az órákat váltakozó háttér és hangsúlyosabb egészórás vonalak választják el. Egérmozgatáskor a teljes naposzlop és az idősáv sora együtt színeződik, a metszéspont külön keretet kap. A kiemelt dátum és időtartomány szövegesen is látható a naptár felett. A billentyűzettel fókuszált idősáv is kiemelést kap. A percre pontos nyitás/zárás megmarad; a részórás nyitást követő sávok egész és fél óráknál kezdődnek.
 
 Ellenőrzés: JavaScript szintaxis; a meglévő `tests/refinements.cjs` böngészős ellenőrzés; célzott Playwright-ellenőrzés a sor/oszlop kiemelésre, billentyűzetes fókuszra, képernyőhöz igazításra, nagyításra, idősávból foglalási ablak nyitására és 390 px mobilos szélességre. Külső Google-/Facebook-belépés éles kulcsokkal és Meta-hitelesítés nélkül nem lett végigtesztelve. E változtatás nem érint adatbázist vagy migrációt.
+
+## Közösségi belépés és saját foglalások
+
+- Foglalóoldalról indított belépés után visszatérés az eredeti szolgáltatóhoz; közvetlen fiókbelépéskor saját fiók.
+- Fiókban tárolt név, email és telefonszám automatikus kitöltése; saját elérhetőségek megjegyzése külön jelölőnégyzettel, sikeres foglalás után.
+- A szolgáltatás, munkatárs, nap és szabad idősáv visszaállítása belépés után; elérhetőség újbóli ellenőrzésével.
+- Saját, igazolt fiókkapcsolatú foglalások több szolgáltatótól, szolgáltatói és szolgáltatási hivatkozásokkal; általános új foglalás és üzenetküldés nélkül a saját adatlapon.
+- Értékelés a megfelelő szolgáltatóhoz küldve; üzenetértesítések külön, megnevezett címzetthez tartozó beszélgetési oldalon.
+
+Ellenőrzés: teljes PHPUnit SQLite-csomag 72 teszt, 418 ellenőrzés, 2 kihagyott InnoDB-párhuzamossági teszt. Az új tesztek Google- és Facebook-kapcsolatot szimulálva ellenőrzik a biztonságos visszairányítást, a saját elérhetőségek megőrzését és más vendégek adatainak kizárását a több szolgáltatós előzményekből. A `tests/guest-flow.cjs` Playwright-ellenőrzés szimulált közösségi belépéssel vizsgálja a visszatérést, az űrlap visszaállítását, az automatikus kitöltést, a telefonszám megjegyzését, a több szolgáltatós listát, a megfelelő szolgáltatóhoz küldött értékelést, a külön üzenetoldalt és a mobilos szélességet. A valódi külső Google-/Facebook-hitelesítést ez a teszt nem végzi el.

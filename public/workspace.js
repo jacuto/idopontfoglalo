@@ -922,17 +922,31 @@ async function socialButtons(container, mode = "guest") {
         .filter((k) => p[k])
         .map(
           (k) =>
-            `<a class="social-button" href="/auth/${k}?provider=${providerId()}&mode=${mode}">${k === "google" ? "Google" : "Facebook"}-fiókkal ${mode === "admin" ? "belépés" : "belépés / regisztráció"}</a>`,
+            `<a class="social-button" href="/auth/${k}?provider=${providerId()}&mode=${mode}${mode === "guest" && ["booking","messages","operatorMessages"].includes(new URLSearchParams(location.search).get("returnTo")) ? "&returnTo=" + new URLSearchParams(location.search).get("returnTo") : ""}">${k === "google" ? "Google" : "Facebook"}-fiókkal ${mode === "admin" ? "belépés" : "belépés / regisztráció"}</a>`,
         )
         .join("") ||
       '<p class="hint">A közösségi belépés a szolgáltatói kapcsolat beállítása után érhető el.</p>';
   } catch {}
 }
 async function guestPage() {
+  if (new URLSearchParams(location.search).has("messages") || new URLSearchParams(location.search).has("platformMessages")) { location.replace("/uzenetek" + location.search); return; }
   try {
     const g = await api("/api/guest");
-    $("#app").innerHTML =
-      `<div class="public"><div class="brand"><span>◷</span>ráérő.</div><h1>Szia, ${esc(g.name)}!</h1><p>A fiókodhoz tartozó foglalások.</p><div class="row"><a href="/foglalas">Új foglalás</a><button onclick="guestLogout()">Kilépés</button></div>${g.bookings.map((b) => `<div class="card"><h3>${esc((b.serviceSnapshot || []).map((s) => s.name).join(" + "))}</h3><p>${new Date(b.start).toLocaleString("hu-HU")} · ${statusName[b.status]}</p><a href="/modositas?provider=${providerId()}&token=${b.token}">Foglalás kezelése →</a></div>`).join("") || '<div class="card">Még nincs a fiókodhoz kapcsolt foglalás.</div>'}</div>`;
+    const destination = new URLSearchParams(location.search).get('returnTo');
+    if (['messages','operatorMessages'].includes(destination)) { location.replace('/uzenetek?provider=' + encodeURIComponent(providerId()) + (destination === 'operatorMessages' ? '&platformMessages=1' : '')); return; }
+    if (destination === 'booking') {
+      location.replace('/foglalas?provider=' + encodeURIComponent(providerId()) + '#public-form');
+      return;
+    }
+    const bookings = g.allBookings || [];
+    const upcoming = bookings.filter(b => new Date(b.start) >= new Date() && !['cancelled','rejected'].includes(b.status));
+    const previous = bookings.filter(b => !upcoming.includes(b)).reverse();
+    const card = b => {
+      const url = '/foglalas?provider=' + encodeURIComponent(b.provider.id);
+      return `<article class="card item guest-booking"><h3><a href="${url}">${esc(b.provider.name)}</a></h3><p>${(b.serviceSnapshot || []).map(s => `<a href="${url}#szolgaltatas-${encodeURIComponent(s.id)}">${esc(s.name)}</a>`).join(' + ')}</p><p>${new Date(b.start).toLocaleString('hu-HU')} · <strong>${statusName[b.status] || esc(b.status)}</strong></p><p>${attendanceName(b.attendance)}${b.pricing ? ' · Fizetendő: ' + money(b.pricing.payable) : ''}</p><a href="/modositas?provider=${encodeURIComponent(b.provider.id)}&token=${encodeURIComponent(b.token)}">Foglalás részletei / módosítása →</a>${b.status === 'confirmed' && b.attendance === 'attended' ? `<p><button class="guest-review" data-id="${esc(b.id)}" data-provider="${Number(b.provider.id)}">Szolgáltató értékelése</button></p>` : ''}</article>`;
+    };
+    $("#app").innerHTML = `<div class="public"><div class="brand"><span>◷</span>ráérő.</div><h1>Szia, ${esc(g.name)}!</h1><p>Saját foglalásaid, minden szolgáltatónál.</p><button onclick="guestLogout()">Kilépés</button><h2>Közelgő foglalások</h2>${upcoming.map(card).join('') || '<div class="card item">Még nincs közelgő foglalásod. Új időpontot a választott szolgáltató foglalóoldalán foglalhatsz.</div>'}<h2>Korábbi és lezárt foglalások</h2>${previous.map(card).join('') || '<div class="card item">Még nincs korábbi foglalásod.</div>'}</div>`;
+    document.querySelectorAll('.guest-review').forEach(button => button.onclick = () => reviewForm(button.dataset.id, true, button.dataset.provider));
   } catch {
     $("#app").innerHTML =
       `<div class="public"><div class="brand"><span>◷</span>ráérő.</div><div class="card"><h1>Vendégfiók</h1><p>Lépj be Google- vagy Facebook-fiókkal. Első belépéskor vendégfiókot hozunk létre. Foglalni belépés nélkül is lehet.</p><div id="guest-social" class="social-buttons"></div>${new URLSearchParams(location.search).has("authError") ? '<p class="error">A belépés nem sikerült. Próbáld újra.</p>' : ""}<a href="/foglalas">Foglalás belépés nélkül →</a></div></div>`;

@@ -27,7 +27,7 @@ clientDetail=async function(id){await detailBeforeActions(id);const c=state.clie
 const dailySettings=settingsPage;
 settingsPage=function(){dailySettings();const panel=document.createElement('section');panel.className='card item settings-shortcuts';panel.innerHTML=`<h2>További beállítások</h2><p>A napi munkához a Naptárat használd. Az ajánlatokat és a vendégeknek látható adatlapot itt módosíthatod.</p><div class="buttons"><button onclick="view='offers';render()">Kuponok és bérletek</button><button onclick="view='profile';render()">Nyilvános adatlap</button></div><p><strong>Belépés Google-lal vagy Facebookkal:</strong> lent a kapcsolatoknál add meg az adott szolgáltató alkalmazásazonosítóját és titkos kulcsát. Ezután a vendég egy gombbal indulhat a Google vagy a Facebook saját belépési és hozzájárulási oldalára.</p><p><strong>Nyitás és zárás:</strong> az online felajánlható időpontok határa. <strong>Jóváhagyás:</strong> bekapcsolva az új vendégfoglalás a te elfogadásodra vár. <strong>Értesítések:</strong> az emailhez SMTP-kapcsolat és működő cron szükséges. A kulcsokhoz csak akkor nyúlj, ha az adott külső szolgáltatást használod.</p></section>`;$('#content').prepend(panel);};
 async function socialButtons(container,mode='guest'){
- try{const configured=await api('/api/auth/providers');const el=$(container);if(!el)return;el.innerHTML=['google','facebook'].map(k=>configured[k]?`<a class="social-button" href="/auth/${k}?provider=${providerId()}&mode=${mode}">${k==='google'?'Google / Gmail':'Facebook'}-fiókkal ${mode==='admin'?'belépés':'belépés / regisztráció'}</a>`:`<button type="button" class="social-button" disabled>${k==='google'?'Google / Gmail':'Facebook'} · még nincs beállítva</button>`).join('')+(!configured.google&&!configured.facebook?'<p class="hint">A szolgáltató még nem kapcsolta be a közösségi belépést. Foglalni továbbra is lehet regisztráció nélkül.</p>':'');}catch(e){if($(container))$(container).textContent='A belépési lehetőségek most nem tölthetők be.';}
+ try{const configured=await api('/api/auth/providers');const el=$(container);if(!el)return;el.innerHTML=['google','facebook'].map(k=>configured[k]?`<a class="social-button" href="/auth/${k}?provider=${providerId()}&mode=${mode}${mode === "guest" && ["booking","messages","operatorMessages"].includes(new URLSearchParams(location.search).get("returnTo")) ? "&returnTo=" + new URLSearchParams(location.search).get("returnTo") : ""}">${k==='google'?'Google / Gmail':'Facebook'}-fiókkal ${mode==='admin'?'belépés':'belépés / regisztráció'}</a>`:`<button type="button" class="social-button" disabled>${k==='google'?'Google / Gmail':'Facebook'} · még nincs beállítva</button>`).join('')+(!configured.google&&!configured.facebook?'<p class="hint">A szolgáltató még nem kapcsolta be a közösségi belépést. Foglalni továbbra is lehet regisztráció nélkül.</p>':'');}catch(e){if($(container))$(container).textContent='A belépési lehetőségek most nem tölthetők be.';}
 }
 const accountBeforeContacts=guestPage;
 guestPage=async function(){await accountBeforeContacts();if(!$('#avatar-form'))return;try{const g=await api('/api/guest');const section=document.createElement('section');section.className='card item';section.innerHTML=`<h2>Saját elérhetőségeim</h2><p>Az itt megadott elérhetőségeket a hozzád kapcsolt szolgáltatók látják. Ők nem írhatják át őket. A korábbi foglalások eredeti adatai megmaradnak.</p><form id="guest-contact-form"><label>Telefonszám</label><input name="phone" type="tel" maxlength="40" value="${esc(g.phone||'')}"><label>Kapcsolattartási email</label><input name="email" type="email" maxlength="200" value="${esc(g.email||'')}"><p class="hint">Ez a kapcsolattartási cím; a Google-/Facebook-belépési azonosítódat nem módosítja.</p><p id="contact-error" class="error"></p><button class="primary">Elérhetőségek mentése</button></form>`;$('.public').append(section);$('#guest-contact-form').onsubmit=async e=>{e.preventDefault();try{await api('/api/guest/profile','PATCH',Object.fromEntries(new FormData(e.target)));toast('Saját elérhetőségek mentve.');}catch(err){$('#contact-error').textContent=err.message;}};}catch{}};
@@ -54,8 +54,71 @@ const formBeforeLock=bookingForm;
 bookingForm=function(dt){if(state.subscription?.calendarBlocked){view='billing';render();toast('A naptár használatához előbb rendezd a lejárt havi díjat.');return;}formBeforeLock(dt);};
 const renderBeforeSampleBanner=render;
 render=function(){renderBeforeSampleBanner();if(!isPublic&&state.sampleData&&$('.intro')){const banner=document.createElement('p');banner.className='notice sample-banner';banner.setAttribute('role','status');banner.textContent='Tesztpéldány · mesterséges mintaadatok, nem valódi befizetések.';$('.intro').before(banner);if(document.querySelector('.timeline'))calendarPage();}};
+const publicBeforeGuestDetails = publicPage;
+publicPage = function() {
+  publicBeforeGuestDetails();
+  if (location.hash === '#public-form' || location.hash.startsWith('#szolgaltatas-')) {
+    try { const target = document.getElementById(decodeURIComponent(location.hash.slice(1))); if (target) requestAnimationFrame(() => target.scrollIntoView()); } catch {}
+  }
+  const form = $('#booking-form');
+  if (!form) return;
+  const login = document.querySelector('#public-form a[href^="/fiokom"]');
+  if (login) {
+    login.href = '/fiokom?provider=' + encodeURIComponent(providerId()) + '&returnTo=booking';
+    login.addEventListener('click', () => {
+      const data = new FormData(form);
+      try { sessionStorage.setItem('raero-booking-draft:' + providerId(), JSON.stringify({time: Date.now(), services: data.getAll('services'), staff: data.get('staff'), date: $('#booking-date')?.value, start: data.get('start')})); } catch {}
+    });
+  }
+  fillOwnBookingDetails(form, login);
+};
+async function fillOwnBookingDetails(form, login) {
+  let guest;
+  try { guest = await api('/api/guest'); } catch { return; }
+  if (!form.isConnected) return;
+  for (const key of ['name','email','phone']) {
+    const field = form.elements.namedItem(key);
+    if (field && !field.value) field.value = guest[key] || '';
+  }
+  if (login) { login.textContent = 'Saját fiókom és foglalásaim →'; login.href = providerLink('/fiokom'); }
+  const notice = document.createElement('div');
+  notice.className = 'notice guest-autofill';
+  notice.innerHTML = `<p>Bejelentkezve: <strong>${esc(guest.name)}</strong>. A fiókodban megadott adatokat kitöltöttük.</p><label class="check"><input type="checkbox" name="rememberContact" value="1" checked>Elérhetőségeim megjegyzése sikeres foglalás után</label><p class="hint">A Google és a Facebook általában nem ad át telefonszámot. Ha most megadod, legközelebb ezt is kitöltjük. Más személynek történő foglalásnál vedd ki a pipát.</p>`;
+  form.querySelector('[name=name]').before(notice);
+  const key = 'raero-booking-draft:' + providerId();
+  try {
+    const draft = JSON.parse(sessionStorage.getItem(key) || 'null');
+    sessionStorage.removeItem(key);
+    if (draft && Date.now() - draft.time < 20 * 60 * 1000 && Array.isArray(draft.services)) {
+      form.querySelectorAll('[name=services]').forEach(field => { field.checked = draft.services.includes(field.value); });
+      updateStaff();
+      const staff = form.elements.namedItem('staff');
+      if ([...staff.options].some(o => o.value === draft.staff)) staff.value = draft.staff;
+      if (draft.date && draft.date >= datekey(new Date())) $('#booking-date').value = draft.date;
+      await loadSlots();
+      const slot = [...form.querySelectorAll('[data-start]')].find(el => el.dataset.start === draft.start);
+      if (slot) selectSlot(slot);
+    }
+  } catch {}
+}
+
+async function guestMessagesPage() {
+  const operator = new URLSearchParams(location.search).has('platformMessages');
+  let guest;
+  try { guest = await api('/api/guest'); }
+  catch { location.replace('/fiokom?provider=' + encodeURIComponent(providerId()) + '&returnTo=' + (operator ? 'operatorMessages' : 'messages')); return; }
+  let provider;
+  if (!operator) {
+    provider = guest.providers.find(p => String(p.id) === String(providerId()));
+    if (!provider) { $('#app').innerHTML = '<div class="public card item"><h1>Ez a beszélgetés nem érhető el</h1><p>Csak a saját szolgáltatóiddal beszélgethetsz.</p><a href="/fiokom">Vissza a saját fiókhoz</a></div>'; return; }
+  }
+  $('#app').innerHTML = `<div class="public"><h1>Üzenetek: ${operator ? 'Ráérő üzemeltetője' : esc(provider.name)}</h1><p><a href="/fiokom">Vissza a saját fiókhoz</a></p>${operator ? '<button onclick="operatorConversation(false)">Beszélgetés megnyitása</button>' : '<div id="conversation"></div>'}</div>`;
+  if (operator) await operatorConversation(false); else await openConversation(guest.id, true);
+}
+
 // All extensions are registered before the first request renders a page.
-if(location.pathname==='/foadmin') platformPage();
+if(location.pathname==='/uzenetek') guestMessagesPage();
+else if(location.pathname==='/foadmin') platformPage();
 else if(manageToken) managePage();
 else if(location.pathname.replace(/\/+$/,'')==='/fiokom') guestPage();
 else refresh().catch(loginPage);

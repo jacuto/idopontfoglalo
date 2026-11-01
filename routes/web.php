@@ -23,6 +23,7 @@ Route::get("/auth/{provider}", [
     "start",
 ])->whereIn("provider", ["google", "facebook"]);
 Route::view("/fiokom", "app");
+Route::view("/uzenetek", "app");
 Route::view("/foadmin", "app");
 Route::match(['GET','PUT'], '/api/newsletter/consent', [\App\Http\Controllers\NewsletterController::class,'consent']);
 Route::get('/hirlevel/leiratkozas/{id}', [\App\Http\Controllers\NewsletterController::class,'unsubscribe'])->name('newsletter.unsubscribe')->whereNumber('id');

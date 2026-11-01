@@ -27,7 +27,7 @@ const localdt = (d) =>
   ":" +
   String(d.getMinutes()).padStart(2, "0");
 let csrfToken;
-const api = async (url, method = "GET", body) => {
+const api = async (url, method = "GET", body, tenant) => {
   if (method !== "GET" && !csrfToken) {
     const response = await fetch("/api/csrf", {
       headers: { Accept: "application/json" },
@@ -35,7 +35,7 @@ const api = async (url, method = "GET", body) => {
     const csrf = await response.json();
     csrfToken = csrf.token;
   }
-  url += (url.includes("?") ? "&" : "?") + "provider=" + encodeURIComponent(new URLSearchParams(location.search).get("provider") || "1");
+  url += (url.includes("?") ? "&" : "?") + "provider=" + encodeURIComponent(tenant ?? (new URLSearchParams(location.search).get("provider") || "1"));
   const r = await fetch(url, {
     method,
     headers: {
@@ -163,9 +163,18 @@ async function submitBooking(e) {
       if (!b) throw last || Error("Nincs elérhető munkatárs");
     } else b = await api("/api/bookings", "POST", body);
     if (isPublic) {
+      let remembered = "";
+      if (f.get("rememberContact")) {
+        try {
+          await api('/api/guest/profile', 'PATCH', {email: body.email || '', phone: body.phone || ''});
+          remembered = '<p>Elérhetőségeidet megjegyeztük a következő foglaláshoz.</p>';
+        } catch {
+          remembered = '<p class="notice">A foglalás elkészült, de az elérhetőségek megjegyzése nem sikerült. A saját fiókodban elmentheted őket.</p>';
+        }
+      }
       trackBooking();
       $("#public-form").innerHTML =
-        `<div class="success"><h2>${b.status === "pending" ? "Foglalási kérésed megérkezett!" : "Az időpontod megerősítve!"}</h2><p>${b.status === "pending" ? "A szalon jóváhagyására vár." : "Várunk szeretettel!"}</p><p>Mentsd el a módosítási hivatkozásod. A szalon beállításai alapján e-mailes értesítőt is kaphatsz:</p><a href="/modositas?provider=${providerId()}&token=${b.token}">Foglalásom kezelése →</a></div>`;
+        `<div class="success">${remembered}<h2>${b.status === "pending" ? "Foglalási kérésed megérkezett!" : "Az időpontod megerősítve!"}</h2><p>${b.status === "pending" ? "A szalon jóváhagyására vár." : "Várunk szeretettel!"}</p><p>Mentsd el a módosítási hivatkozásod. A szalon beállításai alapján e-mailes értesítőt is kaphatsz:</p><a href="/modositas?provider=${providerId()}&token=${b.token}">Foglalásom kezelése →</a></div>`;
     } else {
       $("#modal").close();
       await refresh();
