@@ -5,6 +5,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\{DB, Storage};
 final class GuestFeaturesController
 {
+    public function profile(Request $r){
+        $id=(int)$r->session()->get('guest_id',0);abort_unless($id&&DB::table('guest_accounts')->where('id',$id)->exists(),401);
+        $v=$r->validate(['email'=>'present|nullable|email|max:200','phone'=>'present|nullable|string|max:40']);
+        DB::table('guest_accounts')->where('id',$id)->update(['contact_email'=>$v['email']??'','phone'=>$v['phone']??'','updated_at'=>now()]);
+        return response()->json(['ok'=>true]);
+    }
     public function passes(Request $r)
     {
         $id=(int)$r->session()->get('guest_id',0);abort_unless($id,401);$s=app(SalonStore::class)->read();
@@ -41,7 +47,7 @@ final class GuestFeaturesController
         $own = (int) $r->session()->get('guest_id', 0) === $id;
         $provider = $r->session()->get('admin') === true && (int) $r->session()->get('provider_id', 1) === app(Tenant::class)->id;
         if (!$own && $provider) {
-            $own = (bool) collect(app(SalonStore::class)->read()['clients'])->first(fn($c) => (int) ($c['guestId'] ?? 0) === $id);
+            $own = (bool) collect(app(SalonStore::class)->read()['clients'])->first(fn($c) => \App\Services\Clients::visible($c) && (int) ($c['guestId'] ?? 0) === $id);
         }
         abort_unless($own, 404);
         $path = DB::table('guest_accounts')->where('id', $id)->value('avatar');

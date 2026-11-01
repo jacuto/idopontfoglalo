@@ -73,7 +73,7 @@ function serviceChecks() {
     .filter((s) => !s.archived)
     .map(
       (s) =>
-        `<label class="check"><input type="checkbox" name="services" value="${s.id}" onchange="updateStaff()">${esc(s.name)}<span>${s.duration} p · ${money(s.price)}</span></label>`,
+        `<label class="check"><input type="checkbox" name="services" value="${s.id}" onchange="serviceSelectionChanged()">${esc(s.name)}<span>${s.duration} p · ${money(s.price)}</span></label>`,
     )
     .join("");
 }
@@ -121,7 +121,7 @@ function updateStaff() {
     $("#total").textContent = total[0] + " perc · " + money(total[1]);
 }
 function bookingFields(dt) {
-  return `<label>Szolgáltatások</label>${serviceChecks()}<p id="total" style="margin-top:12px">Válassz szolgáltatást</p><div class="staff-field"><label>Munkatárs</label><select name="staff"></select></div>${isPublic ? `<label>Nap kiválasztása</label><input type="date" id="booking-date" min="${datekey(new Date())}" value="${datekey(new Date())}" onchange="loadSlots()"><label>Szabad időpontok</label><div class="row" id="available-slots"></div><input type="hidden" name="start" required>` : `<label>Időpont</label><input type="datetime-local" name="start" required value="${dt || localdt(new Date())}">`}<label>Vendég neve</label><input name="name" required placeholder="Pl. Szabó Kata" ${!isPublic ? 'list="clients" oninput="fillClient(this.value)"' : ""}><datalist id="clients">${(state.clients || []).map((c) => `<option value="${esc(c.name)}">${esc(c.phone)}</option><option value="${esc(c.phone)}">${esc(c.name)}</option>`).join("")}</datalist><div class="row"><div style="flex:1"><label>Telefonszám</label><input name="phone" type="tel" placeholder="+36 30 123 4567" ${!isPublic ? 'list="clients" oninput="fillClient(this.value)"' : ""}></div><div style="flex:1"><label>E-mail</label><input name="email" type="email" placeholder="nev@pelda.hu"></div></div><p style="font-size:11px;margin-top:10px">Telefonszám vagy e-mail megadása szükséges.</p><div class="error" id="form-error"></div>`;
+  return `<label>Szolgáltatások</label>${serviceChecks()}<p id="total" style="margin-top:12px">Válassz szolgáltatást</p><div class="staff-field"><label>Munkatárs</label><select name="staff"></select></div>${isPublic ? `<section id="booking-day-step" hidden><label>Nap kiválasztása</label><input type="date" id="booking-date" min="${datekey(new Date())}" value="" onchange="bookingDaySelected()"></section><section id="booking-slot-step" hidden><label>Szabad időpontok</label><div class="row" id="available-slots"></div></section><input type="hidden" name="start" required>` : `<label>Időpont</label><input type="datetime-local" name="start" required value="${dt || localdt(new Date())}">`}<label>Vendég neve</label><input name="name" required placeholder="Pl. Szabó Kata" ${!isPublic ? 'list="clients" oninput="fillClient(this.value)"' : ""}><datalist id="clients">${(state.clients || []).map((c) => `<option value="${esc(c.name)}">${esc(c.phone)}</option><option value="${esc(c.phone)}">${esc(c.name)}</option>`).join("")}</datalist><div class="row"><div style="flex:1"><label>Telefonszám</label><input name="phone" type="tel" placeholder="+36 30 123 4567" ${!isPublic ? 'list="clients" oninput="fillClient(this.value)"' : ""}></div><div style="flex:1"><label>E-mail</label><input name="email" type="email" placeholder="nev@pelda.hu"></div></div><p style="font-size:11px;margin-top:10px">Telefonszám vagy e-mail megadása szükséges.</p><div class="error" id="form-error"></div>`;
 }
 function fillClient(value) {
   const c = state.clients.find((c) => c.name === value || c.phone === value);
@@ -249,7 +249,9 @@ async function loadSlots() {
     (x) => x.value,
   );
   $("[name=start]").value = "";
-  if (!ids.length) {
+  $('#booking-day-step')?.toggleAttribute('hidden', !ids.length);
+  $('#booking-slot-step')?.toggleAttribute('hidden', !ids.length || !$('#booking-date').value);
+  if (!ids.length || !$('#booking-date').value) {
     $("#available-slots").innerHTML = "<p>Először válassz szolgáltatást.</p>";
     return;
   }

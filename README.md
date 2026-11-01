@@ -2,6 +2,8 @@
 
 A **jacuto/idopontfoglalo meglévő PHP/Laravel alkalmazásának továbbfejlesztése**, nem külön demó. PHP 8.2+, Laravel 12, MySQL/MariaDB. Nincs Node.js-build vagy Passenger-követelmény.
 
+- [Napi használati finomítások, 21 napos határidő és mintaadatok](docs/FINOMITASOK.md)
+- [Google-/Facebook-alkalmazásadatok megkeresése](docs/BELEPES.md)
 - [Frissítés Tárhely.eu-n, mentéssel és pontos parancsokkal](FRISSITES.md)
 - [Funkcióleltár, megőrzött működés, szabályok és ismert korlátok](docs/ATADAS.md)
 - [Külső kapcsolatok, callbackek, webhookok és cron](docs/KAPCSOLATOK.md)

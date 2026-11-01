@@ -108,10 +108,20 @@ class Payments
             );
         }
         $s = $this->store->read();
-        if (
-            !empty($s["subscription"]["id"]) && in_array($s["subscription"]["status"] ?? "", ["active", "trialing"], true)
-        ) {
-            throw new InvalidArgumentException("Már van aktív előfizetés.");
+        if (!empty($s['subscription']['id'])) {
+            // Reuse a real unpaid Stripe invoice instead of creating a second subscription.
+            $existing=Http::timeout(15)->withToken($key)->get('https://api.stripe.com/v1/subscriptions/'.rawurlencode($s['subscription']['id']),['expand'=>['latest_invoice']]);
+            if(!$existing->successful())throw new InvalidArgumentException('A meglévő Stripe-előfizetés most nem ellenőrizhető. Próbáld később, vagy használd az átutalást.');
+            $subscription=$existing->json();
+            if(!in_array($subscription['status']??'', ['canceled','incomplete_expired'],true)) {
+                $invoice=$subscription['latest_invoice']??[];$url=is_array($invoice)?($invoice['hosted_invoice_url']??''):'';
+                if(is_array($invoice)&&($invoice['status']??'')==='open'&&($invoice['amount_remaining']??0)>0&&is_string($url)&&parse_url($url,PHP_URL_SCHEME)==='https'&&parse_url($url,PHP_URL_HOST)==='invoice.stripe.com')return ['url'=>$url];
+                throw new InvalidArgumentException('Már van élő Stripe-előfizetésed, és nincs most megnyitható fizetési számlád. Újabb előfizetést nem indítunk. Az esedékes díjakat az Előfizetés menüben látod.');
+            }
+        }
+        if(!empty($s['subscription']['trialEndsAt'])) {
+            $trialEnd=\Carbon\CarbonImmutable::parse($s['subscription']['trialEndsAt']);
+            if($trialEnd->isFuture()&&$trialEnd->lt(now()->addHours(48)->addMinute()))throw new InvalidArgumentException('A próbaidő utolsó két napjában új Stripe-próba már nem indítható. A kártyás előfizetést a próbaidő végén indíthatod; addig díjmentesen használhatod a rendszert, vagy választhatod az átutalást.');
         }
         $p = Http::timeout(15)
             ->withToken($key)
@@ -139,7 +149,7 @@ class Payments
             ->post("https://api.stripe.com/v1/checkout/sessions", [
                 "mode" => "subscription",
                 "metadata" => ["provider_id" => (string) app(Tenant::class)->id],
-                "subscription_data" => ["metadata" => ["provider_id" => (string) app(Tenant::class)->id]],
+                "subscription_data" => ["metadata" => ["provider_id" => (string) app(Tenant::class)->id], ...(!empty($s["subscription"]["trialEndsAt"]) && \Carbon\CarbonImmutable::parse($s["subscription"]["trialEndsAt"])->isFuture() ? ["trial_end" => \Carbon\CarbonImmutable::parse($s["subscription"]["trialEndsAt"])->timestamp] : [])],
                 "line_items" => [["price" => $price, "quantity" => 1]],
                 "billing_address_collection" => "required",
                 "tax_id_collection" => ["enabled" => "true"],
@@ -190,6 +200,8 @@ class Payments
         }
         $event = $request->json()->all();
         $object = $event["data"]["object"] ?? [];
+        // Keep only identifiers from optionally expanded Stripe references, never client secrets.
+        foreach(['subscription','customer','payment_intent'] as $field) if(isset($object[$field])&&is_array($object[$field]))$object[$field]=$object[$field]['id']??null;
         if ($platform && isset($object["metadata"]["provider_id"])) {
             $tenant = filter_var($object["metadata"]["provider_id"], FILTER_VALIDATE_INT, ["options" => ["min_range" => 1]]);
             if (!$tenant || !\Illuminate\Support\Facades\DB::table("salon_state")->where("id", $tenant)->exists()) return response()->json(["error" => "Ismeretlen szolgáltató."], 400);
@@ -212,13 +224,14 @@ class Payments
             if ($event["type"] === "checkout.session.completed") {
                 $checkout = $s["checkouts"][$object["id"]] ?? null;
                 if (!$checkout) {
+                    if (($platform && isset($object['metadata']['provider_id'])) || (!$platform && isset($object['metadata']['booking_id']))) abort(409,'A fizetési munkamenet mentése még folyamatban. Az eseményt újra kell küldeni.');
                     return;
                 }
-                if ($checkout["type"] === "subscription" && $platform && ($object["payment_status"] ?? "") === "paid") {
+                if ($checkout["type"] === "subscription" && $platform && in_array($object["payment_status"] ?? "", ["paid","no_payment_required"],true)) {
                     $s["subscription"] = array_replace($s["subscription"], [
                         "id" => $object["subscription"],
                         "customer" => $object["customer"],
-                        "status" => ($event["created"] ?? 0) >= ($s["subscription"]["lastEventAt"] ?? 0) ? "active" : ($s["subscription"]["status"] ?? "active"),
+                        "status" => ($event["created"] ?? 0) >= ($s["subscription"]["lastEventAt"] ?? 0) ? (($object["payment_status"]??"")==="no_payment_required"?"trialing":"active") : ($s["subscription"]["status"] ?? "active"),
                         "lastEventAt" => max($event["created"] ?? 0, $s["subscription"]["lastEventAt"] ?? 0),
                     ]);
                     return;
@@ -268,7 +281,10 @@ class Payments
                 $reference = 'stripe-invoice:' . $object['id'];
                 $end = $object['lines']['data'][0]['period']['end'] ?? $object['period_end'] ?? null;
                 if (!$end) throw new InvalidArgumentException('A Stripe nem adta meg az előfizetési időszak végét.');
-                \Illuminate\Support\Facades\DB::table('platform_payments')->insertOrIgnore(['provider_id' => app(Tenant::class)->id, 'reference' => $reference, 'amount' => 4000, 'method' => 'card', 'paid_at' => now(), 'period_end' => \Carbon\CarbonImmutable::createFromTimestamp($end), 'created_at' => now(), 'updated_at' => now()]);
+                \Illuminate\Support\Facades\DB::table('platform_payments')->insertOrIgnore(['provider_id' => app(Tenant::class)->id, 'reference' => $reference, 'amount' => 4000, 'method' => 'card', 'paid_at' => \Carbon\CarbonImmutable::createFromTimestamp($object['status_transitions']['paid_at']??time())->setTimezone(config('app.timezone')), 'period_start'=>isset($object['lines']['data'][0]['period']['start'])?\Carbon\CarbonImmutable::createFromTimestamp($object['lines']['data'][0]['period']['start'])->setTimezone(config('app.timezone')):null, 'details'=>json_encode(['source'=>'stripe','stripeInvoice'=>$object['id'],'stripeSubscription'=>$object['subscription']??$object['parent']['subscription_details']['subscription']??null,'stripeCustomer'=>$object['customer']??null,'paymentIntent'=>$object['payment_intent']??null,'eventId'=>$event['id']??null,'currency'=>'HUF','amountPaid'=>4000]), 'period_end' => \Carbon\CarbonImmutable::createFromTimestamp($end)->setTimezone(config('app.timezone')), 'created_at' => now(), 'updated_at' => now()]);
+                $payment = \Illuminate\Support\Facades\DB::table('platform_payments')->where('reference',$reference)->first();
+                $periodStart = $object['lines']['data'][0]['period']['start'] ?? $object['period_start'] ?? null;
+                Subscriptions::settle($s,$payment,null,$periodStart ? \Carbon\CarbonImmutable::createFromTimestamp($periodStart)->toISOString() : null);
                 $paidUntil = \Carbon\CarbonImmutable::createFromTimestamp($end)->toISOString();
                 if (empty($s['subscription']['paidUntil']) || $paidUntil > $s['subscription']['paidUntil']) $s['subscription']['paidUntil'] = $paidUntil;
                 if (($event['created'] ?? 0) >= ($s['subscription']['lastEventAt'] ?? 0)) {
@@ -313,6 +329,7 @@ class Payments
                 }
             }
         });
+        $this->store->mutate(function(&$s){ Subscriptions::refresh($s); });
         return response()->json(["received" => true]);
     }
 }

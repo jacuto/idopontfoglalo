@@ -61,6 +61,16 @@ final class Settings
         ];
         if (($state['subscription']['status'] ?? '') === 'trialing' && !empty($state['subscription']['trialEndsAt']) && \Carbon\CarbonImmutable::parse($state['subscription']['trialEndsAt'])->isPast()) $state['subscription']['status'] = 'past_due';
         if (($state['subscription']['status'] ?? '') === 'active' && !empty($state['subscription']['paidUntil']) && empty($state['subscription']['id']) && \Carbon\CarbonImmutable::parse($state['subscription']['paidUntil'])->isPast()) $state['subscription']['status'] = 'past_due';
+        $guestIds=array_values(array_filter(array_column($state['clients']??[],'guestId')));
+        if($guestIds){
+            $accounts=\Illuminate\Support\Facades\DB::table('guest_accounts')->whereIn('id',$guestIds)->get()->keyBy('id');
+            foreach($state['clients'] as &$client)if(Clients::visible($client)&&!empty($client['guestId'])&&($account=$accounts->get($client['guestId']))){
+                if($account->phone!==null)$client['phone']=$account->phone;
+                if($account->contact_email!==null||$account->email!==null)$client['email']=$account->contact_email??$account->email;
+            }
+            unset($client);
+        }
+        Subscriptions::refresh($state);
         // Legacy record association is local to the salon; it grants no account access.
         foreach ($state["bookings"] as &$booking) {
             if (!isset($booking["clientId"])) {

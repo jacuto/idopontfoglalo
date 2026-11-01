@@ -3,16 +3,18 @@
 ## Végleges ellenőrzés
 
 - PHP **8.2.32**, PHPUnit **11.5.57**.
-- Külön **MariaDB 11.4** tesztadatbázis: **56 sikeres teszt, 309 ellenőrzés**.
-- Külön SQLite memóriabeli adatbázis: **56 teszt, 298 ellenőrzés, 2 szándékosan kihagyott többfolyamatos teszt** (54 sikeres); a két valódi párhuzamossági teszt itt szándékosan kihagyott, mert azokhoz InnoDB-zárolás szükséges.
+- Külön **MariaDB 11.4** tesztadatbázis: **69 sikeres teszt, 389 ellenőrzés**.
+- Külön SQLite memóriabeli adatbázis: **69 teszt, 378 ellenőrzés, 2 szándékosan kihagyott többfolyamatos teszt** (67 sikeres); a két valódi párhuzamossági teszt itt szándékosan kihagyott, mert azokhoz InnoDB-zárolás szükséges.
 - Valódi Chromium/Playwright: importált, foglalás nélküli vendég keresése; azonos nevek megkülönböztetése; telefonszám-formázás; lefelé/felfelé nyíl, Enter, Esc és kiválasztás; vendégadatlap; 390 px mobilnézet vízszintes oldal-túlcsordulás nélkül; avatarigazítás; nyilvános szolgáltatás mellől foglalásindítás. Nem volt böngészős JavaScript-hiba.
 - Az összes alkalmazás-, útvonal-, konfiguráció-, migráció- és PHP-tesztfájl szintaktikai ellenőrzése.
-- A négy böngészős JavaScript-fájl és a Playwright-szkript `node --check` ellenőrzése.
+- Az öt böngészős JavaScript-fájl és a Playwright-szkript `node --check` ellenőrzése.
 - `git diff --check`.
 
 A tesztek között szerepelnek a korábbi, megőrzött naptár-/foglalás-/import-/értesítés-/OAuth-/Stripe-/Billingo-/Számlázz.hu-tesztek. Az új tesztek ellenőrzik az adatelkülönítést, a kézi küldés sorainak elkülönítését, a maszkolt főadminkulcsokat, a hamis vendégfiók-hozzárendelés tilalmát, a titkos link egyszeri kapcsolását, a megjelenést/értékelést, a kuponár-pillanatképet, a bérlet egyszeri visszaadását és meg nem jelenéskori fogyasztását, az üzeneteket, hírlevél-hozzájárulást/leiratkozást/küldési sort, előfizetési jóváírást/számlázást és Stripe-eseményismétlést, a csomag naptárkeretét, valamint az adatmegőrző frissítés ismételhetőségét.
 
 A `ConcurrencyTest` **két külön PHP-folyamatot** indít ugyanazon MariaDB-rekord ellen. Külön vizsgálja az egyetlen bérletalkalom és az egyetlen kuponfelhasználás versenyhelyzetét. Mindkét esetben pontosan egy foglalás sikerül; a másik érthető jogosultsági/kerethibával áll meg. Nem memóriabeli utánzat teszteli a zárolást.
+
+A bővített böngészős ellenőrzés a feltételes kuponmezőt, a szolgáltatás → nap → időpont sorrendet (az iframe nélküli modulban is), a követőkódok hiányát, a vendéglistás eltávolítást, hívási/üzenetküldési hivatkozásokat, az Esc-/háttérkattintásos bezárást, a függő lista megnyitását, az egyszerűsített menüt, az előző hónapot/30 napot/napi grafikont és a főadmin havi díjlistáját is ellenőrzi. Új backendtesztek fedik a központi elérhetőségek védelmét, a helyi vendégeltávolítást, a 0 Ft-os próbatételeket, a 21 napos határidőt, régebbi tartozás megőrzését újabb hónap kifizetésekor, a Stripe-metaadatok és titkok szétválasztását, valamint a mintaadat-feltöltés védelmét és ismételhetőségét. A Stripe-munkamenet mentése előtt érkező esemény újrapróbálását, a meglévő nyitott Stripe-számla újrafelhasználását és az utolsó 48 próbaóra kezelését is teszteljük.
 
 ## Mit nem bizonyítanak ezek a tesztek?
 
@@ -59,7 +61,7 @@ A többfolyamatos teszt átadja az ellenőrzött tesztkapcsolatot a két munkafo
 
 ## Böngészős ellenőrzés
 
-A `tests/browser.cjs` a meglévő alkalmazást nyitja meg, nem külön demót. Ehhez külön helyi SQLite-példány és a `tests/support/browser-fixture.php` tesztadat-előkészítő szükséges. A fixture csak az alkalmazás `work/` könyvtára alatti SQLite-adatbázison fut; két mesterséges vendéget készít az egyforma nevek tesztjéhez.
+A `tests/browser.cjs` és a `tests/refinements.cjs` a meglévő alkalmazást nyitja meg, nem külön demót. Ehhez külön helyi SQLite-példány és a `tests/support/browser-fixture.php` tesztadat-előkészítő szükséges. A fixture csak az alkalmazás `work/` könyvtára alatti SQLite-adatbázison fut; két mesterséges vendéget készít az egyforma nevek tesztjéhez.
 
 Példa külön fejlesztői checkoutban, POSIX shellben:
 
@@ -79,12 +81,14 @@ A szerver fusson ebben a terminálban. Egy másik terminálban, az alkalmazás g
 
 ```sh
 node tests/browser.cjs
+node tests/refinements.cjs
 ```
 
 Ha a rendszer saját Chromiumját használod:
 
 ```sh
 CHROMIUM_EXECUTABLE=/usr/bin/chromium node tests/browser.cjs
+node tests/refinements.cjs
 ```
 
 A Playwright külön, ideiglenes fejlesztői `work/` könyvtárba telepíthető; nem kell Node.js az alkalmazás éles futtatásához. A szkript `RAERO_TEST_URL` és `RAERO_BROWSER_PASSWORD` környezeti változóval másik, szándékosan kijelölt tesztpéldányra is állítható. A képernyőképeket a `work/` könyvtárba írja.

@@ -45,14 +45,8 @@ final class PlatformController {
   }
   if($path==='api/platform/payments'&&$method==='GET')return response()->json(DB::table('platform_payments')->latest('id')->get());
   if($path==='api/platform/payments'&&$method==='POST'){
-   $v=$r->validate(['providerId'=>'required|integer|min:1','reference'=>'required|string|max:150','paidAt'=>'required|date']);
-   $result=app(Tenant::class)->run($v['providerId'],fn()=>app(SalonStore::class)->mutate(function(&$s)use($v){
-    $old=DB::table('platform_payments')->where('reference',$v['reference'])->first();if($old){abort_unless((int)$old->provider_id===$v['providerId'],422,'Ez a banki hivatkozás másik szolgáltatóhoz tartozik.');return ['ok'=>true,'alreadyCredited'=>true];}
-    $base=\Carbon\CarbonImmutable::parse($s['subscription']['paidUntil']??$s['subscription']['trialEndsAt']??now());if($base->isPast())$base=\Carbon\CarbonImmutable::now();$end=$base->addMonthNoOverflow();
-    $inserted=DB::table('platform_payments')->insertOrIgnore(['provider_id'=>$v['providerId'],'reference'=>$v['reference'],'amount'=>4000,'method'=>'transfer','paid_at'=>\Carbon\CarbonImmutable::parse($v['paidAt']),'period_end'=>$end,'created_at'=>now(),'updated_at'=>now()]);
-    if(!$inserted)throw new \InvalidArgumentException('Ezt a banki tranzakciót már rögzítették. Frissítsd a befizetési listát.');
-    $s['subscription']=array_replace($s['subscription'],['status'=>'active','paidUntil'=>$end->toISOString()]);return ['ok'=>true,'alreadyCredited'=>false];
-   }));return response()->json($result);
+   $v=$r->validate(['providerId'=>'required|integer|min:1','reference'=>'required|string|max:150','paidAt'=>'required|date','chargeId'=>'nullable|string|max:100']);
+   return response()->json(app(\App\Services\Subscriptions::class)->transfer($v['providerId'],$v['reference'],$v['paidAt'],$v['chargeId']??null));
   }
   if($path==='api/platform/operator'&&$method==='GET')return response()->json($this->operator());
   if($path==='api/platform/operator'&&$method==='PUT'){

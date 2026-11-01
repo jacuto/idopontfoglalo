@@ -148,3 +148,10 @@ Artisan::command('raero:upgrade',function(){
 
 Artisan::command('raero:newsletters {--limit=30}', function(){ $this->info(json_encode(app(\App\Services\Newsletters::class)->run(min(100,max(1,(int)$this->option('limit')))),JSON_UNESCAPED_UNICODE)); });
 \Illuminate\Support\Facades\Schedule::command('raero:newsletters')->everyMinute()->withoutOverlapping();
+
+Artisan::command('raero:subscriptions',function(){foreach(DB::table('salon_state')->pluck('id') as $id)app(\App\Services\Tenant::class)->run((int)$id,fn()=>app(SalonStore::class)->mutate(function(&$s){\App\Services\Subscriptions::refresh($s);}));$this->info('Havi díjtételek és hozzáférések frissítve.');});
+\Illuminate\Support\Facades\Schedule::command('raero:subscriptions')->hourly()->withoutOverlapping();
+Artisan::command('raero:sample-data {--provider=1}',function(){
+ $id=filter_var($this->option('provider'),FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);if(!$id){$this->error('Érvénytelen szolgáltatóazonosító.');return 1;}
+ try{$result=app(\App\Services\Tenant::class)->run($id,fn()=>app(\App\Services\SampleData::class)->add());$this->info(json_encode($result,JSON_UNESCAPED_UNICODE));}catch(InvalidArgumentException $e){$this->error($e->getMessage());return 1;}
+})->purpose('Mesterséges tesztadatok, kizárólag külön tesztadatbázisba');

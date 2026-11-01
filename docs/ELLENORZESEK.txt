@@ -1,4 +1,4 @@
-Ráérő – végleges ellenőrzési naplók, 2026. november 1.
+Ráérő – napi használati és előfizetési finomítások, 2026. november 1.
 
 MariaDB 11.4 – valódi InnoDB és párhuzamos folyamatok
 PHPUnit 11.5.57 by Sebastian Bergmann and contributors.
@@ -6,11 +6,12 @@ PHPUnit 11.5.57 by Sebastian Bergmann and contributors.
 Runtime:       PHP 8.2.32
 Configuration: /workspace/idopontfoglalo/phpunit.xml
 
-........................................................          56 / 56 (100%)
+................................................................. 65 / 69 ( 94%)
+....                                                              69 / 69 (100%)
 
-Time: 00:18.653, Memory: 50.50 MB
+Time: 00:23.010, Memory: 52.50 MB
 
-OK (56 tests, 309 assertions)
+OK (69 tests, 389 assertions)
 
 SQLite – két MariaDB-versenyteszt szándékosan kihagyva
 PHPUnit 11.5.57 by Sebastian Bergmann and contributors.
@@ -18,17 +19,21 @@ PHPUnit 11.5.57 by Sebastian Bergmann and contributors.
 Runtime:       PHP 8.2.32
 Configuration: /workspace/idopontfoglalo/phpunit.xml
 
-............SS..........................................          56 / 56 (100%)
+............SS................................................... 65 / 69 ( 94%)
+....                                                              69 / 69 (100%)
 
-Time: 00:16.652, Memory: 50.50 MB
+Time: 00:20.425, Memory: 50.50 MB
 
 OK, but some tests were skipped!
-Tests: 56, Assertions: 298, Skipped: 2.
+Tests: 69, Assertions: 378, Skipped: 2.
 
-Chromium / Playwright
+Chromium / Playwright – korábbi folyamatok regressziója
 PASS: imported-client lookup, normalized phone, ArrowDown/ArrowUp/Enter/Esc, client details, mobile width, centered avatar, public service booking; no browser errors.
 
-PHP-szintaxis: 55 fájl sikeres ellenőrzése.
-JavaScript: app.js, workspace.js, features.js, embed.js és tests/browser.cjs szintaktikailag rendben.
-git diff --check: sikeres.
-Külső HTTP-szolgáltatások: szimulált válaszok; éles fizetés, számla és kiküldés nem történt.
+Chromium / Playwright – új felület és iframe nélküli foglalás
+PASS: simplified settings menu; compact clickable pending count; modal Esc/backdrop; guest links/calls/messages/removal; prior month/30 days; daily revenue; mobile width; service → day → slots; conditional offers; no tracking; OAuth readiness; mainadmin monthly charges; iframe-free progressive booking.
+
+PHP-szintaxis: 58 fájl ellenőrizve.
+JavaScript: app.js, workspace.js, features.js, refinements.js, embed.js és a böngészőtesztek szintaktikailag rendben.
+Külső HTTP-integrációk: szimulált válaszok; nem történt éles fizetés, számlázás vagy kiküldés.
+Mintaadatok: kizárólag külön work/ alatti SQLite tesztpéldányba; nem az éles adatbázisba.

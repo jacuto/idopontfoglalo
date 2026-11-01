@@ -1,5 +1,7 @@
 # Fejlesztési átadás – 2026. november 1.
 
+> Újabb működési szabályok: [FINOMITASOK.md](FINOMITASOK.md). Ez tartalmazza a később kért felületet, vendégadatvédelmet, méréskikapcsolást és a 21 napos előfizetési határidőt; ezekben az alábbi korábbi leltárt felülírja.
+
 ## Kiindulási állapot és vizsgálat
 
 Tároló: `jacuto/idopontfoglalo`, `main`. Kiinduló commit: `c59c6060497be1e8bd92254ba6629e8d6e973afd`.

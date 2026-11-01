@@ -4,13 +4,18 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 final class Clients
 {
+    public static function editable(array $client,array $input):void {
+        if(empty($client['guestId']))return;
+        foreach(['email','phone'] as $field)if(array_key_exists($field,$input)&&(string)($input[$field]??'')!==(string)($client[$field]??'')) throw new InvalidArgumentException('A regisztrált vendég emailjét és telefonszámát csak a vendég módosíthatja a saját fiókjában.');
+    }
+    public static function visible(array $client):bool {return empty($client['deletedAt']);}
     public static function phone(string $value): string { return preg_replace('/[^0-9]/', '', $value); }
     public static function attach(array &$state, array &$booking, ?string $selected, bool $provider): void
     {
         if ($provider) $booking['guestId'] = null;
         if ($provider && $selected) {
             foreach ($state['clients'] as $c) {
-                if ($c['id'] === $selected) {
+                if ($c['id'] === $selected && self::visible($c)) {
                     $booking['clientId'] = $c['id'];
                     foreach (['name', 'phone', 'email'] as $key) $booking[$key] = $c[$key] ?? '';
                     // Reuse an already proved account relationship; selection cannot create one.
@@ -23,8 +28,9 @@ final class Clients
         // Only an authenticated guest identity may reuse its own linked record automatically.
         $guestId = $booking['guestId'] ?? null;
         if ($guestId && !$provider) {
-            foreach ($state['clients'] as $c) {
+            foreach ($state['clients'] as &$c) {
                 if ((int) ($c['guestId'] ?? 0) === (int) $guestId) {
+                    unset($c['deletedAt']);
                     $booking['clientId'] = $c['id'];
                     return;
                 }
@@ -38,7 +44,7 @@ final class Clients
     public static function detail(array $s, string $id): array
     {
         $c = collect($s['clients'])->firstWhere('id', $id);
-        abort_unless($c, 404, 'Nincs ilyen vendég.');
+        abort_unless($c && self::visible($c), 404, 'Nincs ilyen vendég.');
         $bookings = array_values(array_filter($s['bookings'], fn($b) => ($b['clientId'] ?? null) === $id));
         $stats = ['total' => count($bookings), 'cancelled' => 0, 'attended' => 0, 'no_show' => 0];
         foreach ($bookings as $b) {

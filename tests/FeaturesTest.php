@@ -215,4 +215,109 @@ class FeaturesTest extends TestCase {
   DB::table('deliveries')->insert(['provider_id'=>2,'dedup'=>str_repeat('a',64),'payload'=>\Illuminate\Support\Facades\Crypt::encryptString(json_encode(['kind'=>'message','messageId'=>'absent'])),'status'=>'pending','attempts'=>0,'available_at'=>now(),'created_at'=>now(),'updated_at'=>now()]);
   $this->provider();$this->postJson('/api/deliveries/run')->assertOk();$this->assertSame('pending',DB::table('deliveries')->value('status'));
  }
+
+ protected function tearDown():void {\Carbon\Carbon::setTestNow();\Carbon\CarbonImmutable::setTestNow();parent::tearDown();}
+ private function clock(string $date):void {\Carbon\Carbon::setTestNow($date);\Carbon\CarbonImmutable::setTestNow($date);}
+ public function test_registered_contacts_are_guest_owned_across_all_provider_write_routes():void {
+  $this->guest();$a=$this->postJson('/api/bookings',$this->booking())->assertCreated()->json();$this->postJson('/api/bookings?provider=2',$this->booking())->assertCreated();
+  $this->patchJson('/api/guest/profile',['email'=>'new@example.com','phone'=>'+36 20 222 3333'])->assertOk();
+  $this->provider();$this->getJson('/api/state')->assertJsonPath('clients.0.email','new@example.com')->assertJsonPath('clients.0.phone','+36 20 222 3333');
+  $change=['name'=>'Vendég','email'=>'attacker@example.com','phone'=>'999'];
+  $this->patchJson('/api/clients/'.$a['clientId'],$change)->assertUnprocessable();
+  $this->putJson('/api/config',['clients'=>[['id'=>$a['clientId']]+$change]])->assertUnprocessable();
+  $this->postJson('/api/imports/clients',['records'=>[['id'=>$a['clientId']]+$change]])->assertUnprocessable();
+  $this->getJson('/api/state')->assertJsonPath('bookings.0.email','guest@example.com');
+  $this->provider(2);$this->getJson('/api/state')->assertJsonPath('clients.0.email','new@example.com');
+  $this->assertSame('guest@example.com',DB::table('guest_accounts')->where('id',10)->value('email'));
+ }
+ public function test_removing_client_only_hides_current_provider_relationship_and_keeps_history():void {
+  $this->guest();$a=$this->postJson('/api/bookings',$this->booking())->assertCreated()->json();$this->postJson('/api/bookings?provider=2',$this->booking())->assertCreated();
+  $this->provider();$this->deleteJson('/api/clients/'.$a['clientId'])->assertOk();
+  $this->getJson('/api/state')->assertJsonCount(0,'clients')->assertJsonCount(1,'bookings');
+  $this->getJson('/api/clients/search?q=Vend')->assertExactJson([]);$this->getJson('/api/clients/'.$a['clientId'].'/detail')->assertNotFound();
+  $this->assertSame(1,DB::table('guest_accounts')->count());$this->provider(2);$this->getJson('/api/state')->assertJsonCount(1,'clients')->assertJsonCount(1,'bookings');
+ }
+ public function test_trial_has_two_zero_charges_and_no_invoice_or_payment():void {
+  $this->clock('2026-11-01 10:00:00');$this->provider();
+  app(SalonStore::class)->mutate(function(&$s){$s['subscription']=['status'=>'trialing','trialStartedAt'=>'2026-11-01T10:00:00+01:00','trialEndsAt'=>'2027-01-01T10:00:00+01:00'];});
+  $d=$this->getJson('/api/subscription/info')->assertOk()->assertJsonCount(2,'subscription.charges')->assertJsonPath('subscription.calendarBlocked',false)->json();
+  $this->assertSame([0,0],array_column($d['subscription']['charges'],'amount'));$this->assertSame(0,DB::table('platform_payments')->count());$this->assertSame(0,DB::table('platform_invoices')->count());
+ }
+ public function test_21_day_deadline_blocks_calendar_but_allows_login_billing_and_settlement():void {
+  $this->clock('2026-10-11 10:00:00');
+  app(SalonStore::class)->mutate(function(&$s){$s['subscription']=['status'=>'trialing','trialStartedAt'=>'2026-07-01T10:00:00+02:00','trialEndsAt'=>'2026-09-01T10:00:00+02:00'];});
+  config(['raero.admin_password_hash'=>Hash::make('calendar-test-password')]);
+  $this->postJson('/api/login',['password'=>'calendar-test-password'])->assertOk();$this->provider();
+  $this->postJson('/api/bookings',$this->booking())->assertStatus(423);
+  $d=$this->getJson('/api/subscription/info')->assertOk()->assertJsonPath('subscription.calendarBlocked',true)->json();
+  $monthly=array_values(array_filter($d['subscription']['charges'],fn($e)=>$e['kind']==='monthly'));$this->assertSame(['overdue','pending'],array_column($monthly,'status'));
+  $this->withSession(['platform_admin'=>true]);
+  $this->postJson('/api/platform/payments',['providerId'=>1,'reference'=>'bank-new-period','paidAt'=>'2026-10-11','chargeId'=>$monthly[1]['id']])->assertOk();
+  $this->getJson('/api/subscription/info')->assertJsonPath('subscription.calendarBlocked',true); // Paying a newer month must not erase older debt.
+  $this->postJson('/api/platform/payments',['providerId'=>1,'reference'=>'bank-new-period','paidAt'=>'2026-10-11','chargeId'=>$monthly[0]['id']])->assertUnprocessable();
+  $this->postJson('/api/platform/payments',['providerId'=>1,'reference'=>'bank-old-period','paidAt'=>'2026-10-11','chargeId'=>$monthly[0]['id']])->assertOk();
+  $this->getJson('/api/subscription/info')->assertJsonPath('subscription.calendarBlocked',false);
+  $this->postJson('/api/platform/payments',['providerId'=>1,'reference'=>'another-bank-reference','paidAt'=>'2026-10-11','chargeId'=>$monthly[0]['id']])->assertUnprocessable();
+  $this->assertSame(2,DB::table('platform_payments')->count());$this->postJson('/api/bookings',$this->booking())->assertCreated();
+ }
+ public function test_public_booking_lock_does_not_disclose_provider_financial_data():void {
+  $this->clock('2026-10-11 10:00:00');app(SalonStore::class)->mutate(function(&$s){$s['subscription']=['trialStartedAt'=>'2026-07-01T10:00:00+02:00','trialEndsAt'=>'2026-09-01T10:00:00+02:00'];});
+  $this->postJson('/api/bookings',$this->booking())->assertStatus(423)->assertJsonPath('message','A szolgáltató online foglalása jelenleg szünetel. Időpontért keresd közvetlenül a szolgáltatót.');
+ }
+ public function test_stripe_payment_settles_pending_charge_and_keeps_transaction_metadata_on_replay():void {
+  $this->clock('2026-09-10 10:00:00');config(['integrations.platform_stripe.webhook_secret'=>'whsec_refinement_test']);
+  app(SalonStore::class)->mutate(function(&$s){$s['subscription']=['id'=>'sub_refinement','trialStartedAt'=>'2026-07-01T10:00:00+02:00','trialEndsAt'=>'2026-09-01T10:00:00+02:00'];});
+  $start=\Carbon\CarbonImmutable::parse('2026-09-01T10:00:00+02:00')->timestamp;$end=\Carbon\CarbonImmutable::parse('2026-10-01T10:00:00+02:00')->timestamp;
+  $event=['id'=>'evt_refinement','created'=>time(),'type'=>'invoice.paid','data'=>['object'=>['id'=>'in_refinement','subscription'=>'sub_refinement','customer'=>'cus_refinement','payment_intent'=>['id'=>'pi_refinement','client_secret'=>'never-return-this-test-string'],'paid'=>true,'currency'=>'huf','amount_paid'=>400000,'lines'=>['data'=>[['period'=>['start'=>$start,'end'=>$end]]]]]]];
+  $body=json_encode($event);$t=time();$signature='t='.$t.',v1='.hash_hmac('sha256',$t.'.'.$body,'whsec_refinement_test');
+  for($i=0;$i<2;$i++)$this->call('POST','/api/platform-stripe/webhook',[],[],[],['CONTENT_TYPE'=>'application/json','HTTP_STRIPE_SIGNATURE'=>$signature],$body)->assertOk();
+  $this->assertSame(1,DB::table('platform_payments')->count());$this->provider();$d=$this->getJson('/api/subscription/info')->assertOk()->json();
+  $charge=collect($d['subscription']['charges'])->firstWhere('kind','monthly');$this->assertSame('paid',$charge['status']);
+  $meta=json_decode($d['payments'][0]['details'],true);$this->assertSame('in_refinement',$meta['stripeInvoice']);$this->assertSame('pi_refinement',$meta['paymentIntent']);$this->assertStringNotContainsString('never-return-this-test-string',$d['payments'][0]['details']);
+ }
+ public function test_offer_availability_flags_do_not_expose_private_codes_or_measurement_ids():void {
+  $this->getJson('/api/public')->assertJsonPath('hasCoupons',false)->assertJsonPath('hasPasses',false)->assertJsonMissingPath('settings.googleAnalyticsId');
+  $this->provider();$c=$this->coupon();$c['public']=false;$this->postJson('/api/coupons',$c)->assertCreated();
+  $this->getJson('/api/public')->assertJsonPath('hasCoupons',true)->assertJsonCount(0,'offers')->assertJsonMissing(['code'=>'ELSO']);
+ }
+ public function test_month_end_charge_periods_are_stable_at_deadline_boundary():void {
+  $this->clock('2026-04-21 10:00:00');$s=\App\Services\Settings::upgrade(SalonStore::initial());$s['subscription']=['trialStartedAt'=>'2026-01-31T10:00:00+01:00','trialEndsAt'=>'2026-03-31T10:00:00+02:00'];
+  \App\Services\Subscriptions::refresh($s);$once=$s;\App\Services\Subscriptions::refresh($s);$this->assertSame($once,$s);$this->assertFalse($s['subscription']['calendarBlocked']);
+  $this->clock('2026-04-21 10:00:01');\App\Services\Subscriptions::refresh($s);$this->assertTrue($s['subscription']['calendarBlocked']);
+ }
+
+ public function test_zero_trial_entry_is_never_invoiced():void {
+  config(['integrations.platform_billingo.key'=>'zero-test-key','integrations.platform_billingo.block'=>1]);$this->withSession(['platform_admin'=>true]);
+  $id=DB::table('platform_payments')->insertGetId(['provider_id'=>1,'reference'=>'legacy-zero','amount'=>0,'method'=>'transfer','paid_at'=>now(),'period_end'=>now()->addMonth(),'created_at'=>now(),'updated_at'=>now()]);
+  \Illuminate\Support\Facades\Http::fake();$this->postJson('/api/platform/invoices',['paymentId'=>$id])->assertUnprocessable()->assertJsonPath('error','A díjmentes próbaidőről nem állítunk ki számlát.');\Illuminate\Support\Facades\Http::assertNothingSent();
+ }
+ public function test_sample_seed_is_guarded_and_real_test_fixture_is_repeatable():void {
+  $this->app['env']='production';try{app(\App\Services\SampleData::class)->add();$this->fail('Production seed must fail');}catch(\InvalidArgumentException){$this->assertCount(0,app(SalonStore::class)->read()['bookings']);}
+  $this->app['env']='testing';$original=config('database.default');$file=base_path('work/sample-test-'.bin2hex(random_bytes(6)).'.sqlite');if(!is_dir(dirname($file)))mkdir(dirname($file),0700,true);touch($file);
+  config(['database.default'=>'sqlite','database.connections.sqlite.database'=>$file]);DB::purge('sqlite');
+  try{Artisan::call('migrate',['--force'=>true]);DB::table('salon_state')->insert(['id'=>1,'data'=>json_encode(SalonStore::initial())]);
+   $first=app(\App\Services\SampleData::class)->add();$second=app(\App\Services\SampleData::class)->add();$this->assertGreaterThan(60,$first['addedBookings']);$this->assertSame(0,$second['addedBookings']);$this->assertGreaterThan(30,count(app(SalonStore::class)->read()['payments']));$this->assertSame(0,DB::table('deliveries')->count());$this->assertSame(0,DB::table('platform_payments')->count());
+  }finally{DB::purge('sqlite');config(['database.default'=>$original]);unlink($file);}
+ }
+
+ public function test_early_stripe_checkout_event_is_retried_without_losing_subscription_link():void {
+  config(['integrations.platform_stripe.webhook_secret'=>'whsec_race_test']);
+  $event=['id'=>'evt_early','created'=>time(),'type'=>'checkout.session.completed','data'=>['object'=>['id'=>'cs_early','subscription'=>'sub_early','customer'=>'cus_early','payment_status'=>'paid','metadata'=>['provider_id'=>'1']]]];
+  $send=function()use($event){$body=json_encode($event);$t=time();return $this->call('POST','/api/platform-stripe/webhook',[],[],[],['CONTENT_TYPE'=>'application/json','HTTP_STRIPE_SIGNATURE'=>'t='.$t.',v1='.hash_hmac('sha256',$t.'.'.$body,'whsec_race_test')],$body);};
+  $send()->assertStatus(409);$this->assertNotContains('evt_early',app(SalonStore::class)->read()['stripeEvents']??[]);
+  app(SalonStore::class)->mutate(function(&$s){$s['checkouts']['cs_early']=['type'=>'subscription'];});$send()->assertOk();$this->assertSame('sub_early',app(SalonStore::class)->read()['subscription']['id']);$this->assertSame(0,DB::table('platform_payments')->count());
+ }
+
+ public function test_overdue_stripe_invoice_is_reused_instead_of_creating_second_subscription():void {
+  config(['integrations.platform_stripe.key'=>'sk_subscription_test','integrations.platform_stripe.price'=>'price_test']);$this->provider();
+  app(SalonStore::class)->mutate(function(&$s){$s['subscription']=['id'=>'sub_pending','status'=>'past_due'];});
+  \Illuminate\Support\Facades\Http::fake(['api.stripe.com/v1/subscriptions/sub_pending*'=>\Illuminate\Support\Facades\Http::response(['status'=>'past_due','latest_invoice'=>['status'=>'open','amount_remaining'=>400000,'hosted_invoice_url'=>'https://invoice.stripe.com/i/test_existing']])]);
+  $this->postJson('/api/subscription/checkout')->assertOk()->assertJsonPath('url','https://invoice.stripe.com/i/test_existing');
+  \Illuminate\Support\Facades\Http::assertSentCount(1);\Illuminate\Support\Facades\Http::assertSent(fn($r)=>$r->method()==='GET');
+ }
+ public function test_last_48_hours_of_trial_never_sends_invalid_stripe_trial_request():void {
+  $this->clock('2026-12-31 10:00:00');config(['integrations.platform_stripe.key'=>'sk_trial_test','integrations.platform_stripe.price'=>'price_test']);$this->provider();
+  app(SalonStore::class)->mutate(function(&$s){$s['subscription']=['trialStartedAt'=>'2026-11-01T10:00:00+01:00','trialEndsAt'=>'2027-01-01T10:00:00+01:00'];});
+  \Illuminate\Support\Facades\Http::fake();$this->postJson('/api/subscription/checkout')->assertUnprocessable();\Illuminate\Support\Facades\Http::assertNothingSent();
+ }
 }

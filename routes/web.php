@@ -43,6 +43,7 @@ Route::post(
     )->webhook($r, true),
 );
 Route::match(['GET', 'POST', 'PATCH'], '/api/messages', [\App\Http\Controllers\MessagesController::class, 'handle']);
+Route::patch('/api/guest/profile', [\App\Http\Controllers\GuestFeaturesController::class, 'profile']);
 Route::get('/api/guest/passes', [\App\Http\Controllers\GuestFeaturesController::class, 'passes']);
 Route::post('/api/guest/claim', [\App\Http\Controllers\GuestFeaturesController::class, 'claim']);
 Route::post('/api/guest/avatar', [\App\Http\Controllers\GuestFeaturesController::class, 'avatar']);

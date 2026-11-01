@@ -48,12 +48,12 @@
       return d;
     }
     render() {
-      this.shadowRoot.innerHTML = `<style>:host{display:block;color:#193842;font-family:Arial,sans-serif;max-width:720px;margin:auto}*{box-sizing:border-box}.card{background:white;border:1px solid #bdced8;border-radius:18px;padding:26px;box-shadow:0 5px 20px #17394c0a}h2{font-size:25px;margin:0 0 12px}p{color:#506772;line-height:1.7;font-size:13px}label{display:block;font-size:12px;font-weight:700;margin:16px 0 7px}input,select,button{font:inherit}input,select{width:100%;padding:12px;border:1px solid #b6cbd4;border-radius:8px;color:#193842;background:white}.service{display:flex;align-items:center;gap:10px;background:#eff5f7;padding:12px;border-radius:8px;font-size:13px}.service input{width:auto;accent-color:#126451}.service span{margin-left:auto;font-size:11px;font-weight:400;white-space:nowrap}button{padding:11px 14px;background:white;border:1px solid #b6cbd4;color:#284953;border-radius:8px;cursor:pointer}.slots{display:flex;gap:7px;flex-wrap:wrap}.primary{background:#126451;color:white;border-color:#126451}.actions{margin-top:22px;text-align:right}.error{color:#ab3131;margin-top:12px}.total{font-weight:700;color:#126451}.success{background:#e1f3e8;padding:22px;border-radius:12px}a{color:#126451}.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:480px){.fields{grid-template-columns:1fr}.card{padding:18px}.service{font-size:12px;flex-wrap:wrap}}</style><div class="card"><h2>${escape(this.data.settings.name)}</h2><p>Válassz szolgáltatást és szabad időpontot. Regisztráció nélkül is foglalhatsz.</p><form><label>Szolgáltatások</label>${this.data.services.map((s) => `<label class="service"><input type="checkbox" name="services" value="${escape(s.id)}">${escape(s.name)}<span>${s.duration} perc · ${s.price.toLocaleString("hu-HU")} Ft</span></label>`).join("")}<p class="total"></p><div class="staff"><label>Munkatárs</label><select name="staff"></select></div><label>Nap</label><input name="date" type="date" required><label>Szabad időpontok (magyarországi idő)</label><div class="slots"><p>Először válassz szolgáltatást.</p></div><label>Név</label><input name="name" required maxlength="150"><div class="fields"><div><label>Telefonszám</label><input name="phone" type="tel" maxlength="40"></div><div><label>E-mail</label><input name="email" type="email" maxlength="200"></div></div><p>Telefonszám vagy e-mail megadása szükséges.</p><div class="error" role="alert"></div><div class="actions"><button class="primary" type="submit">Időpont lefoglalása</button></div></form></div>`;
+      this.shadowRoot.innerHTML = `<style>:host{display:block;color:#193842;font-family:Arial,sans-serif;max-width:720px;margin:auto}*{box-sizing:border-box}.card{background:white;border:1px solid #bdced8;border-radius:18px;padding:26px;box-shadow:0 5px 20px #17394c0a}h2{font-size:25px;margin:0 0 12px}p{color:#506772;line-height:1.7;font-size:13px}label{display:block;font-size:12px;font-weight:700;margin:16px 0 7px}input,select,button{font:inherit}input,select{width:100%;padding:12px;border:1px solid #b6cbd4;border-radius:8px;color:#193842;background:white}.service{display:flex;align-items:center;gap:10px;background:#eff5f7;padding:12px;border-radius:8px;font-size:13px}.service input{width:auto;accent-color:#126451}.service span{margin-left:auto;font-size:11px;font-weight:400;white-space:nowrap}button{padding:11px 14px;background:white;border:1px solid #b6cbd4;color:#284953;border-radius:8px;cursor:pointer}.slots{display:flex;gap:7px;flex-wrap:wrap}.primary{background:#126451;color:white;border-color:#126451}.actions{margin-top:22px;text-align:right}.error{color:#ab3131;margin-top:12px}.total{font-weight:700;color:#126451}.success{background:#e1f3e8;padding:22px;border-radius:12px}a{color:#126451}.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:480px){.fields{grid-template-columns:1fr}.card{padding:18px}.service{font-size:12px;flex-wrap:wrap}}</style><div class="card"><h2>${escape(this.data.settings.name)}</h2><p>Válassz szolgáltatást és szabad időpontot. Regisztráció nélkül is foglalhatsz.</p><form><label>Szolgáltatások</label>${this.data.services.map((s) => `<label class="service"><input type="checkbox" name="services" value="${escape(s.id)}">${escape(s.name)}<span>${s.duration} perc · ${s.price.toLocaleString("hu-HU")} Ft</span></label>`).join("")}<p class="total"></p><div class="staff"><label>Munkatárs</label><select name="staff"></select></div><section class="day-step" hidden><label>Nap kiválasztása</label><input name="date" type="date" required disabled></section><section class="slot-step" hidden><label>Szabad időpontok (magyarországi idő)</label><div class="slots"></div></section><label>Név</label><input name="name" required maxlength="150"><div class="fields"><div><label>Telefonszám</label><input name="phone" type="tel" maxlength="40"></div><div><label>E-mail</label><input name="email" type="email" maxlength="200"></div></div><p>Telefonszám vagy e-mail megadása szükséges.</p><div class="error" role="alert"></div><div class="actions"><button class="primary" type="submit">Időpont lefoglalása</button></div></form></div>`;
       const now = new Intl.DateTimeFormat("sv-SE", {
         timeZone: "Europe/Budapest",
       }).format(new Date());
       const date = this.shadowRoot.querySelector("[name=date]");
-      date.min = date.value = now;
+      date.min = now;date.value = "";
       this.shadowRoot
         .querySelectorAll("[name=services]")
         .forEach((e) => (e.onchange = () => this.update()));
@@ -67,6 +67,7 @@
       ].map((e) => e.value);
     }
     update() {
+      this.shadowRoot.querySelector("[name=date]").value="";
       const ids = this.selected(),
         people = this.data.staff.filter((p) =>
           ids.every((id) =>
@@ -96,7 +97,10 @@
       this.selectedSlot = null;
       const box = this.shadowRoot.querySelector(".slots"),
         ids = this.selected();
-      if (!ids.length) {
+      this.shadowRoot.querySelector('[name=date]').disabled=!ids.length;
+      this.shadowRoot.querySelector('.day-step').hidden=!ids.length;
+      this.shadowRoot.querySelector('.slot-step').hidden=!ids.length||!this.shadowRoot.querySelector('[name=date]').value;
+      if (!ids.length || !this.shadowRoot.querySelector('[name=date]').value) {
         box.innerHTML = "<p>Először válassz szolgáltatást.</p>";
         return;
       }

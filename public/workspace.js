@@ -41,8 +41,7 @@ function render() {
     payments: "Befizetések",
     reports: "Statisztika",
     messages: "Üzenetek",
-    offers: "Kuponok és bérletek",
-    profile: "Nyilvános adatlap",
+
     settings: "Beállítások",
     billing: "Előfizetés",
   };
@@ -61,7 +60,7 @@ function render() {
     billing: "↗",
   };
   $("#app").innerHTML =
-    `<div class="shell"><aside class="sidebar"><div class="brand"><span>◷</span>ráérő.</div><div class="workspace"><strong>${esc(state.settings.name)}</strong><small>${state.settings.businessMode === "solo" ? "Egyéni vállalkozás" : "Csapatmunkatér"}</small></div><nav>${Object.entries(
+    `<div class="shell"><aside class="sidebar"><div class="brand"><span>◷</span>ráérő.</div><nav>${Object.entries(
       labels,
     )
       .map(
@@ -70,7 +69,7 @@ function render() {
       )
       .join(
         "",
-      )}</nav><div class="profile"><div class="avatar">${esc(initials(state.settings.name))}</div><div><strong>${esc(state.settings.name)}</strong><small>Szolgáltatói munkaterület</small></div></div></aside><main><header class="topbar"><div class="crumb">Munkaterület / <b>${labels[view]}</b></div><div class="top-actions"><button onclick="window.open('/foglalas?provider='+providerId(),'_blank')">↗ Foglalási oldalam</button><button onclick="logout()">Kilépés</button></div></header><div class="intro"><div><span class="eyebrow">${view === "calendar" ? "A NAPOD, ÁTLÁTHATÓAN" : "RÁÉRŐ MUNKATÉR"}</span><h1>${view === "calendar" ? "Minden időpont a helyén." : labels[view]}</h1><p>${view === "calendar" ? "Kevesebb szervezés. Több idő a vendégeidre." : "Minden fontos adat, egy helyen."}</p></div>${["calendar", "clients", "services", "staff"].includes(view) ? `<button class="primary" onclick="${{ calendar: "bookingForm()", clients: "clientForm()", services: "serviceForm()", staff: "staffForm()" }[view]}">＋ ${view === "calendar" ? "Új időpont" : view === "clients" ? "Új vendég" : view === "services" ? "Új szolgáltatás" : "Új munkatárs"}</button>` : ""}</div><div id="content"></div></main></div>`;
+      )}</nav><button class="profile" onclick="view='settings';render()" aria-label="Vállalkozás beállításai"><div class="avatar">${esc(initials(state.settings.name))}</div><div><strong>${esc(state.settings.name)}</strong><small>Beállítások megnyitása</small></div></button></aside><main><header class="topbar"><div class="crumb">Munkaterület / <b>${labels[view] || ({offers:"Kuponok és bérletek",profile:"Nyilvános adatlap"}[view])}</b></div><div class="top-actions"><button onclick="window.open('/foglalas?provider='+providerId(),'_blank')">↗ Foglalási oldalam</button><button onclick="logout()">Kilépés</button></div></header><div class="intro"><div><span class="eyebrow">${view === "calendar" ? "A NAPOD, ÁTLÁTHATÓAN" : "RÁÉRŐ MUNKATÉR"}</span><h1>${view === "calendar" ? "Minden időpont a helyén." : (labels[view] || ({offers:"Kuponok és bérletek",profile:"Nyilvános adatlap"}[view]))}</h1><p>${view === "calendar" ? "Kevesebb szervezés. Több idő a vendégeidre." : "Minden fontos adat, egy helyen."}</p></div>${["calendar", "clients", "services", "staff"].includes(view) ? `<button class="primary" onclick="${{ calendar: "bookingForm()", clients: "clientForm()", services: "serviceForm()", staff: "staffForm()" }[view]}">＋ ${view === "calendar" ? "Új időpont" : view === "clients" ? "Új vendég" : view === "services" ? "Új szolgáltatás" : "Új munkatárs"}</button>` : ""}</div><div id="content"></div></main></div>`;
   document.querySelectorAll("[data-nav]").forEach(
     (b) =>
       (b.onclick = () => {
@@ -131,7 +130,7 @@ function calendarPage() {
   if (state.settings.businessMode === "solo") filter = "";
   const filtered = active.filter((b) => !filter || b.staff === filter);
   $("#content").innerHTML =
-    `<div class="stats"><div class="stat"><div><small>Mai időpontok</small><strong>${daily.length}</strong></div><div class="symbol">▦</div></div><div class="stat"><div><small>Jóváhagyásra vár</small><strong>${pending.length}</strong></div><div class="symbol">◷</div></div><div class="stat"><div><small>Mai befizetések</small><strong>${money(paid)}</strong><em>Tervezett: ${money(daily.reduce((n, b) => n + bookingValue(b), 0))}</em></div><div class="symbol">↗</div></div></div><div class="card calendar-card"><div class="calendar-tools"><div class="row"><h3>${calendarAnchor.toLocaleDateString("hu-HU", { year: "numeric", month: "long", ...(calendarMode === "day" ? { day: "numeric" } : {}) })}</h3><button aria-label="Előző időszak" onclick="calendarMove(-1)">‹</button><button aria-label="Következő időszak" onclick="calendarMove(1)">›</button><button onclick="calendarAnchor=new Date();calendarPage()">Ma</button></div><div class="row">${
+    `<div class="stats calendar-summary"><div class="stat"><div><small>Mai időpontok</small><strong>${daily.length}</strong></div><div class="symbol">▦</div></div><button class="stat pending-summary" onclick="pendingBookings()" aria-label="Jóváhagyásra váró foglalások"><div><small>Jóváhagyásra vár</small><strong>${pending.length}</strong></div><div class="symbol">◷</div></button><div class="stat"><div><small>Mai befizetések</small><strong>${money(paid)}</strong><em>Tervezett: ${money(daily.reduce((n, b) => n + bookingValue(b), 0))}</em></div><div class="symbol">↗</div></div></div><div class="card calendar-card"><div class="calendar-tools"><div class="row"><h3>${calendarAnchor.toLocaleDateString("hu-HU", { year: "numeric", month: "long", ...(calendarMode === "day" ? { day: "numeric" } : {}) })}</h3><button aria-label="Előző időszak" onclick="calendarMove(-1)">‹</button><button aria-label="Következő időszak" onclick="calendarMove(1)">›</button><button onclick="calendarAnchor=new Date();calendarPage()">Ma</button></div><div class="row">${
       state.settings.businessMode !== "solo" && activePeople().length > 1
         ? `<select aria-label="Munkatársszűrő" style="width:180px" onchange="filter=this.value;calendarPage()"><option value="">Minden munkatárs</option>${activePeople()
             .map(
@@ -243,7 +242,7 @@ function clientRows(query) {
       )
       .map(
         (c) =>
-          `<tr><td><strong>${esc(c.name)}</strong></td><td>${esc(c.phone) || "—"}</td><td>${esc(c.email) || "—"}</td><td><button onclick="clientDetail('${c.id}')">Adatlap</button><button onclick="clientForm('${c.id}')">Szerkesztés</button></td></tr>`,
+          `<tr><td><a href="#vendeg-${c.id}" onclick="event.preventDefault();clientDetail('${c.id}')"><strong>${esc(c.name)}</strong></a></td><td>${phoneLink(c.phone)}</td><td>${esc(c.email) || "—"}</td><td><button onclick="clientDetail('${c.id}')">Adatlap</button><button onclick="clientForm('${c.id}')">Szerkesztés</button><button onclick="clientMessage('${c.id}')">Üzenet</button><button class="danger" onclick="removeClientForm('${c.id}')">Eltávolítás</button></td></tr>`,
       )
       .join("") ||
     (query ? '<tr><td colspan="4">Nincs találat. Próbálj másik nevet vagy elérhetőséget, vagy válaszd az Új vendég gombot.</td></tr>' : '<tr><td colspan="4">Még nincs vendéged. Az Új vendég gombbal felveheted az elsőt, az Importálással pedig meglévő listát hozhatsz be.</td></tr>');
@@ -251,7 +250,7 @@ function clientRows(query) {
 function clientForm(id) {
   const c = state.clients.find((c) => c.id === id) || {};
   showModal(
-    `<h2>${id ? "Vendég szerkesztése" : "Új vendég"}</h2><form id="client-form"><label>Név</label><input name="name" value="${esc(c.name || "")}" required><label>Telefonszám</label><input name="phone" value="${esc(c.phone || "")}" type="tel"><label>E-mail</label><input name="email" value="${esc(c.email || "")}" type="email"><div id="form-error" class="error"></div><div class="buttons"><button type="button" onclick="$('#modal').close()">Mégse</button><button class="primary">Mentés</button></div></form>`,
+    `<h2>${id ? "Vendég szerkesztése" : "Új vendég"}</h2><form id="client-form"><label>Név</label><input name="name" value="${esc(c.name || "")}" required><label>Telefonszám</label><input name="phone" value="${esc(c.phone || "")}" type="tel" ${c.guestId?'readonly aria-readonly="true"':''}><label>E-mail</label><input name="email" value="${esc(c.email || "")}" type="email" ${c.guestId?'readonly aria-readonly="true"':''}>${c.guestId?'<p class="hint">Ez regisztrált vendég. Emailjét és telefonszámát a saját vendégfiókjában módosíthatja.</p>':''}<div id="form-error" class="error"></div><div class="buttons"><button type="button" onclick="$('#modal').close()">Mégse</button><button class="primary">Mentés</button></div></form>`,
   );
   $("#client-form").onsubmit = async (e) => {
     e.preventDefault();
@@ -489,7 +488,7 @@ function activityPage() {
         )
         .map(
           (b) =>
-            `<tr><td>${esc(b.name)}</td><td>${new Date(b.start).toLocaleString("hu-HU")}</td><td>${(b.serviceSnapshot || []).map(s => `<a class="text-link" href="#szolgaltatas-${esc(s.id)}" onclick="event.preventDefault();serviceDetail('${esc(s.id)}')">${esc(s.name)}</a>`).join(" + ")}</td><td><span class="status ${b.status}">${statusName[b.status]}</span></td><td><button onclick="bookingDetails('${b.id}')">Részletek</button></td></tr>`,
+            `<tr><td>${bookingGuestLink(b)}<br>${phoneLink(bookingContact(b).phone)}</td><td>${new Date(b.start).toLocaleString("hu-HU")}</td><td>${(b.serviceSnapshot || []).map(s => `<a class="text-link" href="#szolgaltatas-${esc(s.id)}" onclick="event.preventDefault();serviceDetail('${esc(s.id)}')">${esc(s.name)}</a>`).join(" + ")}</td><td><span class="status ${b.status}">${statusName[b.status]}</span></td><td><button onclick="bookingDetails('${b.id}')">Részletek</button><button onclick="bookingMessage('${b.id}')">Üzenet</button></td></tr>`,
         )
         .join("") || '<tr><td colspan="5">Még nincs foglalás.</td></tr>'
     }</tbody></table></div>`;
@@ -543,23 +542,7 @@ function settingsPage() {
    .join(
      "",
    )}</select><label>Áfakulcs a vendégszámlákon</label><select name="invoiceVat">${["AAM", "27%", "18%", "5%", "0%"].map((v) => `<option ${v === s.invoiceVat ? "selected" : ""}>${v}</option>`).join("")}</select><p class="hint">A saját vállalkozásod számlázási adatai az előfizetéshez tartoznak. A vendég számlázási adatait számlakiállításkor külön kell megadni. A számla a Befizetések menüből indítható.</p></details>
- <details><summary>Google és Facebook mérés</summary><p class="hint">Azonosítót adj meg, ne teljes JavaScript-kódot. A mérés csak a vendég hozzájárulása után indul.</p><div class="form-grid">${[
-   ["googleAnalyticsId", "Google Analytics 4", "G-XXXXXXXXXX"],
-   ["googleTagManagerId", "Google Tag Manager", "GTM-XXXXXXX"],
-   ["googleAdsId", "Google Ads", "AW-123456789"],
-   [
-     "googleAdsLabel",
-     "Google Ads foglalási konverzió címkéje",
-     "Konverziócímke",
-   ],
-   ["facebookPixelId", "Meta / Facebook Pixel", "123456789012345"],
- ]
-   .map(
-     ([k, l, p]) =>
-       `<div><label>${l}</label><input name="${k}" value="${esc(s[k] || "")}" placeholder="${p}"></div>`,
-   )
-   .join("")}</div></details>
- <details><summary>Beágyazás saját weboldalba</summary><label>Engedélyezett weboldalak (soronként egy eredet)</label><textarea name="embedOrigins" placeholder="https://digitmarketing.hu">${esc((s.embedOrigins || []).join("\n"))}</textarea><label>Beilleszthető kód</label><textarea readonly rows="4">${esc('<script charset="utf-8" src="' + location.origin + '/embed.js" defer></script>\n<raero-booking endpoint="' + location.origin + '"></raero-booking>')}</textarea><p class="hint">Önálló webkomponens, iframe nélkül, elkülönített stílusokkal. A befogadó oldal pontos https://domain.hu címét engedélyezni kell. A foglalás adatvédelmi/mérési beállításait a befogadó oldal is vegye figyelembe.</p></details><div id="settings-error" class="error"></div><div class="buttons"><button class="primary">Beállítások mentése</button></div></form></div><div class="card item"><h2>Szolgáltatói kapcsolatok</h2><p>A titkos kulcsok titkosítva tárolódnak. Az üresen hagyott mezők megtartják a korábbi értéket.</p><div id="connections-form"><p>Kapcsolatok betöltése…</p></div></div><div class="card item"><h2>Értesítési küldési sor</h2><div class="row"><button onclick="deliveryRows()">Frissítés</button><button onclick="runDeliveries()">Esedékes küldések most</button></div><div class="table-scroll" id="delivery-table"></div></div></div>`;
+ <details><summary>Beágyazás saját weboldalba</summary><label>Engedélyezett weboldalak (soronként egy eredet)</label><textarea name="embedOrigins" placeholder="https://digitmarketing.hu">${esc((s.embedOrigins || []).join("\n"))}</textarea><label>Beilleszthető kód</label><textarea readonly rows="4">${esc('<script charset="utf-8" src="' + location.origin + '/embed.js" defer></script>\n<raero-booking endpoint="' + location.origin + '"></raero-booking>')}</textarea><p class="hint">Önálló webkomponens, iframe nélkül, elkülönített stílusokkal. A befogadó oldal pontos https://domain.hu címét engedélyezni kell. A foglalás adatkezelési tájékoztatóját a befogadó oldalon is tedd elérhetővé.</p></details><div id="settings-error" class="error"></div><div class="buttons"><button class="primary">Beállítások mentése</button></div></form></div><div class="card item"><h2>Szolgáltatói kapcsolatok</h2><p>A titkos kulcsok titkosítva tárolódnak. Az üresen hagyott mezők megtartják a korábbi értéket.</p><div id="connections-form"><p>Kapcsolatok betöltése…</p></div></div><div class="card item"><h2>Értesítési küldési sor</h2><div class="row"><button onclick="deliveryRows()">Frissítés</button><button onclick="runDeliveries()">Esedékes küldések most</button></div><div class="table-scroll" id="delivery-table"></div></div></div>`;
   $("#settings-form").onsubmit = async (e) => {
     e.preventDefault();
     const f = new FormData(e.target),
@@ -954,123 +937,12 @@ publicPage = function () {
       '<a href="/fiokom">Google / Facebook-belépés és saját foglalásaim →</a>';
     card.prepend(link);
   }
-  trackingConsent();
-  if (card) {
-    const privacy = document.createElement("button");
-    privacy.className = "privacy-button";
-    privacy.textContent = "Mérési hozzájárulás módosítása";
-    privacy.onclick = resetConsent;
-    card.append(privacy);
-  }
+
 };
 
-function trackingConsent() {
-  if (!state?.settings) return;
-  const s = state.settings;
-  if (
-    ![
-      s.googleAnalyticsId,
-      s.googleTagManagerId,
-      s.googleAdsId,
-      s.facebookPixelId,
-    ].some(Boolean)
-  )
-    return;
-  let choice;
-  try {
-    choice = JSON.parse(localStorage.getItem("raero-consent-v1") || "null");
-  } catch {}
-  if (choice) {
-    enableTracking(choice);
-    return;
-  }
-  const banner = document.createElement("div");
-  banner.id = "consent-banner";
-  banner.className = "consent-banner";
-  banner.innerHTML =
-    '<strong>Adatvédelmi beállítások</strong><p>A foglalás mérés nélkül is működik. Engedélyezed a látogatottságmérést és a marketingcélú követést?</p><div class="row"><button onclick="chooseConsent(false,false)">Csak szükséges</button><button onclick="chooseConsent(true,false)">Csak statisztika</button><button class="primary" onclick="chooseConsent(true,true)">Mindet engedélyezem</button></div>';
-  document.body.append(banner);
-}
-function chooseConsent(analytics, marketing) {
-  const choice = { analytics, marketing };
-  localStorage.setItem("raero-consent-v1", JSON.stringify(choice));
-  $("#consent-banner")?.remove();
-  enableTracking(choice);
-}
-function enableTracking(choice) {
-  const s = state.settings;
-  if (window.raeroTrackingStarted) return;
-  window.raeroTrackingStarted = true;
-  const load = (url) => {
-    const script = document.createElement("script");
-    script.src = url;
-    script.async = true;
-    document.head.append(script);
-  };
-  window.dataLayer = window.dataLayer || [];
-  window.gtag =
-    window.gtag ||
-    function () {
-      dataLayer.push(arguments);
-    };
-  gtag("consent", "default", {
-    analytics_storage: choice.analytics ? "granted" : "denied",
-    ad_storage: choice.marketing ? "granted" : "denied",
-    ad_user_data: choice.marketing ? "granted" : "denied",
-    ad_personalization: choice.marketing ? "granted" : "denied",
-  });
-  const ids = [
-    ...(choice.analytics && s.googleAnalyticsId ? [s.googleAnalyticsId] : []),
-    ...(choice.marketing && s.googleAdsId ? [s.googleAdsId] : []),
-  ];
-  if (ids.length) {
-    load(
-      "https://www.googletagmanager.com/gtag/js?id=" +
-        encodeURIComponent(ids[0]),
-    );
-    gtag("js", new Date());
-    ids.forEach((id) => gtag("config", id));
-  }
-  if (choice.analytics && choice.marketing && s.googleTagManagerId) {
-    dataLayer.push({ "gtm.start": Date.now(), event: "gtm.js" });
-    load(
-      "https://www.googletagmanager.com/gtm.js?id=" +
-        encodeURIComponent(s.googleTagManagerId),
-    );
-  }
-  if (choice.marketing && s.facebookPixelId) {
-    window.fbq =
-      window.fbq ||
-      function () {
-        (fbq.queue = fbq.queue || []).push(arguments);
-      };
-    fbq.loaded = true;
-    fbq.version = "2.0";
-    load("https://connect.facebook.net/en_US/fbevents.js");
-    fbq("init", s.facebookPixelId);
-    fbq("track", "PageView");
-  }
-}
-function trackBooking() {
-  let c;
-  try {
-    c = JSON.parse(localStorage.getItem("raero-consent-v1") || "null");
-  } catch {}
-  if (!c) return;
-  const s = state.settings;
-  if (c.analytics) {
-    window.gtag?.("event", "booking_completed");
-    window.dataLayer?.push({ event: "booking_completed" });
-  }
-  if (c.marketing) {
-    if (s.googleAdsId && s.googleAdsLabel)
-      window.gtag?.("event", "conversion", {
-        send_to: s.googleAdsId + "/" + s.googleAdsLabel,
-      });
-    window.fbq?.("track", "Schedule");
-  }
-}
-
+// Measurement is disabled for this release, including previously stored consent.
+function trackingConsent() {}
+function trackBooking() {}
 async function payGuest() {
   try {
     const r = await api("/api/manage/checkout", "POST", { token: manageToken });

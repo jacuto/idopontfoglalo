@@ -26,7 +26,7 @@ class WorkspaceController
         $method = $request->method();
         if (preg_match('#^/api/subscription/invoices/([1-9][0-9]*)/pdf$#',$path,$m) && $method === 'GET') return app(\App\Services\PlatformInvoices::class)->download((int)$m[1],app(\App\Services\Tenant::class)->id);
         if ($path === "/api/subscription/info" && $method === "GET") {
-            return response()->json(["providerId" => app(\App\Services\Tenant::class)->id, "operator" => app(PlatformController::class)->operator(), "invoices" => DB::table("platform_invoices")->where("provider_id", app(\App\Services\Tenant::class)->id)->select("id", "payment_id", "status", "number", "reference")->get(), "payments" => DB::table("platform_payments")->where("provider_id", app(\App\Services\Tenant::class)->id)->latest("id")->get()]);
+            return response()->json(["subscription"=>$this->store->read()["subscription"], "providerId" => app(\App\Services\Tenant::class)->id, "operator" => app(PlatformController::class)->operator(), "invoices" => DB::table("platform_invoices")->where("provider_id", app(\App\Services\Tenant::class)->id)->select("id", "payment_id", "status", "number", "reference")->get(), "payments" => DB::table("platform_payments")->where("provider_id", app(\App\Services\Tenant::class)->id)->latest("id")->get()]);
         }
         if ($path === "/api/connections" && $method === "GET") {
             return response()->json(app(Connections::class)->status());
@@ -123,14 +123,17 @@ class WorkspaceController
             ) {
                 foreach ($s[$kind] as &$row) {
                     if ($row["id"] === $id) {
+                        if ($kind === 'clients' && !\App\Services\Clients::visible($row)) { if($method==='DELETE') return ['ok'=>true]; abort(404,'A vendég nincs a saját listádban.'); }
                         if ($method === "PATCH") {
+                            if($kind==="clients") \App\Services\Clients::editable($row,$data);
                             $row = array_replace($row, $data);
                             $row["phone"] = $row["phone"] ?? "";
                             $row["email"] = $row["email"] ?? "";
                             return $row;
                         }
-                        if ($kind !== "staff") {
-                            abort(405);
+                        if ($kind === 'clients') {
+                            $row['deletedAt']=now()->toISOString();
+                            return ['ok'=>true,'message'=>'A vendéget eltávolítottuk a saját listádból. A foglalási előzmények, a vendégfiók és más szolgáltatók adatai megmaradtak.'];
                         }
                         if (
                             count(
@@ -325,6 +328,7 @@ class WorkspaceController
                         $added++;
                     } else {
                         $record["id"] = $s[$kind][$match]["id"];
+                        if($kind==="clients") \App\Services\Clients::editable($s[$kind][$match],$record);
                         $s[$kind][$match] = array_replace(
                             $s[$kind][$match],
                             $record,

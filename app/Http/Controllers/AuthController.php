@@ -245,7 +245,8 @@ class AuthController
             "id" => $account->id,
             "avatar" => $account->avatar ? "/api/guest/avatar/" . $account->id : null,
             "name" => $account->name,
-            "email" => $account->email,
+            "email" => $account->contact_email ?? $account->email,
+            "phone" => $account->phone ?? "",
             "bookings" => $bookings,
         ]);
     }

@@ -6,7 +6,7 @@ bookingFields = function(dt) {
   const box = `<div class="client-search"><input type="hidden" name="clientId"><div id="client-results" role="listbox" hidden></div><p id="client-hint" class="hint" aria-live="polite">Három betűt vagy számjegyet írj be. Új vendégnél töltsd ki az adatokat.</p></div>`;
   return html.replace(/<datalist id="clients">[\s\S]*?<\/datalist>/, isPublic ? '' : box)
     .replaceAll('list="clients" oninput="fillClient(this.value)"', 'role="combobox" aria-autocomplete="list" aria-controls="client-results" aria-expanded="false" autocomplete="off" oninput="searchClient(this)" onkeydown="clientKey(event,this)"')
-    + `<details><summary>Kedvezmény vagy bérlet</summary><label>Kuponkód</label><input name="coupon"><button type="button" onclick="previewPrice()">Ár ellenőrzése</button><label>Bérlet</label><select name="passId" onchange="previewPrice()"><option value="">Nem használok bérletet</option></select><p class="hint">Bérlethez lépj be, vagy szolgáltatóként válassz vendéget. Mentéskor egy alkalmat lefoglalunk; lemondásnál visszajár, megjelenésnél és meg nem jelenésnél elfogy.</p><p id="price-preview" aria-live="polite"></p></details>`;
+    + offerFields();
 };
 let clientMatches = [], clientIndex = -1, clientTicket = 0, searchTimer;
 function closeClients() {
@@ -16,6 +16,7 @@ function closeClients() {
 }
 function searchClient(input) {
   const selected = $('[name=clientId]'); if (selected) selected.value = '';
+  for(const key of ['phone','email']){const field=$(`[name=${key}]`);if(field)field.readOnly=false;}
   const pass = $('[name=passId]'); if (pass) pass.innerHTML = '<option value="">Nem használok bérletet</option>';
   clearTimeout(searchTimer); const ticket = ++clientTicket; closeClients();
   if (input.value.trim().length < 3) return;
@@ -31,7 +32,7 @@ function searchClient(input) {
   }, 180);
 }
 function clientKey(e,input) {
-  if (e.key === 'Escape') { if ($('#client-results') && !$('#client-results').hidden) { e.preventDefault(); e.stopPropagation(); } ++clientTicket; clearTimeout(searchTimer); closeClients(); return; }
+  if (e.key === 'Escape') { ++clientTicket; clearTimeout(searchTimer); closeClients(); return; }
   if ($('#client-results')?.hidden || !clientMatches.length) return;
   if (['ArrowDown','ArrowUp'].includes(e.key)) {
     e.preventDefault(); clientIndex = clientIndex < 0 ? (e.key === 'ArrowDown' ? 0 : clientMatches.length - 1) : (clientIndex + (e.key === 'ArrowDown' ? 1 : -1) + clientMatches.length) % clientMatches.length;
@@ -45,13 +46,14 @@ function chooseClient(index) {
   ++clientTicket; clearTimeout(searchTimer);
   for (const key of ['name','phone','email']) $(`[name=${key}]`).value = c[key] || '';
   $('[name=clientId]').value = c.id; closeClients();
+  const linked=state.clients?.find(x=>x.id===c.id)?.guestId;for(const key of ['phone','email'])$(`[name=${key}]`).readOnly=!!linked;
   $('#client-hint').textContent = 'Kiválasztva: ' + c.name + '. A meglévő vendéghez kerül az időpont.';
   const pass = $('[name=passId]');
   if (pass) pass.innerHTML = '<option value="">Nem használok bérletet</option>' + (state.clientPasses || []).filter(p => p.clientId === c.id && p.remaining > 0 && new Date(p.expiresAt) > new Date()).map(p => `<option value="${p.id}">${esc(p.name)} · ${p.remaining} alkalom · ${new Date(p.expiresAt).toLocaleDateString('hu-HU')}</option>`).join('');
 }
 async function previewPrice() {
   try {
-    const price = await api('/api/quote','POST',{services:[...document.querySelectorAll('[name=services]:checked')].map(x=>x.value),coupon:$('[name=coupon]').value || null,clientId:$('[name=clientId]')?.value || null,passId:$('[name=passId]')?.value || null,start:$('[name=start]')?.value || null});
+    const price = await api('/api/quote','POST',{services:[...document.querySelectorAll('[name=services]:checked')].map(x=>x.value),coupon:$('[name=coupon]')?.value || null,clientId:$('[name=clientId]')?.value || null,passId:$('[name=passId]')?.value || null,start:$('[name=start]')?.value || null});
     $('#price-preview').textContent = `Eredeti ár: ${money(price.original)} · Kedvezmény: ${money(price.discount)} · Fizetendő: ${money(price.payable)}`;
   } catch(e) { $('#price-preview').textContent = e.message; }
 }
@@ -60,7 +62,7 @@ submitBooking = async function(e) {
   // A visible server quote is required before a discounted booking is submitted.
   if ($('[name=coupon]')?.value || $('[name=passId]')?.value) {
     e.preventDefault();
-    try { const price = await api('/api/quote','POST',{services:[...document.querySelectorAll('[name=services]:checked')].map(x=>x.value),coupon:$('[name=coupon]').value,clientId:$('[name=clientId]')?.value || null,passId:$('[name=passId]')?.value || null,start:$('[name=start]')?.value || null});
+    try { const price = await api('/api/quote','POST',{services:[...document.querySelectorAll('[name=services]:checked')].map(x=>x.value),coupon:$('[name=coupon]')?.value,clientId:$('[name=clientId]')?.value || null,passId:$('[name=passId]')?.value || null,start:$('[name=start]')?.value || null});
       if (!confirm(`Eredeti ár: ${money(price.original)}\nKedvezmény: ${money(price.discount)}\nFizetendő: ${money(price.payable)}\nLefoglalod?`)) return;
     } catch(err) { $('#form-error').textContent = err.message; return; }
   }
@@ -105,7 +107,7 @@ publicPage = function() {
   root.insertBefore(section,form);if(!state.services.length)form.innerHTML='<h2>Az online foglalás még nem érhető el</h2><p>A szolgáltató még nem adott meg foglalható szolgáltatást. Keresd a megadott elérhetőségein.</p>';
   document.querySelectorAll('a[href="/fiokom"]').forEach(a=>a.href=providerLink('/fiokom'));
 };
-function startService(id){const el=document.querySelector(`[name=services][value="${CSS.escape(id)}"]`);if(el){el.checked=true;updateStaff();$('#public-form').scrollIntoView({behavior:'smooth'});}}
+function startService(id){const el=document.querySelector(`[name=services][value="${CSS.escape(id)}"]`);if(el){el.checked=true;serviceSelectionChanged();$('#public-form').scrollIntoView({behavior:'smooth'});}}
 function offersPage() {
   $('#content').innerHTML=`<div class="toolbar"><button class="primary" onclick="couponForm()">Új kupon</button><button onclick="passForm()">Új bérlet</button><button onclick="assignPassForm()">Bérlet hozzárendelése vendéghez</button></div><h2>Kuponok</h2><div class="entity-grid">${(state.coupons||[]).map(c=>`<article class="card item"><h3>${esc(c.name)}</h3><p>${esc(c.code)} · ${c.type==='percent'?c.value+'%':money(c.value)}</p><p>${c.active?'Aktív':'Inaktív'} · ${c.public?'Nyilvános':'Csak kóddal'}</p><button onclick="couponForm('${c.id}')">Szerkesztés</button></article>`).join('')||'<p>Még nincs kupon. Az Új kupon gombbal készíthetsz ajánlatot.</p>'}</div><h2>Bérletek</h2><div class="entity-grid">${(state.passes||[]).map(p=>`<article class="card item"><h3>${esc(p.name)}</h3><p>${p.visits} alkalom · ${money(p.price)} · ${p.days} nap · ${p.active?'Aktív':'Inaktív'}</p><button onclick="passForm('${p.id}')">Szerkesztés</button></article>`).join('')||'<p>Még nincs bérlet. Az Új bérlet gombbal hozhatod létre az elsőt.</p>'}</div><p class="hint">A meglévő foglalások árai és a kiadott bérletek feltételei szerkesztéskor nem változnak.</p>`;
 }
@@ -241,8 +243,3 @@ const servicesWithItems=servicesPage;
 servicesPage=function(){servicesWithItems();if(!state.services.some(s=>!s.archived)){const p=document.createElement('p');p.className='notice';p.textContent='Még nincs szolgáltatás. Az Új szolgáltatás gombbal add meg az első nevét, árát és időtartamát.';$('#content').append(p);}};
 const bookingWithServices=bookingForm;
 bookingForm=function(dt){if(!state.services.some(s=>!s.archived)){showModal(`<h2>Először vegyél fel szolgáltatást</h2><p>Az időpont mellé szükség lesz a szolgáltatás nevére, árára és időtartamára.</p><div class="buttons"><button onclick="$('#modal').close()">Bezárás</button><button class="primary" onclick="$('#modal').close();view='services';render();serviceForm()">Új szolgáltatás</button></div>`);return;}bookingWithServices(dt);};
-// All extensions are registered before the first request renders a page.
-if(location.pathname==='/foadmin') platformPage();
-else if(manageToken) managePage();
-else if(location.pathname.replace(/\/+$/,'')==='/fiokom') guestPage();
-else refresh().catch(loginPage);

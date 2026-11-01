@@ -10,7 +10,7 @@ Külső fiók és valódi API-kulcs nélkül a kapcsolat nem aktiválható. A te
 
 ## Stripe – az üzemeltető előfizetése
 
-A főadmin saját Stripe-fiókjában készíts havi, 1 havonta ismétlődő, **4 000 Ft fizetendő összegű, HUF** árat. Az alkalmazás a Stripe-árobjektumot szerveroldalon ellenőrzi. A próbaidő helyi, két naptári hónap; a szolgáltató felvételekor nincs Checkout és nincs kártyakérés. A Stripe Checkout elindítása már a fizetős előfizetés vállalása; a helyi próbaidőt nem másoljuk át automatikusan Stripe-próbára.
+A főadmin saját Stripe-fiókjában készíts havi, 1 havonta ismétlődő, **4 000 Ft fizetendő összegű, HUF** árat. Az alkalmazás a Stripe-árobjektumot szerveroldalon ellenőrzi. A próbaidő két naptári hónap; a szolgáltató felvételekor nincs Checkout és nincs kártyakérés. Ha önként korábban elindítja a Stripe-előfizetést, az alkalmazás a helyi próba végéig tartó Stripe-próbát ad át. A havi díjtételek, a 21 napos határidő és a naptárzárolás szabályai: [FINOMITASOK.md](FINOMITASOK.md).
 
 Webhook:
 
@@ -83,6 +83,8 @@ Az eredeti vállalkozásnál a korábbi `/api/stripe/webhook` cím is működik.
 A fizetési visszaigazoló oldal és a vendégnek küldött foglaláskezelő link megtartja a szolgáltató azonosítóját. A belső üzenet tranzakcióban mentődik, az emailértesítő külön küldési sorba kerül; a küldés hibája nem törli az üzenetet.
 
 ## Google és Facebook
+
+A konzolokban követendő pontos lépések: [BELEPES.md](BELEPES.md).
 
 A szolgáltató saját Kapcsolatok felületén adhatja meg az OAuth-adatokat. Az eredeti vállalkozás korábbi `.env`-adatai is működnek. Callbackek:
 

@@ -81,6 +81,9 @@ class SalonController
                 );
             }
             if ($admin && (int) $request->session()->get("provider_id", 1) !== app(\App\Services\Tenant::class)->id) { $admin = false; }
+            if (($path === '/api/bookings' && $method === 'POST') || preg_match('#^/api/bookings/[^/]+$#',$path) || $path === '/api/slots' || ($path === '/api/imports/bookings' && $method === 'POST')) {
+                \App\Services\Subscriptions::guard($this->store->read(),$admin);
+            }
             if ($path === "/api/manage/checkout" && $method === "POST") {
                 $token = $request->input("token");
                 if (
@@ -112,6 +115,8 @@ class SalonController
             if ($path === "/api/public" && $method === "GET") {
                 $s = $this->store->read();
                 return response()->json([
+                    "hasCoupons" => collect($s['coupons'])->contains(fn($c)=>$c['active'] && now()->between(CarbonImmutable::parse($c['startsAt']),CarbonImmutable::parse($c['endsAt']))),
+                    "hasPasses" => collect($s['passes'])->contains(fn($p)=>$p['active']) || collect($s['clientPasses'])->contains(fn($p)=>$p['remaining']>0 && CarbonImmutable::parse($p['expiresAt'])->isFuture()),
                     "profile" => $s["profile"],
                     "offers" => array_values(array_filter($s["coupons"], fn($c) => $c["active"] && $c["public"] && now()->between(CarbonImmutable::parse($c["startsAt"]), CarbonImmutable::parse($c["endsAt"])))),
                     "passes" => array_values(array_filter($s["passes"], fn($p) => $p["active"])),
@@ -122,11 +127,6 @@ class SalonController
                             "name",
                             "businessMode",
                             "primaryStaffId",
-                            "googleAnalyticsId",
-                            "googleTagManagerId",
-                            "googleAdsId",
-                            "googleAdsLabel",
-                            "facebookPixelId",
                         ]),
                     ),
                     "services" => array_values(
@@ -166,7 +166,8 @@ class SalonController
                 return app(WorkspaceController::class)->handle($request);
             }
             if ($path === "/api/state" && $method === "GET") {
-                return response()->json($this->store->read());
+                $state=$this->store->read();$state['clients']=array_values(array_filter($state['clients'],fn($c)=>\App\Services\Clients::visible($c)));
+                return response()->json($state);
             }
             if ($path === "/api/slots" && $method === "GET") {
                 return response()->json($this->slots($request));
@@ -220,6 +221,7 @@ class SalonController
                     ]);
                     $b["guestId"] = $request->session()->get("guest_id");
                     \App\Services\Clients::attach($s, $b, $data["clientId"] ?? null, !$b["public"]);
+                    \App\Services\Subscriptions::guard($s,!$b["public"]);
                     $this->rules->validate($b, $s);
                     $b["id"] = (string) Str::uuid();
                     $b["token"] = bin2hex(random_bytes(24));
@@ -357,6 +359,7 @@ class SalonController
                         404,
                     );
                 }
+                if(!$request->boolean('cancel')) \App\Services\Subscriptions::guard($this->store->read(),false);
                 $result = $this->store->mutate(function (&$s) use (
                     $token,
                     $request,
@@ -583,7 +586,10 @@ class SalonController
                     }
                     if (isset($data["clients"])) {
                         $oldClients = collect($s["clients"])->keyBy("id");
-                        foreach ($data["clients"] as &$client) $client = array_replace($oldClients->get($client["id"], []), array_intersect_key($client, array_flip(["id", "name", "phone", "email"])));
+                        foreach ($data["clients"] as &$client) {
+                            $previous=$oldClients->get($client['id'],[]);\App\Services\Clients::editable($previous,$client);
+                            $client=array_replace($previous,array_intersect_key($client,array_flip(['id','name','phone','email'])));
+                        }
                         foreach ($s["clients"] as $oldClient) if (!in_array($oldClient["id"], array_column($data["clients"], "id"), true)) $data["clients"][]=$oldClient;
                         unset($client);
                         foreach ($s["bookings"] as $booking) {

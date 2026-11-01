@@ -7,6 +7,7 @@ final class PlatformInvoices {
   $key=config('integrations.platform_billingo.key');$block=config('integrations.platform_billingo.block');
   if(!$key||!$block)throw new InvalidArgumentException('Az üzemeltető saját Billingo API-kulcsa és számlatömbje még nincs beállítva.');
   $payment=DB::table('platform_payments')->find($paymentId);abort_unless($payment,404);
+  if((int)$payment->amount<=0)throw new InvalidArgumentException('A díjmentes próbaidőről nem állítunk ki számlát.');
   $buyer=app(Tenant::class)->run((int)$payment->provider_id,fn()=>app(SalonStore::class)->read()['settings']);
   foreach(['billingName','billingZip','billingCity','billingAddress'] as $field)if(empty($buyer[$field]))throw new InvalidArgumentException('A szolgáltató számlázási adatai hiányosak. Előbb egészítse ki a Beállításoknál.');
   $invoice=DB::transaction(function()use($payment,$buyer){

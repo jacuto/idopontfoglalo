@@ -62,9 +62,10 @@ Előbb ellenőrizd a feltöltött könyvtárat:
 test -f /home/digitmar/raero-frissites/artisan
 test -f /home/digitmar/raero-frissites/app/Services/Tenant.php
 test -f /home/digitmar/raero-frissites/public/features.js
+test -f /home/digitmar/raero-frissites/public/refinements.js
 ```
 
-Mindhárom parancsnak hiba nélkül kell lefutnia. Ezután:
+Mind a négy parancsnak hiba nélkül kell lefutnia. Ezután:
 
 ```sh
 cp -a /home/digitmar/raero-frissites/app /home/digitmar/idopontfoglalo-php/
@@ -144,3 +145,7 @@ Ha nálad más a PHP 8.2 teljes elérési útja, csak azt cseréld a sor elején
 Kapcsold ki a cront és a látogatói hozzáférést. A 4. lépésben készült **teljes alkalmazásmentést és a hozzá tartozó teljes SQL-mentést együtt** állítsd vissza, a mentéskori `.env`-vel, APP_KEY-vel és feltöltésekkel. Ezt célszerű a tárhely támogatásával vagy az előzetesen kipróbált tesztmásolaton begyakorolva elvégezni.
 
 Az új migrációk visszafelé szándékosan nem törlik a táblákat. Ne próbálj `migrate:rollback` paranccsal visszaállni. A mentés után felvett új adatokat a teljes visszaállítás elveszítheti: ezért a visszaállítást még a rendszer újra megnyitása előtt végezd, vagy egyeztess az adatok külön mentéséről.
+
+## Későbbi finomítások
+
+A felület és a 21 napos előfizetési határidő részletes szabályai: [FINOMITASOK.md](docs/FINOMITASOK.md). A teljes `public` mappával a `refinements.js` is kerüljön fel. A meglévő egyetlen `schedule:run` cron az óránkénti előfizetés-ellenőrzést is indítja; ne adj hozzá párhuzamos cron-sort. Mintaadatot kizárólag külön tesztpéldányra tölts a leírás szerint.
