@@ -27,9 +27,14 @@ final class Connections
         "admin_google_emails",
         "admin_facebook_ids",
     ];
+    private function path(): string
+    {
+        $path = config("integrations.path");
+        return app(Tenant::class)->id === 1 ? $path : $path . ".provider-" . app(Tenant::class)->id;
+    }
     public function all(): array
     {
-        $file = config("integrations.path");
+        $file = $this->path();
         $saved = is_file($file)
             ? json_decode(
                 Crypt::decryptString(file_get_contents($file)),
@@ -38,12 +43,12 @@ final class Connections
                 JSON_THROW_ON_ERROR,
             )
             : [];
-        $env = config("integrations.connections", []);
+        $env = app(Tenant::class)->id === 1 ? config("integrations.connections", []) : array_fill_keys(self::FIELDS, null);
         return array_replace($env, $saved);
     }
     public function save(array $input): void
     {
-        $path = config("integrations.path");
+        $path = $this->path();
         $directory = dirname($path);
         if (
             !is_dir($directory) &&

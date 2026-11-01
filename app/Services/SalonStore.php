@@ -54,7 +54,7 @@ class SalonStore
     }
     public function read(): array
     {
-        $row = DB::table("salon_state")->where("id", 1)->first();
+        $row = DB::table("salon_state")->where("id", app(Tenant::class)->id)->first();
         if (!$row) {
             throw new \RuntimeException(
                 "Az adatbázis nincs előkészítve. Futtasd: php artisan raero:install",
@@ -69,7 +69,7 @@ class SalonStore
         // Lock one salon row for the whole read/check/write operation: prevents double bookings.
         return DB::transaction(function () use ($callback) {
             $row = DB::table("salon_state")
-                ->where("id", 1)
+                ->where("id", app(Tenant::class)->id)
                 ->lockForUpdate()
                 ->first();
             if (!$row) {
@@ -80,7 +80,7 @@ class SalonStore
             );
             $result = $callback($state);
             DB::table("salon_state")
-                ->where("id", 1)
+                ->where("id", app(Tenant::class)->id)
                 ->update([
                     "data" => json_encode(
                         $state,

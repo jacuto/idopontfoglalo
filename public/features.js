@@ -1,0 +1,248 @@
+const providerId = () => new URLSearchParams(location.search).get('provider') || '1';
+const providerLink = (path) => path + (path.includes('?') ? '&' : '?') + 'provider=' + encodeURIComponent(providerId());
+const baseFields = bookingFields;
+bookingFields = function(dt) {
+  const html = baseFields(dt);
+  const box = `<div class="client-search"><input type="hidden" name="clientId"><div id="client-results" role="listbox" hidden></div><p id="client-hint" class="hint" aria-live="polite">Három betűt vagy számjegyet írj be. Új vendégnél töltsd ki az adatokat.</p></div>`;
+  return html.replace(/<datalist id="clients">[\s\S]*?<\/datalist>/, isPublic ? '' : box)
+    .replaceAll('list="clients" oninput="fillClient(this.value)"', 'role="combobox" aria-autocomplete="list" aria-controls="client-results" aria-expanded="false" autocomplete="off" oninput="searchClient(this)" onkeydown="clientKey(event,this)"')
+    + `<details><summary>Kedvezmény vagy bérlet</summary><label>Kuponkód</label><input name="coupon"><button type="button" onclick="previewPrice()">Ár ellenőrzése</button><label>Bérlet</label><select name="passId" onchange="previewPrice()"><option value="">Nem használok bérletet</option></select><p class="hint">Bérlethez lépj be, vagy szolgáltatóként válassz vendéget. Mentéskor egy alkalmat lefoglalunk; lemondásnál visszajár, megjelenésnél és meg nem jelenésnél elfogy.</p><p id="price-preview" aria-live="polite"></p></details>`;
+};
+let clientMatches = [], clientIndex = -1, clientTicket = 0, searchTimer;
+function closeClients() {
+  const box = $('#client-results'); if (box) { box.hidden = true; box.innerHTML = ''; }
+  document.querySelectorAll('[aria-controls="client-results"]').forEach(x => { x.setAttribute('aria-expanded','false'); x.removeAttribute('aria-activedescendant'); });
+  clientIndex = -1;
+}
+function searchClient(input) {
+  const selected = $('[name=clientId]'); if (selected) selected.value = '';
+  const pass = $('[name=passId]'); if (pass) pass.innerHTML = '<option value="">Nem használok bérletet</option>';
+  clearTimeout(searchTimer); const ticket = ++clientTicket; closeClients();
+  if (input.value.trim().length < 3) return;
+  const value = input.value;
+  searchTimer = setTimeout(async () => {
+    try {
+      const result = await api('/api/clients/search?q=' + encodeURIComponent(value));
+      if (ticket !== clientTicket || !$('#client-results') || !input.isConnected) return;
+      clientMatches = result; const box = $('#client-results'); box.hidden = false;
+      input.setAttribute('aria-expanded','true');
+      box.innerHTML = result.map((c,i) => `<button type="button" role="option" aria-selected="false" id="client-option-${i}" onmousedown="event.preventDefault()" onclick="chooseClient(${i})"><strong>${esc(c.name)}</strong><small>${esc(c.phone || 'Nincs telefon')} · ${esc(c.email || 'Nincs email')}</small></button>`).join('') || '<p>Nincs találat. A megadott adatokkal új vendéget rögzítünk.</p>';
+    } catch (e) { if (ticket === clientTicket && $('#client-hint')) $('#client-hint').textContent = e.message; }
+  }, 180);
+}
+function clientKey(e,input) {
+  if (e.key === 'Escape') { if ($('#client-results') && !$('#client-results').hidden) { e.preventDefault(); e.stopPropagation(); } ++clientTicket; clearTimeout(searchTimer); closeClients(); return; }
+  if ($('#client-results')?.hidden || !clientMatches.length) return;
+  if (['ArrowDown','ArrowUp'].includes(e.key)) {
+    e.preventDefault(); clientIndex = clientIndex < 0 ? (e.key === 'ArrowDown' ? 0 : clientMatches.length - 1) : (clientIndex + (e.key === 'ArrowDown' ? 1 : -1) + clientMatches.length) % clientMatches.length;
+    document.querySelectorAll('#client-results [role=option]').forEach((x,i) => x.setAttribute('aria-selected', String(i === clientIndex)));
+    input.setAttribute('aria-activedescendant','client-option-' + clientIndex);
+    $('#client-option-' + clientIndex)?.scrollIntoView({block:'nearest'});
+  } else if (e.key === 'Enter' && clientIndex >= 0) { e.preventDefault(); chooseClient(clientIndex); }
+}
+function chooseClient(index) {
+  const c = clientMatches[index]; if (!c) return;
+  ++clientTicket; clearTimeout(searchTimer);
+  for (const key of ['name','phone','email']) $(`[name=${key}]`).value = c[key] || '';
+  $('[name=clientId]').value = c.id; closeClients();
+  $('#client-hint').textContent = 'Kiválasztva: ' + c.name + '. A meglévő vendéghez kerül az időpont.';
+  const pass = $('[name=passId]');
+  if (pass) pass.innerHTML = '<option value="">Nem használok bérletet</option>' + (state.clientPasses || []).filter(p => p.clientId === c.id && p.remaining > 0 && new Date(p.expiresAt) > new Date()).map(p => `<option value="${p.id}">${esc(p.name)} · ${p.remaining} alkalom · ${new Date(p.expiresAt).toLocaleDateString('hu-HU')}</option>`).join('');
+}
+async function previewPrice() {
+  try {
+    const price = await api('/api/quote','POST',{services:[...document.querySelectorAll('[name=services]:checked')].map(x=>x.value),coupon:$('[name=coupon]').value || null,clientId:$('[name=clientId]')?.value || null,passId:$('[name=passId]')?.value || null,start:$('[name=start]')?.value || null});
+    $('#price-preview').textContent = `Eredeti ár: ${money(price.original)} · Kedvezmény: ${money(price.discount)} · Fizetendő: ${money(price.payable)}`;
+  } catch(e) { $('#price-preview').textContent = e.message; }
+}
+const baseSubmit = submitBooking;
+submitBooking = async function(e) {
+  // A visible server quote is required before a discounted booking is submitted.
+  if ($('[name=coupon]')?.value || $('[name=passId]')?.value) {
+    e.preventDefault();
+    try { const price = await api('/api/quote','POST',{services:[...document.querySelectorAll('[name=services]:checked')].map(x=>x.value),coupon:$('[name=coupon]').value,clientId:$('[name=clientId]')?.value || null,passId:$('[name=passId]')?.value || null,start:$('[name=start]')?.value || null});
+      if (!confirm(`Eredeti ár: ${money(price.original)}\nKedvezmény: ${money(price.discount)}\nFizetendő: ${money(price.payable)}\nLefoglalod?`)) return;
+    } catch(err) { $('#form-error').textContent = err.message; return; }
+  }
+  return baseSubmit(e);
+};
+async function clientDetail(id) {
+  try {
+    const d = await api('/api/clients/' + id + '/detail'); const c = d.client;
+    showModal(`<div class="row">${d.avatar ? `<img class="avatar" alt="Profilkép" src="${providerLink(d.avatar)}">` : `<div class="avatar">${esc(initials(c.name))}</div>`}<h2>${esc(c.name)}</h2></div><p>${esc(c.phone)} · ${esc(c.email)}</p><div class="stats compact-stats">${[['Összes foglalás',d.stats.total],['Lemondott',d.stats.cancelled],['Megjelent',d.stats.attended],['Nem jelent meg',d.stats.no_show]].map(([label,n])=>`<div class="stat"><small>${label}</small><strong>${n}</strong></div>`).join('')}</div><p class="hint">A megjelenés kizárólag kézi igazolás után számít bele.</p>${['Közelgő időpontok','Korábbi időpontok'].map((label,i)=>`<h3>${label}</h3>${d.bookings.filter(b=>(new Date(b.start) < new Date()) === Boolean(i)).sort((a,b)=>a.start.localeCompare(b.start)).map(b=>`<div class="notice"><button onclick="bookingDetails('${b.id}')">${new Date(b.start).toLocaleString('hu-HU')}</button> · ${esc(serviceNames(b))} · ${statusName[b.status]} · ${attendanceName(b.attendance)}</div>`).join('') || '<p>Még nincs ilyen időpont.</p>'}`).join('')}<h3>A szolgáltató értékelései</h3>${d.reviews.map(r=>`<p>${r.score}/5 · ${esc(r.text)}</p>`).join('') || '<p>Igazolt látogatás után a foglalás adatlapján írhatsz értékelést.</p>'}<h3>Bérletek</h3>${(state.clientPasses || []).filter(p=>p.clientId===id).map(p=>`<p>${esc(p.name)} · ${p.remaining} szabad alkalom · Lejár: ${new Date(p.expiresAt).toLocaleDateString('hu-HU')}</p>`).join('') || '<p>Még nincs bérlete. A Kuponok és bérletek menüben rendelhetsz hozzá.</p>'}<div class="buttons"><button onclick="clientForm('${id}')">Adatok szerkesztése</button>${c.guestId ? `<button onclick="$('#modal').close();view='messages';render();openConversation(${Number(c.guestId)})">Üzenet</button>` : ''}<button onclick="$('#modal').close()">Bezárás</button></div>`);
+  } catch(e) { toast(e.message); }
+}
+const attendanceName = (v) => ({attended:'Megjelent',no_show:'Nem jelent meg',unmarked:'Nincs igazolva'}[v] || 'Nincs igazolva');
+const baseDetails = bookingDetails;
+bookingDetails = function(id) {
+  baseDetails(id); const b = state.bookings.find(b=>b.id===id);
+  const end = new Date(b.start).getTime() + (b.serviceSnapshot || []).reduce((n,s)=>n+s.duration,0)*60000;
+  const extra = document.createElement('section');
+  extra.innerHTML = `<h3>Látogatás</h3><p>${attendanceName(b.attendance)}</p>${b.status==='confirmed' && end <= Date.now() && (!b.attendance || b.attendance==='unmarked') ? `<button onclick="markAttendance('${id}','attended')">✓ Megjelent</button><button onclick="markAttendance('${id}','no_show')">Nem jelent meg</button>` : ''}${b.status==='pending' && new Date(b.start)<new Date() ? '<p class="notice">Ez a függő időpont elmúlt. Adj meg új, jövőbeli időpontot, vagy utasítsd el.</p>' : ''}${b.attendance==='attended' ? `<button onclick="reviewForm('${id}',false)">Vendég értékelése (belső)</button>` : ''}${b.pricing ? `<p>Eredeti ár: ${money(b.pricing.original)} · Kedvezmény: ${money(b.pricing.discount)} · Fizetendő: ${money(b.pricing.payable)}</p>`:''}`;
+  $('#modal').append(extra);
+};
+async function markAttendance(id,attendance) { try { await api('/api/bookings/'+id,'PATCH',{attendance}); await refresh(); bookingDetails(id); toast('Látogatás rögzítve.'); } catch(e) {toast(e.message);} }
+function reviewForm(id,guest) {
+  showModal(`<h2>${guest?'Szolgáltató értékelése':'Vendég értékelése'}</h2><p>${guest?'Az értékelés a szolgáltató nyilvános oldalán jelenik meg.':'Ez belső értékelés, kizárólag ennek a vállalkozásnak a felületén látható.'}</p><form id="review-form"><label>Pontszám</label><select name="score">${[5,4,3,2,1].map(n=>`<option>${n}</option>`).join('')}</select><label>Szöveges értékelés</label><textarea name="text" required maxlength="3000"></textarea><p id="form-error" class="error"></p><div class="buttons"><button type="button" onclick="$('#modal').close()">Mégse</button><button class="primary">Értékelés mentése</button></div></form>`);
+  $('#review-form').onsubmit = async e => {e.preventDefault(); try { const d=Object.fromEntries(new FormData(e.target));d.score=Number(d.score);await api('/api/'+(guest?'guest/':'')+'bookings/'+id+'/review','POST',d);$('#modal').close();toast('Értékelés mentve.');}catch(err){$('#form-error').textContent=err.message;}};
+}
+function serviceDetail(id) {
+  const s = state.services.find(s=>s.id===id); if(!s) return toast('A szolgáltatás már nem szerepel az aktuális listában.');
+  showModal(`<h2>${esc(s.name)}</h2><p>${esc(s.description || '')}</p><p>${s.duration} perc · ${money(s.price)}</p><p>${s.staff.map(id=>esc(state.staff.find(p=>p.id===id)?.name)).join(', ')}</p><div class="buttons"><button onclick="$('#modal').close()">Bezárás</button><button onclick="serviceForm('${id}')">Szerkesztés</button></div>`);
+}
+function profilePage() {
+  const p = state.profile || {};
+  const fields = {intro:'Rövid bemutatkozás',description:'Részletes leírás',address:'Cím',directions:'Megközelítés',phone:'Nyilvános telefon',email:'Nyilvános email',website:'Weboldal',mapUrl:'Térképes hivatkozás',facebook:'Facebook',instagram:'Instagram',logo:'Logó képcíme',cover:'Borítókép címe',hours:'Nyitvatartás leírása',terms:'Foglalási és lemondási feltételek'};
+  $('#content').innerHTML=`<div class="card item"><p>Csak az itt megadott adatok nyilvánosak. A számlázási és API-beállításokat külön kezeljük.</p><form id="profile-form"><div class="form-grid">${Object.entries(fields).map(([key,label])=>`<div><label>${label}</label>${['description','intro','directions','hours','terms'].includes(key)?`<textarea name="${key}">${esc(p[key]||'')}</textarea>`:`<input name="${key}" value="${esc(p[key]||'')}">`}</div>`).join('')}</div><label>Üzletfotók képcímei (soronként egy)</label><textarea name="photos">${esc((p.photos||[]).join('\n'))}</textarea><p class="hint">Saját, HTTPS-en elérhető JPG, PNG vagy WebP képcímeket adj meg.</p><p id="form-error" class="error"></p><div class="buttons"><a href="${providerLink('/foglalas')}" target="_blank" rel="noopener">Nyilvános oldal megnyitása</a><button class="primary">Adatlap mentése</button></div></form></div>`;
+  $('#profile-form').onsubmit=async e=>{e.preventDefault();try{const d=Object.fromEntries(new FormData(e.target));d.photos=d.photos.split('\n').map(x=>x.trim()).filter(Boolean);await api('/api/profile','PUT',d);await refresh();toast('Nyilvános adatlap mentve.');}catch(err){$('#form-error').textContent=err.message;}};
+}
+const plainPublic = publicPage;
+publicPage = function() {
+  plainPublic(); api('/api/guest/passes').then(passes=>{const el=$('[name=passId]');if(el)el.innerHTML='<option value="">Nem használok bérletet</option>'+passes.filter(p=>p.remaining>0&&new Date(p.expiresAt)>new Date()).map(p=>`<option value="${p.id}">${esc(p.name)} · ${p.remaining} alkalom · ${new Date(p.expiresAt).toLocaleDateString('hu-HU')}</option>`).join('');}).catch(()=>{}); const p=state.profile||{}, root=$('.public'), form=$('#public-form');
+  const section=document.createElement('section');section.className='provider-profile';
+  const reviews=state.reviews||[];
+  section.innerHTML=`${p.cover?`<img class="cover" src="${esc(p.cover)}" alt="Borítókép">`:''}${p.logo?`<img class="profile-logo" src="${esc(p.logo)}" alt="${esc(state.settings.name)} logója">`:''}${p.intro?`<p class="lead">${esc(p.intro)}</p>`:''}${p.description?`<p class="preserve-lines">${esc(p.description)}</p>`:''}${p.address?`<div class="card item"><h2>Itt találsz minket</h2><p>${esc(p.address)}</p>${p.directions?`<p>${esc(p.directions)}</p>`:''}${p.mapUrl?`<a href="${esc(p.mapUrl)}" target="_blank" rel="noopener">Útvonal és térkép →</a>`:''}</div>`:''}${[p.phone,p.email,p.website,p.facebook,p.instagram,p.hours].some(Boolean)?`<div class="card item"><h2>Elérhetőség és nyitvatartás</h2><p>${esc(p.phone||'')} ${esc(p.email||'')}</p><p class="preserve-lines">${esc(p.hours||'')}</p>${['website','facebook','instagram'].filter(k=>p[k]).map(k=>`<a href="${esc(p[k])}" target="_blank" rel="noopener">${{website:'Weboldal',facebook:'Facebook',instagram:'Instagram'}[k]} ↗</a> `).join('')}</div>`:''}<h2>Szolgáltatásaink</h2><div class="entity-grid">${state.services.map(s=>`<article class="card item"><h3>${esc(s.name)}</h3><p>${esc(s.description||'')}</p><p>${s.duration} perc · ${money(s.price)}</p><button onclick="startService('${s.id}')">Időpontot foglalok</button></article>`).join('')}</div>${state.settings.businessMode!=='solo'?`<h2>Munkatársaink</h2><div class="entity-grid">${state.staff.map(p=>`<div class="card item"><div class="avatar">${esc(initials(p.name))}</div><h3>${esc(p.name)}</h3><p>${esc(p.role)}</p><p>${state.services.filter(s=>s.staff.includes(p.id)).map(s=>esc(s.name)).join(', ')}</p></div>`).join('')}</div>`:''}${(state.offers||[]).length?`<h2>Aktuális ajánlatok</h2><div class="entity-grid">${state.offers.map(c=>`<article class="card item"><h3>${esc(c.name)}</h3><p>${c.type==='percent'?c.value+'%':money(c.value)} kedvezmény · Kód: <strong>${esc(c.code)}</strong></p><p>${c.firstVisit?'Első látogatásra. ':''}Érvényes: ${new Date(c.endsAt).toLocaleDateString('hu-HU')}</p><p>Belépett vendégeknek; ${c.perClient} felhasználás / vendég. ${c.services.length?'Kijelölt szolgáltatásokra.':'Minden szolgáltatásra.'}</p></article>`).join('')}</div>`:''}${(state.passes||[]).length?`<h2>Bérletek</h2><div class="entity-grid">${state.passes.map(p=>`<article class="card item"><h3>${esc(p.name)}</h3><p>${esc(p.description||'')}</p><p>${p.visits} alkalom · ${money(p.price)} · ${p.days} nap</p><p>${p.services.map(id=>esc(state.services.find(s=>s.id===id)?.name)).join(', ')}</p><p>${esc(p.terms||'')}</p><p>Vásárláshoz keresd a szolgáltatót.</p></article>`).join('')}</div>`:''}${reviews.length?`<h2>Vendégértékelések · ${(reviews.reduce((n,r)=>n+r.score,0)/reviews.length).toFixed(1)} / 5 · ${reviews.length} értékelés</h2>${reviews.map(r=>`<div class="card item"><strong>${r.score}/5</strong><p>${esc(r.text)}</p></div>`).join('')}`:''}${p.photos?.length?`<div class="entity-grid">${p.photos.map(url=>`<img class="shop-photo" src="${esc(url)}" alt="Üzletfotó" loading="lazy">`).join('')}</div>`:''}${p.terms?`<details class="card item"><summary>Foglalási és lemondási feltételek</summary><p class="preserve-lines">${esc(p.terms)}</p></details>`:''}`;
+  root.insertBefore(section,form);if(!state.services.length)form.innerHTML='<h2>Az online foglalás még nem érhető el</h2><p>A szolgáltató még nem adott meg foglalható szolgáltatást. Keresd a megadott elérhetőségein.</p>';
+  document.querySelectorAll('a[href="/fiokom"]').forEach(a=>a.href=providerLink('/fiokom'));
+};
+function startService(id){const el=document.querySelector(`[name=services][value="${CSS.escape(id)}"]`);if(el){el.checked=true;updateStaff();$('#public-form').scrollIntoView({behavior:'smooth'});}}
+function offersPage() {
+  $('#content').innerHTML=`<div class="toolbar"><button class="primary" onclick="couponForm()">Új kupon</button><button onclick="passForm()">Új bérlet</button><button onclick="assignPassForm()">Bérlet hozzárendelése vendéghez</button></div><h2>Kuponok</h2><div class="entity-grid">${(state.coupons||[]).map(c=>`<article class="card item"><h3>${esc(c.name)}</h3><p>${esc(c.code)} · ${c.type==='percent'?c.value+'%':money(c.value)}</p><p>${c.active?'Aktív':'Inaktív'} · ${c.public?'Nyilvános':'Csak kóddal'}</p><button onclick="couponForm('${c.id}')">Szerkesztés</button></article>`).join('')||'<p>Még nincs kupon. Az Új kupon gombbal készíthetsz ajánlatot.</p>'}</div><h2>Bérletek</h2><div class="entity-grid">${(state.passes||[]).map(p=>`<article class="card item"><h3>${esc(p.name)}</h3><p>${p.visits} alkalom · ${money(p.price)} · ${p.days} nap · ${p.active?'Aktív':'Inaktív'}</p><button onclick="passForm('${p.id}')">Szerkesztés</button></article>`).join('')||'<p>Még nincs bérlet. Az Új bérlet gombbal hozhatod létre az elsőt.</p>'}</div><p class="hint">A meglévő foglalások árai és a kiadott bérletek feltételei szerkesztéskor nem változnak.</p>`;
+}
+function catalogChecks(selected=[]) { return state.services.filter(s=>!s.archived).map(s=>`<label class="check"><input type="checkbox" name="services" value="${s.id}" ${selected.includes(s.id)?'checked':''}>${esc(s.name)}</label>`).join(''); }
+function couponForm(id) {
+ const c=(state.coupons||[]).find(c=>c.id===id)||{startsAt:new Date().toISOString(),endsAt:new Date(Date.now()+30*86400000).toISOString(),perClient:1,type:'percent',value:10,active:true,public:false,firstVisit:false};
+ showModal(`<h2>${id?'Kupon szerkesztése':'Új kupon'}</h2><form id="offer-form"><label>Megnevezés</label><input name="name" required value="${esc(c.name||'')}"><label>Kuponkód</label><input name="code" required pattern="[A-Za-z0-9_-]+" value="${esc(c.code||'')}"><div class="form-grid"><div><label>Érvényesség kezdete</label><input name="startsAt" type="datetime-local" required value="${localdt(new Date(c.startsAt))}"></div><div><label>Érvényesség vége</label><input name="endsAt" type="datetime-local" required value="${localdt(new Date(c.endsAt))}"></div><div><label>Kedvezmény típusa</label><select name="type"><option value="percent" ${c.type==='percent'?'selected':''}>Százalék</option><option value="fixed" ${c.type==='fixed'?'selected':''}>Forint</option></select></div><div><label>Kedvezmény értéke</label><input name="value" type="number" min="1" required value="${c.value}"></div><div><label>Összes felhasználás (üres: korlátlan)</label><input name="limit" type="number" min="1" value="${c.limit||''}"></div><div><label>Vendégenkénti korlát</label><input name="perClient" type="number" min="1" required value="${c.perClient}"></div></div><label>Szolgáltatások (üresen: mindegyik)</label>${catalogChecks(c.services)}${[['active','Aktív'],['public','Nyilvános ajánlat'],['firstVisit','Csak első alkalomra']].map(([k,l])=>`<label class="check"><input name="${k}" type="checkbox" ${c[k]?'checked':''}>${l}</label>`).join('')}<p class="hint">Ingyenes első alkalomhoz válassz 100% kedvezményt és az első alkalom feltételt.</p><p id="form-error" class="error"></p><div class="buttons"><button type="button" onclick="$('#modal').close()">Mégse</button><button class="primary">Mentés</button></div></form>`);
+ $('#offer-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),d=Object.fromEntries(f);if(id)d.id=id;for(const k of ['active','public','firstVisit'])d[k]=f.has(k);for(const k of ['value','perClient'])d[k]=Number(d[k]);d.limit=d.limit?Number(d.limit):null;d.services=f.getAll('services');for(const k of ['startsAt','endsAt'])d[k]=new Date(d[k]).toISOString();await saveOffer('/api/coupons',d);};
+}
+function passForm(id) {
+ const p=(state.passes||[]).find(p=>p.id===id)||{price:10000,visits:5,days:90,active:true};
+ showModal(`<h2>${id?'Bérlet szerkesztése':'Új bérlet'}</h2><form id="offer-form"><label>Név</label><input name="name" required value="${esc(p.name||'')}"><label>Leírás</label><textarea name="description">${esc(p.description||'')}</textarea><div class="form-grid">${[['price','Ár (Ft)',0],['visits','Alkalmak',1],['days','Érvényesség napokban',1]].map(([k,l,min])=>`<div><label>${l}</label><input name="${k}" type="number" required min="${min}" value="${p[k]}"></div>`).join('')}</div><label>Használható szolgáltatások</label>${catalogChecks(p.services)}<label>Felhasználási feltételek</label><textarea name="terms">${esc(p.terms||'')}</textarea><label class="check"><input type="checkbox" name="active" ${p.active?'checked':''}>Aktív</label><p class="hint">Foglaláskor lefoglalunk egy alkalmat. Lemondáskor visszaadjuk; igazolt megjelenés és meg nem jelenés esetén végleg elfogy.</p><p id="form-error" class="error"></p><div class="buttons"><button type="button" onclick="$('#modal').close()">Mégse</button><button class="primary">Mentés</button></div></form>`);
+ $('#offer-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),d=Object.fromEntries(f);if(id)d.id=id;d.services=f.getAll('services');d.active=f.has('active');for(const k of ['price','visits','days'])d[k]=Number(d[k]);await saveOffer('/api/passes',d);};
+}
+async function saveOffer(path,d) {try{await api(path,'POST',d);$('#modal').close();await refresh();toast('Sikeresen elmentettük.');}catch(e){$('#form-error').textContent=e.message;}}
+function assignPassForm() {
+ showModal(`<h2>Bérlet kiadása</h2><p>A hozzárendelés nem jelent befizetést. A vásárlást és a számlázást külön rögzítsd.</p><form id="assign-form"><label>Vendég</label><select name="clientId">${state.clients.map(c=>`<option value="${c.id}">${esc(c.name)} · ${esc(c.phone)}</option>`).join('')}</select><label>Bérlet</label><select name="passId">${(state.passes||[]).filter(p=>p.active).map(p=>`<option value="${p.id}">${esc(p.name)} · ${money(p.price)}</option>`).join('')}</select><p id="form-error" class="error"></p><div class="buttons"><button type="button" onclick="$('#modal').close()">Mégse</button><button class="primary">Bérlet kiadása</button></div></form>`);
+ $('#assign-form').onsubmit=async e=>{e.preventDefault();await saveOffer('/api/client-passes',Object.fromEntries(new FormData(e.target)));};
+}
+let messageGuest = null;
+async function messagesPage() {
+ try {
+  const list=await api('/api/messages'); state.messages=list;
+  const people=state.clients.filter(c=>c.guestId);
+  $('#content').innerHTML=`<div class="card item"><h2>Belső üzenetek</h2><p>Az üzenet mentés után akkor is megmarad, ha az emailértesítőt nem sikerül kézbesíteni.</p><label>Beszélgetés vendéggel</label><select id="conversation-person" onchange="openConversation(Number(this.value))"><option value="">Válassz vendéget</option>${people.map(c=>`<option value="${Number(c.guestId)}">${esc(c.name)} ${list.some(m=>m.guestId===Number(c.guestId)&&m.sender==='guest'&&!m.readAt)?'● Olvasatlan':''}</option>`).join('')}</select>${!people.length?'<p>Bejelentkezve foglaló vendéggel indíthatsz beszélgetést. Az importált vendégből nem készül automatikusan fiók.</p>':''}<div id="conversation"></div></div>`;
+ }catch(e){$('#content').textContent=e.message;}
+}
+async function openConversation(id, guestMode=false) {
+ if(!id)return;messageGuest=id;
+ try{
+  const list=await api('/api/messages');const messages=list.filter(m=>m.guestId===id);
+  $('#conversation').innerHTML=`<div class="message-list">${messages.map(m=>`<div class="notice"><strong>${m.sender==='guest'?'Vendég':'Szolgáltató'}</strong> · ${new Date(m.createdAt).toLocaleString('hu-HU')}<p class="preserve-lines">${esc(m.text)}</p></div>`).join('')||'<p>Még nincs üzenet. Írd meg az elsőt.</p>'}</div><form id="message-form"><label>Üzenet</label><textarea name="text" required maxlength="5000"></textarea><p id="message-error" class="error"></p><button class="primary">Üzenet küldése</button></form>`;
+  const select=$('#conversation-person');if(select)select.value=String(id);
+  await api('/api/messages','PATCH',{guestId:id});
+  $('#message-form').onsubmit=async e=>{e.preventDefault();try{await api('/api/messages','POST',{guestId:id,text:new FormData(e.target).get('text')});await openConversation(id,guestMode);toast('Az üzenetet elmentettük. Az emailértesítés külön feldolgozásra vár.');}catch(err){$('#message-error').textContent=err.message;}};
+ }catch(e){toast(e.message);}
+}
+const baseGuestPage=guestPage;
+guestPage=async function(){
+ await baseGuestPage();
+ try{const g=await api('/api/guest');const root=$('.public');
+ const section=document.createElement('section');section.className='card item';
+ section.innerHTML=`<h2>Profilképem</h2>${g.avatar?`<img class="avatar large-avatar" src="${providerLink(g.avatar)}" alt="Saját profilkép">`:`<div class="avatar large-avatar">${esc(initials(g.name))}</div>`}<form id="avatar-form"><label>Új profilkép (JPG, PNG, WebP, legfeljebb 2 MB)</label><input name="image" type="file" accept="image/jpeg,image/png,image/webp" required><button>Profilkép mentése</button><p id="avatar-error" class="error"></p></form><h2>Igazolt látogatásaim értékelése</h2>${g.bookings.filter(b=>b.status==='confirmed'&&b.attendance==='attended').map(b=>`<p>${new Date(b.start).toLocaleDateString('hu-HU')} <button onclick="reviewForm('${b.id}',true)">Értékelem a szolgáltatót</button></p>`).join('')||'<p>Az első igazolt látogatás után írhatsz értékelést.</p>'}<h2>Üzenetek a szolgáltatóval</h2><div id="conversation"></div>`;
+ root.append(section);if(g.providers?.length){const p=document.createElement('p');p.innerHTML='Szolgáltatóim: '+g.providers.map(p=>`<a href="/fiokom?provider=${p.id}">${esc(p.name)}</a>`).join(' · ');root.prepend(p);}
+ document.querySelectorAll('a[href="/foglalas"]').forEach(a=>a.href=providerLink('/foglalas'));
+ $('#avatar-form').onsubmit=async e=>{e.preventDefault();try{if(!csrfToken)csrfToken=(await api('/api/csrf')).token;const r=await fetch(providerLink('/api/guest/avatar'),{method:'POST',headers:{Accept:'application/json','X-CSRF-TOKEN':csrfToken},body:new FormData(e.target)});const d=await r.json();if(!r.ok)throw Error(d.error||d.message);await guestPage();toast('Profilkép mentve.');}catch(err){$('#avatar-error').textContent=err.message;}};
+ await openConversation(g.id,true);
+ }catch{}
+};
+const baseRender=render;
+render=function(){baseRender();if(isPublic)return;
+ const unread=(state.messages||[]).filter(m=>m.sender==='guest'&&!m.readAt).length;
+ const button=document.querySelector('[data-nav="messages"] span');if(button&&unread)button.textContent=`Üzenetek (${unread})`;
+ if(new URLSearchParams(location.search).has('messages') && view==='calendar'){view='messages';baseRender();}
+};
+async function platformPage() {
+ try {
+  const providers=await api('/api/platform/providers');const operator=await api('/api/platform/operator');const payments=await api('/api/platform/payments');
+  $('#app').innerHTML=`<div class="public"><div class="brand"><span>◷</span>ráérő.</div><h1>Főadmin</h1><p>A rendszer üzemeltetőjének külön felülete.</p><button onclick="logout()">Kilépés</button><h2>Szolgáltatók</h2><div class="entity-grid">${providers.map(p=>`<div class="card item"><h3>${esc(p.name)}</h3><p>Azonosító: ${p.id} · ${esc(p.subscription.status||'Nincs előfizetés')}</p><p>Naptárkeret: ${p.subscription.calendarLimit||'Korábbi keret'}</p><button onclick="changeCalendarLimit(${p.id})">Naptárkeret módosítása</button>${p.subscription.trialEndsAt?`<p>Próba vége: ${new Date(p.subscription.trialEndsAt).toLocaleDateString('hu-HU')}</p>`:''}${p.subscription.paidUntil?`<p>Fizetve: ${new Date(p.subscription.paidUntil).toLocaleDateString('hu-HU')}-ig</p>`:''}<a href="/?provider=${p.id}" target="_blank" rel="noopener">Szolgáltatói belépési oldal</a></div>`).join('')}</div><details class="card item"><summary>Új szolgáltató felvétele</summary><form id="provider-create"><label>Vállalkozás neve</label><input name="name" required><label>Email</label><input name="email" type="email" required><label>Kezdőjelszó (legalább 12 karakter)</label><input name="password" type="password" minlength="12" required autocomplete="new-password"><p>Két hónap próbaidő indul, bankkártyaadatok nélkül.</p><button class="primary">Szolgáltató létrehozása</button><p class="error" id="platform-error"></p></form></details><details class="card item"><summary>Átutalás jóváírása · 4 000 Ft / hónap</summary><p>Csak a bankban ténylegesen megérkezett 4 000 Ft-os befizetést rögzítsd. A banki tranzakció egyedi azonosítója megakadályozza a kétszeres jóváírást.</p><form id="transfer-credit"><label>Szolgáltató</label><select name="providerId">${providers.map(p=>`<option value="${p.id}">${esc(p.name)} · RAERO-${p.id}</option>`).join('')}</select><label>Banki tranzakció azonosítója</label><input name="reference" required><label>Befizetés dátuma</label><input name="paidAt" type="date" required value="${datekey(new Date())}"><button class="primary">Befizetés jóváírása</button><p class="error" id="transfer-error"></p></form></details><h2>Előfizetési befizetések</h2>${payments.map(p=>`<p>${p.provider_id} · ${money(p.amount)} · ${esc(p.reference)} · ${esc(p.paid_at)}</p>`).join('')||'<p>Még nincs rögzített befizetés.</p>'}<details class="card item"><summary>Üzemeltető számlázási és banki adatai</summary><form id="operator-form">${Object.entries({name:'Név',country:'Ország',zip:'Irányítószám',city:'Település',address:'Cím',taxNumber:'Adószám',registrationNumber:'Nyilvántartási szám',bank:'Bank neve',account:'Bankszámlaszám',iban:'IBAN',bic:'SWIFT/BIC'}).map(([k,label])=>`<label>${label}</label><input name="${k}" required value="${esc(operator[k])}">`).join('')}<p>Adózási mód: AAM. A havi fizetendő végösszeg 4 000 Ft.</p><button class="primary">Adatok mentése</button></form></details><div class="notice">Az üzemeltető SMTP-, Billingo- és Stripe-kulcsait külön szerverbeállításként add meg. A szolgáltatók saját kulcsai ettől elkülönülnek.</div></div>`;
+  $('#provider-create').onsubmit=async e=>{e.preventDefault();try{await api('/api/platform/providers','POST',Object.fromEntries(new FormData(e.target)));await platformPage();toast('Szolgáltató létrehozva.');}catch(err){$('#platform-error').textContent=err.message;}};
+  $('#transfer-credit').onsubmit=async e=>{e.preventDefault();try{const d=Object.fromEntries(new FormData(e.target));d.providerId=Number(d.providerId);const r=await api('/api/platform/payments','POST',d);await platformPage();toast(r.alreadyCredited?'Ezt már jóváírtuk.':'Befizetés jóváírva.');}catch(err){$('#transfer-error').textContent=err.message;}};
+  $('#operator-form').onsubmit=async e=>{e.preventDefault();try{await api('/api/platform/operator','PUT',Object.fromEntries(new FormData(e.target)));toast('Üzemeltetői adatok mentve.');}catch(err){toast(err.message);}};
+ }catch(e){
+  $('#app').innerHTML=`<div class="public card item"><h1>Főadminbelépés</h1><p>Külön üzemeltetői jelszó szükséges.</p><form id="platform-login"><label>Jelszó</label><input name="password" type="password" required><button class="primary">Belépés</button><p id="platform-error" class="error"></p></form></div>`;
+  $('#platform-login').onsubmit=async e=>{e.preventDefault();try{await api('/api/platform/login','POST',Object.fromEntries(new FormData(e.target)));await platformPage();}catch(err){$('#platform-error').textContent=err.message;}};
+ }
+}
+const oldBillingPage=billingPage;
+billingPage=async function(){oldBillingPage();try{const d=await api('/api/subscription/info');const sub=state.subscription||{},o=d.operator;$('#content').innerHTML=`<div class="entity-grid"><div class="card item"><h2>4 000 Ft / hó</h2><p>Fizetendő végösszeg. Alanyi adómentes.</p><p>Állapot: ${esc({trialing:'Próbaidő',active:'Aktív',past_due:'Fizetésre vár',canceled:'Megszűnt'}[sub.status]||'Nincs előfizetés')}</p>${sub.trialEndsAt?`<p>Próbaidő vége: ${new Date(sub.trialEndsAt).toLocaleDateString('hu-HU')}</p>`:''}${sub.paidUntil?`<p>Rendezve eddig: ${new Date(sub.paidUntil).toLocaleDateString('hu-HU')}</p>`:''}<button class="primary" onclick="startSubscription()">Előfizetés Stripe-pal</button><p class="hint">A próbaidőhöz nem kell bankkártya.</p></div><div class="card item"><h2>Átutalás</h2>${!o.account?'<p class="notice">Az üzemeltető még nem adta meg az átutalási bankadatokat. Kérj segítséget az Üzenet az üzemeltetőnek gombbal.</p>':''}<p>${esc(o.name)}<br>${esc(o.bank)}<br>${esc(o.account)}</p><p>IBAN: ${esc(o.iban)}<br>SWIFT/BIC: ${esc(o.bic)}</p><p>Közlemény: <strong>RAERO-${d.providerId}</strong><br>Összeg: <strong>4 000 Ft</strong></p><p>Az átutalást az üzemeltető a banki beérkezés után írja jóvá.</p></div></div><h2>Befizetéseim</h2>${d.payments.map(p=>`<p>${money(p.amount)} · ${esc(p.paid_at)} · ${esc(p.method)}</p>`).join('')||'<p>Még nincs előfizetési befizetés.</p>'}<h2>Előfizetési számláim</h2>${(d.invoices||[]).map(i=>`<p>${esc(i.number||'Még nincs számlaszám')} · ${esc({issued:'Kiállítva',issuing:'Folyamatban',unknown:'Ellenőrzés alatt'}[i.status]||i.status)} ${i.status==='issued'?`<a href="${providerLink('/api/subscription/invoices/'+i.id+'/pdf')}">PDF letöltése</a>`:''}</p>`).join('')||'<p>Még nincs kiállított előfizetési számla. Az üzemeltető állítja ki a befizetésből.</p>'}`;}catch(e){toast(e.message);}};
+async function newsletterPage(){
+ try{const d=await api('/api/platform/newsletters');
+ showModal(`<h2>Főadmin hírlevelek</h2><p>SMTP-kapcsolat: ${d.configured?'Beállítva':'Nincs beállítva'}. Csak kifejezetten feliratkozott címzetteknek küldünk. Az „SMTP elfogadta” állapot nem igazolja a címzett postaládájába érkezést.</p><button class="primary" onclick="newsletterForm()">Új hírlevél</button>${d.campaigns.map(n=>`<div class="notice"><strong>${esc(n.subject)}</strong><p>${n.audience==='provider'?'Szolgáltatók':'Vendégek'} · ${esc(n.status)}</p><button onclick="newsletterPreview(${n.id})">Előnézet és küldés</button>${n.status==='draft'?`<button onclick="newsletterForm(${n.id})">Szerkesztés</button>`:''}</div>`).join('')||'<p>Még nincs hírlevél. Az Új hírlevél gombbal készíthetsz piszkozatot.</p>'}<h3>Kézbesítési állapotok</h3>${d.deliveries.map(j=>`<p>${esc(j.email)} · ${esc({pending:'Sorban',processing:'Küldés folyamatban',accepted:'SMTP elfogadta',skipped:'Kihagyva',unknown:'Ellenőrzést igényel'}[j.status]||j.status)} ${esc(j.error||'')}</p>`).join('')||'<p>Még nincs kiküldés.</p>'}<div class="buttons"><button onclick="$('#modal').close()">Bezárás</button></div>`);
+ }catch(e){toast(e.message);}
+}
+async function newsletterForm(id){
+ try{const d=await api('/api/platform/newsletters'),n=d.campaigns.find(n=>n.id===id)||{};
+ showModal(`<h2>Hírlevélpiszkozat</h2><form id="newsletter-form"><label>Célcsoport</label><select name="audience"><option value="provider" ${n.audience==='provider'?'selected':''}>Szolgáltatók</option><option value="guest" ${n.audience==='guest'?'selected':''}>Vendégek</option></select><label>Tárgy</label><input name="subject" required maxlength="200" value="${esc(n.subject||'')}"><label>Levél szövege</label><textarea name="content" required maxlength="50000">${esc(n.content||'')}</textarea><p>A leiratkozási hivatkozást küldéskor hozzáadjuk.</p><p id="form-error" class="error"></p><div class="buttons"><button type="button" onclick="newsletterPage()">Vissza</button><button class="primary">Piszkozat mentése</button></div></form>`);
+ $('#newsletter-form').onsubmit=async e=>{e.preventDefault();try{await api('/api/platform/newsletters'+(id?'/'+id:''),'POST',Object.fromEntries(new FormData(e.target)));await newsletterPage();toast('Piszkozat mentve.');}catch(err){$('#form-error').textContent=err.message;}};
+ }catch(e){toast(e.message);}
+}
+async function newsletterPreview(id){
+ try{const d=await api('/api/platform/newsletters'),n=d.campaigns.find(n=>n.id===id);if(!n)return;
+ showModal(`<h2>${esc(n.subject)}</h2><p>${n.audience==='provider'?'Szolgáltatói':'Vendég'} célcsoport · ${esc(n.status)}</p><div class="notice preserve-lines">${esc(n.content)}</div><form id="test-newsletter"><label>Tesztcímzett</label><input name="email" required type="email"><button>Tesztlevél küldése</button></form>${n.status==='draft'?`<form id="schedule-newsletter"><label>Küldés ideje</label><input name="scheduledAt" type="datetime-local" required value="${localdt(new Date(Date.now()+120000))}"><button class="primary">Küldés ütemezése</button></form>`:''}<p id="newsletter-status" role="status"></p><button onclick="newsletterPage()">Vissza</button>`);
+ $('#test-newsletter').onsubmit=async e=>{e.preventDefault();try{await api('/api/platform/newsletters/'+id+'/test','POST',Object.fromEntries(new FormData(e.target)));$('#newsletter-status').textContent='A tesztlevelet az SMTP-szerver elfogadta.';}catch(err){$('#newsletter-status').textContent=err.message;}};
+ if($('#schedule-newsletter'))$('#schedule-newsletter').onsubmit=async e=>{e.preventDefault();try{await api('/api/platform/newsletters/'+id+'/schedule','POST',{scheduledAt:new Date(new FormData(e.target).get('scheduledAt')).toISOString()});await newsletterPage();toast('Küldés ütemezve.');}catch(err){$('#newsletter-status').textContent=err.message;}};
+ }catch(e){toast(e.message);}
+}
+const basicPlatform=platformPage;
+platformPage=async function(){await basicPlatform();if($('#provider-create')){const button=document.createElement('button');button.textContent='Hírlevélküldés';button.onclick=newsletterPage;$('.public').prepend(button);}};
+async function newsletterConsent(container){
+ try{const d=await api('/api/newsletter/consent');const el=document.createElement('label');el.className='check';el.innerHTML=`<input type="checkbox" ${d.subscribed?'checked':''}>Szeretnék Ráérő hírleveleket kapni (önkéntes, bármikor visszavonható).`;
+ el.querySelector('input').onchange=async e=>{try{await api('/api/newsletter/consent','PUT',{subscribed:e.target.checked});toast(e.target.checked?'Hírlevél-hozzájárulás mentve.':'Leiratkozás mentve.');}catch(err){e.target.checked=!e.target.checked;toast(err.message);}};
+ container?.append(el);
+ }catch{}
+}
+const guestWithMessages=guestPage;
+guestPage=async function(){await guestWithMessages();if($('#avatar-form'))await newsletterConsent($('.public'));};
+const providerSettings=settingsPage;
+settingsPage=function(){providerSettings();newsletterConsent($('#content'));};
+async function platformInvoicesPage(){
+ try{const payments=await api('/api/platform/payments'),invoices=await api('/api/platform/invoices');
+ showModal(`<h2>Üzemeltetői előfizetési számlák</h2><p>Az üzemeltető saját Billingo-fiókjából készülnek. Fizetendő összeg: 4 000 Ft / hónap, adózási mód: AAM. Bizonytalan küldési eredménynél nincs automatikus ismétlés.</p>${payments.map(p=>{const i=invoices.find(i=>i.payment_id===p.id);return `<div class="notice"><strong>${p.provider_id} · ${money(p.amount)}</strong><p>${esc(p.reference)} · ${i?esc(i.number||i.status):'Még nincs számla'}</p>${!i||i.status==='not_created'?`<button onclick="issuePlatformInvoice(${p.id})">Számla kiállítása Billingóval</button>`:i.status==='issued'?`<a href="${providerLink('/api/platform/invoices/'+i.id+'/pdf')}">Számla PDF-je</a>`:i.status==='unknown'?`<button onclick="reconcilePlatformInvoice(${i.id})">Egyeztetés a Billingo alapján</button>`:''}</div>`;}).join('')||'<p>Előbb rögzíts előfizetési befizetést.</p>'}<button onclick="$('#modal').close()">Bezárás</button>`);
+ }catch(e){toast(e.message);}
+}
+async function issuePlatformInvoice(id){try{const r=await api('/api/platform/invoices','POST',{paymentId:id});toast('Kiállított számla: '+r.number);await platformInvoicesPage();}catch(e){toast(e.message);}}
+async function operatorConversation(platform=false){
+ try{const messages=await api('/api/platform-messages');let recipients=null;if(platform)recipients=await api('/api/platform/recipients');
+ showModal(`<h2>${platform?'Főadmin közvetlen levelezés':'Üzenetek az üzemeltetővel'}</h2><div class="message-list">${messages.map(m=>`<div class="notice"><strong>${m.sender==='platform'?'Üzemeltető':m.recipient_type==='provider'?'Szolgáltató':'Vendég'} ${platform?'· '+m.recipient_type+' #'+m.recipient_id:''}</strong><p class="preserve-lines">${esc(m.text)}</p><small>${new Date(m.created_at).toLocaleString('hu-HU')}</small></div>`).join('')||'<p>Még nincs üzenet. Itt írhatsz az első alkalommal is.</p>'}</div><form id="operator-message-form">${platform?`<label>Címzett</label><select name="recipient">${recipients.providers.map(id=>`<option value="provider:${id}">Szolgáltató #${id}</option>`).join('')}${recipients.guests.map(g=>`<option value="guest:${g.id}">Vendég: ${esc(g.name)} · ${esc(g.email||'')} (#${g.id})</option>`).join('')}</select>`:''}<label>Üzenet</label><textarea name="text" maxlength="5000" required></textarea><p id="operator-message-error" class="error"></p><div class="buttons"><button type="button" onclick="$('#modal').close()">Bezárás</button><button class="primary">Üzenet küldése</button></div></form>`);
+ await api('/api/platform-messages/read','PATCH',{});
+ $('#operator-message-form').onsubmit=async e=>{e.preventDefault();try{const d=Object.fromEntries(new FormData(e.target));if(platform){const [type,id]=d.recipient.split(':');d.recipientType=type;d.recipientId=Number(id);delete d.recipient;}await api('/api/platform-messages','POST',d);await operatorConversation(platform);toast('Belső üzenet mentve.');}catch(err){$('#operator-message-error').textContent=err.message;}};
+ }catch(e){toast(e.message);}
+}
+const platformWithNews=platformPage;
+platformPage=async function(){await platformWithNews();if($('#provider-create')){for(const [label,action] of [['Előfizetési számlák',platformInvoicesPage],['Közvetlen levelezés',()=>operatorConversation(true)]]){const b=document.createElement('button');b.textContent=label;b.onclick=action;$('.public').prepend(b);}if(new URLSearchParams(location.search).has('platformMessages'))operatorConversation(true);}};
+const renderWithUnread=render;
+render=function(){renderWithUnread();if(!isPublic){const actions=$('.top-actions');if(actions){const b=document.createElement('button');b.textContent='Üzenet az üzemeltetőnek';b.onclick=()=>operatorConversation(false);actions.prepend(b);}}};
+const guestWithConsent=guestPage;
+guestPage=async function(){await guestWithConsent();if($('#avatar-form')){const b=document.createElement('button');b.textContent='Üzenet az üzemeltetőnek';b.onclick=()=>operatorConversation(false);$('.public').append(b);if(new URLSearchParams(location.search).has('platformMessages'))operatorConversation(false);}};
+const originalManage=managePage;
+managePage=async function(){await originalManage();try{await api('/api/guest');const card=$('.public .card');if(card){const b=document.createElement('button');b.textContent='Foglalás kapcsolása a saját vendégfiókomhoz';b.onclick=async()=>{try{await api('/api/guest/claim','POST',{token:manageToken});toast('Foglalás a vendégfiókodhoz kapcsolva.');}catch(e){toast(e.message);}};card.append(b);}}catch{}};
+async function changeCalendarLimit(id){const value=prompt('Engedélyezett naptárak száma (1–100). A bővített csomag feltételeit előbb egyeztesd a szolgáltatóval.','1');if(value===null)return;try{await api('/api/platform/providers/'+id+'/plan','PATCH',{calendarLimit:Number(value)});await platformPage();toast('Naptárkeret mentve.');}catch(e){toast(e.message);}}
+async function platformConnectionsForm(){
+try{const c=await api('/api/platform/connections');const fields=[['stripe_key','Saját Stripe titkos kulcs',true],['stripe_price','Stripe havi ár azonosítója (4 000 Ft)'],['stripe_webhook_secret','Stripe webhook aláírókulcs',true],['billingo_key','Saját Billingo API-kulcs',true],['billingo_block','Billingo számlatömb azonosító'],['smtp_host','Központi SMTP-kiszolgáló'],['smtp_port','SMTP-port'],['smtp_username','SMTP-felhasználónév'],['smtp_password','SMTP-jelszó',true],['mail_from','Feladó emailcíme'],['mail_name','Feladó neve']];
+showModal(`<h2>Üzemeltető külső kapcsolatai</h2><p>Ezek a kulcsok kizárólag a rendszer üzemeltetőjéhez tartoznak. A szolgáltatók nem férnek hozzájuk. A titkos mező üresen hagyva megőrzi a korábbi értéket.</p><form id="platform-connections-form">${fields.map(([key,label,secret])=>`<label>${label} · ${c[key+'_configured']?'Beállítva':'Nincs beállítva'}</label><input name="${key}" type="${secret?'password':'text'}" autocomplete="off" value="${secret?'':esc(c[key]||'')}">`).join('')}<p>Stripe webhook: ${esc(location.origin)}/api/platform-stripe/webhook</p><p id="form-error" class="error"></p><div class="buttons"><button type="button" onclick="$('#modal').close()">Mégse</button><button class="primary">Kapcsolatok mentése</button></div></form>`);
+$('#platform-connections-form').onsubmit=async e=>{e.preventDefault();try{await api('/api/platform/connections','PUT',Object.fromEntries(new FormData(e.target)));$('#modal').close();toast('Központi kapcsolatok mentve. Éles tranzakció még nem történt.');}catch(err){$('#form-error').textContent=err.message;}};
+}catch(e){toast(e.message);}}
+const platformWithBilling=platformPage;
+platformPage=async function(){await platformWithBilling();if($('#provider-create')){const b=document.createElement('button');b.textContent='Saját Billingo, Stripe és SMTP';b.onclick=platformConnectionsForm;$('.public').prepend(b);}};
+function reconcilePlatformInvoice(id){showModal(`<h2>Számla egyeztetése</h2><p>Előbb keresd meg a befizetést a Billingóban. Csak biztos eredményt rögzíts: egy téves „nem jött létre” jelölés után ismételt számla készülhet.</p><form id="reconcile-form"><label>Ellenőrzés eredménye</label><select name="decision"><option value="issued">A számla létrejött</option><option value="not_created">Biztosan nem jött létre</option></select><label>Számlaszám (ha létrejött)</label><input name="number"><label>Billingo bizonylatazonosító (ha létrejött)</label><input name="reference"><label class="check"><input type="checkbox" name="confirmed" required>A Billingóban ellenőriztem az eredményt.</label><p id="form-error" class="error"></p><button class="primary">Eredmény mentése</button></form>`);$('#reconcile-form').onsubmit=async e=>{e.preventDefault();try{const d=Object.fromEntries(new FormData(e.target));d.confirmed=true;await api('/api/platform/invoices/'+id+'/reconcile','PATCH',d);await platformInvoicesPage();toast('Egyeztetés rögzítve.');}catch(err){$('#form-error').textContent=err.message;}};}
+const financialReports=reportsPage;
+reportsPage=function(){financialReports();const visits=state.bookings.filter(b=>datekey(new Date(b.start))>=reportFrom&&datekey(new Date(b.start))<=reportTo);const section=document.createElement('section');section.className='card item';section.innerHTML=`<h2>Látogatások a kiválasztott időszakban</h2><p>Csak a saját vállalkozás foglalásai. A megjelenéshez kézi igazolás szükséges.</p><div class="stats">${[['Összes foglalás',visits.length],['Megjelent',visits.filter(b=>b.status==='confirmed'&&b.attendance==='attended').length],['Nem jelent meg',visits.filter(b=>b.status==='confirmed'&&b.attendance==='no_show').length],['Lemondott',visits.filter(b=>b.status==='cancelled').length]].map(([label,n])=>`<div class="stat"><small>${label}</small><strong>${n}</strong></div>`).join('')}</div>`;$('#content').append(section);};
+const servicesWithItems=servicesPage;
+servicesPage=function(){servicesWithItems();if(!state.services.some(s=>!s.archived)){const p=document.createElement('p');p.className='notice';p.textContent='Még nincs szolgáltatás. Az Új szolgáltatás gombbal add meg az első nevét, árát és időtartamát.';$('#content').append(p);}};
+const bookingWithServices=bookingForm;
+bookingForm=function(dt){if(!state.services.some(s=>!s.archived)){showModal(`<h2>Először vegyél fel szolgáltatást</h2><p>Az időpont mellé szükség lesz a szolgáltatás nevére, árára és időtartamára.</p><div class="buttons"><button onclick="$('#modal').close()">Bezárás</button><button class="primary" onclick="$('#modal').close();view='services';render();serviceForm()">Új szolgáltatás</button></div>`);return;}bookingWithServices(dt);};
+// All extensions are registered before the first request renders a page.
+if(location.pathname==='/foadmin') platformPage();
+else if(manageToken) managePage();
+else if(location.pathname.replace(/\/+$/,'')==='/fiokom') guestPage();
+else refresh().catch(loginPage);

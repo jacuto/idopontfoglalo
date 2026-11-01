@@ -25,6 +25,7 @@ return [
         "admin_facebook_ids" => env("ADMIN_FACEBOOK_IDS", ""),
     ],
     "facebook_version" => env("FACEBOOK_GRAPH_VERSION", "v23.0"),
+    "platform_billingo" => ["key" => env("PLATFORM_BILLINGO_API_KEY"), "block" => env("PLATFORM_BILLINGO_BLOCK_ID")],
     "platform_stripe" => [
         "key" => env("PLATFORM_STRIPE_SECRET_KEY"),
         "price" => env("PLATFORM_STRIPE_PRICE_ID"),

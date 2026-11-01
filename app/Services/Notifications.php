@@ -17,7 +17,7 @@ class Notifications
         if (
             $event !== "reminder" &&
             !empty($settings["notifyGuest"]) &&
-            !empty($booking["email"])
+            !empty($booking["email"]) && in_array($settings["channel"], ["email", "mindkettő"], true)
         ) {
             $this->add(
                 $booking,
@@ -27,7 +27,8 @@ class Notifications
                 "guest",
                 now(),
             );
-        } elseif (
+        }
+        if (
             $event !== "reminder" &&
             !empty($settings["notifyGuest"]) &&
             !empty($booking["phone"]) &&
@@ -104,6 +105,7 @@ class Notifications
         $at,
     ): void {
         $payload = [
+            "providerId" => app(Tenant::class)->id,
             "bookingId" => $b["id"],
             "version" => $b["updatedAt"],
             "settingsVersion" => $b["notificationVersion"] ?? 1,
@@ -113,6 +115,7 @@ class Notifications
             "audience" => $audience,
         ];
         DB::table("deliveries")->insertOrIgnore([
+            "provider_id" => app(Tenant::class)->id,
             "dedup" => hash("sha256", json_encode($payload)),
             "payload" => Crypt::encryptString(json_encode($payload)),
             "available_at" => $at,
@@ -122,16 +125,18 @@ class Notifications
             "updated_at" => now(),
         ]);
     }
-    public function run(int $limit = 50): array
+    public function run(int $limit = 50, ?int $providerId = null): array
     {
         $counts = ["sent" => 0, "skipped" => 0, "blocked" => 0, "failed" => 0];
         DB::table("deliveries")
+            ->when($providerId !== null, fn($q) => $q->where("provider_id", $providerId))
             ->where("status", "processing")
             ->where("locked_at", "<", now()->subMinutes(10))
             ->update(["status" => "pending", "locked_at" => null]);
         for ($i = 0; $i < $limit; $i++) {
-            $job = DB::transaction(function () {
+            $job = DB::transaction(function () use ($providerId) {
                 $j = DB::table("deliveries")
+                    ->when($providerId !== null, fn($q) => $q->where("provider_id", $providerId))
                     ->whereIn("status", ["pending", "blocked"])
                     ->where("available_at", "<=", now())
                     ->orderBy("id")
@@ -153,7 +158,23 @@ class Notifications
             }
             try {
                 $p = json_decode(Crypt::decryptString($job->payload), true);
+                $previousTenant = app(Tenant::class)->id;
+                app(Tenant::class)->id = (int) $job->provider_id;
+                if (($p['kind'] ?? '') === 'platform_message') {
+                    if (!app(Newsletters::class)->ready()) { $this->finish($job->id, 'blocked', ['error' => 'Hiányzó központi SMTP-kapcsolat.', 'available_at' => now()->addMinutes(5)]); $counts['blocked']++; continue; }
+                    $url = rtrim(config('app.url'), '/') . ($p['platformRecipient'] ? '/foadmin' : ($p['recipientType'] === 'guest' ? '/fiokom' : '/')) . '?provider=' . ($p['recipientType'] === 'provider' ? $p['recipientId'] : 1) . '&platformMessages=1';
+                    app(Newsletters::class)->send($p['recipient'], 'Új üzemeltetői üzenet — Ráérő', 'Új belső üzeneted érkezett. Beszélgetés: ' . $url);
+                    $this->finish($job->id, 'sent', ['attempts' => $job->attempts + 1]); $counts['sent']++; continue;
+                }
                 $s = app(SalonStore::class)->read();
+                if (($p['kind'] ?? '') === 'message') {
+                    $message = collect($s['messages'])->firstWhere('id', $p['messageId']);
+                    if (!$message) { $this->finish($job->id, 'skipped'); $counts['skipped']++; continue; }
+                    if (!$this->connections->mailReady()) { $this->finish($job->id, 'blocked', ['error' => 'Hiányzó küldőkapcsolat.', 'available_at' => now()->addMinutes(5)]); $counts['blocked']++; continue; }
+                    $this->sendMail($this->connections->all(), $p['recipient'], 'Új belső üzenet — Ráérő',
+                        'Új üzeneted érkezett. Beszélgetés: ' . rtrim(config('app.url'), '/') . ($p['guest'] ? '/fiokom' : '/') . '?provider=' . app(Tenant::class)->id . '&messages=1');
+                    $this->finish($job->id, 'sent', ['attempts' => $job->attempts + 1]); $counts['sent']++; continue;
+                }
                 $b = collect($s["bookings"])->firstWhere("id", $p["bookingId"]);
                 $enabled =
                     $p["event"] === "reminder"
@@ -227,7 +248,7 @@ class Notifications
                     $text .=
                         "\nFoglalás kezelése: " .
                         rtrim(config("app.url"), "/") .
-                        "/modositas?token=" .
+                        "/modositas?provider=" . app(Tenant::class)->id . "&token=" .
                         $b["token"] .
                         "\nSaját vendégfiók: " .
                         rtrim(config("app.url"), "/") .
@@ -298,9 +319,19 @@ class Notifications
                     "available_at" => now()->addMinutes(5 * $attempts),
                 ]);
                 $counts["failed"]++;
+            } finally {
+                if (isset($previousTenant)) app(Tenant::class)->id = $previousTenant;
             }
         }
         return $counts;
+    }
+    private function sendMail(array $c, string $recipient, string $subject, string $text): void
+    {
+        config(['mail.default' => 'smtp', 'mail.mailers.smtp.host' => $c['smtp_host'], 'mail.mailers.smtp.port' => (int) ($c['smtp_port'] ?: 587),
+            'mail.mailers.smtp.username' => $c['smtp_username'] ?: null, 'mail.mailers.smtp.password' => $c['smtp_password'] ?: null,
+            'mail.mailers.smtp.scheme' => (int) $c['smtp_port'] === 465 ? 'smtps' : 'smtp', 'mail.from.address' => $c['mail_from'], 'mail.from.name' => $c['mail_name'] ?: 'Ráérő']);
+        Mail::purge('smtp');
+        Mail::raw($text, fn($m) => $m->to($recipient)->subject($subject));
     }
     private function finish(int $id, string $status, array $extra = []): void
     {

@@ -11,3 +11,5 @@
 /database/*.sqlite*
 .phpunit.cache/
 *.log
+
+/work/

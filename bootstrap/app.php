@@ -10,6 +10,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: "/up",
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->web(append: [\App\Http\Middleware\TenantContext::class]);
         $middleware->prepend(\App\Http\Middleware\EmbedCors::class);
         // Public booking and secret-link management also work in embedded frames.
         $middleware->validateCsrfTokens(
@@ -23,6 +24,9 @@ return Application::configure(basePath: dirname(__DIR__))
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->render(function (\InvalidArgumentException $e, Request $r) {
+            if ($r->is('api/*')) return response()->json(['error' => $e->getMessage()], 422);
+        });
         $exceptions->shouldRenderJsonWhen(
             fn(Request $request) => $request->is("api/*") ||
                 $request->expectsJson(),

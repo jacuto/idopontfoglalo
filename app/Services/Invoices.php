@@ -49,9 +49,7 @@ class Invoices
         if (
             abs(
                 $invoiceAmount -
-                    array_sum(
-                        array_column($booking["serviceSnapshot"], "price"),
-                    ),
+                    Offers::total($booking),
             ) > 0.001
         ) {
             throw new InvalidArgumentException(

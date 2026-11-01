@@ -24,6 +24,10 @@ class WorkspaceController
     {
         $path = "/" . $request->path();
         $method = $request->method();
+        if (preg_match('#^/api/subscription/invoices/([1-9][0-9]*)/pdf$#',$path,$m) && $method === 'GET') return app(\App\Services\PlatformInvoices::class)->download((int)$m[1],app(\App\Services\Tenant::class)->id);
+        if ($path === "/api/subscription/info" && $method === "GET") {
+            return response()->json(["providerId" => app(\App\Services\Tenant::class)->id, "operator" => app(PlatformController::class)->operator(), "invoices" => DB::table("platform_invoices")->where("provider_id", app(\App\Services\Tenant::class)->id)->select("id", "payment_id", "status", "number", "reference")->get(), "payments" => DB::table("platform_payments")->where("provider_id", app(\App\Services\Tenant::class)->id)->latest("id")->get()]);
+        }
         if ($path === "/api/connections" && $method === "GET") {
             return response()->json(app(Connections::class)->status());
         }
@@ -52,14 +56,14 @@ class WorkspaceController
                 "admin_facebook_ids" => "nullable|string|max:2000",
             ]);
             app(Connections::class)->save($data);
-            DB::table("deliveries")
+            DB::table("deliveries")->where("provider_id", app(\App\Services\Tenant::class)->id)
                 ->where("status", "blocked")
                 ->update(["status" => "pending", "available_at" => now()]);
             return response()->json(["ok" => true]);
         }
         if ($path === "/api/deliveries" && $method === "GET") {
             return response()->json(
-                DB::table("deliveries")
+                DB::table("deliveries")->where("provider_id", app(\App\Services\Tenant::class)->id)
                     ->select(
                         "id",
                         "status",
@@ -74,13 +78,13 @@ class WorkspaceController
             );
         }
         if ($path === "/api/deliveries/run" && $method === "POST") {
-            return response()->json(app(Notifications::class)->run(10));
+            return response()->json(app(Notifications::class)->run(10, app(\App\Services\Tenant::class)->id));
         }
         if (
             preg_match('#^/api/deliveries/(\d+)/retry$#', $path, $m) &&
             $method === "POST"
         ) {
-            DB::table("deliveries")
+            DB::table("deliveries")->where("provider_id", app(\App\Services\Tenant::class)->id)
                 ->where("id", $m[1])
                 ->whereIn("status", ["failed", "blocked"])
                 ->update([
@@ -195,6 +199,7 @@ class WorkspaceController
             ]);
             $kind = $m[1];
             $result = $this->store->mutate(function (&$s) use ($kind, $data) {
+                $previousStaff = $s["staff"];
                 $added = 0;
                 $updated = 0;
                 foreach ($data["records"] as $index => $record) {
@@ -327,6 +332,7 @@ class WorkspaceController
                         $updated++;
                     }
                 }
+                if ($kind === "staff") Settings::checkCalendars(array_replace($s,["staff"=>$previousStaff]),$s["staff"]);
                 return ["added" => $added, "updated" => $updated];
             });
             return response()->json($result);
@@ -344,9 +350,7 @@ class WorkspaceController
                 if (!$b) {
                     abort(404, "Nincs ilyen foglalás.");
                 }
-                $total = array_sum(
-                    array_column($b["serviceSnapshot"], "price"),
-                );
+                $total = \App\Services\Offers::total($b);
                 $paid = collect($s["payments"])
                     ->where("bookingId", $b["id"])
                     ->where("status", "paid")

@@ -12,5 +12,6 @@
     <div id="toast" role="status"></div>
     <script src="/app.js?v={{ filemtime(public_path('app.js')) }}" defer></script>
     <script src="/workspace.js?v={{ filemtime(public_path('workspace.js')) }}" defer></script>
+    <script src="/features.js?v={{ filemtime(public_path('features.js')) }}" defer></script>
   </body>
 </html>

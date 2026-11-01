@@ -6,9 +6,7 @@ let calendarMode = window.innerWidth < 650 ? "day" : "week",
   reportTo = datekey(new Date());
 const activePeople = () => state.staff.filter((p) => !p.archived);
 const bookingValue = (b) =>
-  (
-    b.serviceSnapshot || state.services.filter((s) => b.services.includes(s.id))
-  ).reduce((n, s) => n + Number(s.price), 0);
+  b.pricing?.payable ?? (b.serviceSnapshot || state.services.filter((s) => b.services.includes(s.id))).reduce((n, s) => n + Number(s.price), 0);
 const serviceNames = (b) =>
   (b.serviceSnapshot || state.services.filter((s) => b.services.includes(s.id)))
     .map((s) => s.name)
@@ -42,6 +40,9 @@ function render() {
     activity: "Foglalási események",
     payments: "Befizetések",
     reports: "Statisztika",
+    messages: "Üzenetek",
+    offers: "Kuponok és bérletek",
+    profile: "Nyilvános adatlap",
     settings: "Beállítások",
     billing: "Előfizetés",
   };
@@ -53,6 +54,9 @@ function render() {
     activity: "◉",
     payments: "▱",
     reports: "◔",
+    messages: "✉",
+    offers: "%",
+    profile: "☰",
     settings: "⚙",
     billing: "↗",
   };
@@ -66,7 +70,7 @@ function render() {
       )
       .join(
         "",
-      )}</nav><div class="profile"><div class="avatar">${esc(initials(state.settings.name))}</div><div><strong>${esc(state.settings.name)}</strong><small>Szolgáltatói munkaterület</small></div></div></aside><main><header class="topbar"><div class="crumb">Munkaterület / <b>${labels[view]}</b></div><div class="top-actions"><button onclick="window.open('/foglalas','_blank')">↗ Foglalási oldalam</button><button onclick="logout()">Kilépés</button></div></header><div class="intro"><div><span class="eyebrow">${view === "calendar" ? "A NAPOD, ÁTLÁTHATÓAN" : "RÁÉRŐ MUNKATÉR"}</span><h1>${view === "calendar" ? "Minden időpont a helyén." : labels[view]}</h1><p>${view === "calendar" ? "Kevesebb szervezés. Több idő a vendégeidre." : "Minden fontos adat, egy helyen."}</p></div>${["calendar", "clients", "services", "staff"].includes(view) ? `<button class="primary" onclick="${{ calendar: "bookingForm()", clients: "clientForm()", services: "serviceForm()", staff: "staffForm()" }[view]}">＋ ${view === "calendar" ? "Új időpont" : view === "clients" ? "Új vendég" : view === "services" ? "Új szolgáltatás" : "Új munkatárs"}</button>` : ""}</div><div id="content"></div></main></div>`;
+      )}</nav><div class="profile"><div class="avatar">${esc(initials(state.settings.name))}</div><div><strong>${esc(state.settings.name)}</strong><small>Szolgáltatói munkaterület</small></div></div></aside><main><header class="topbar"><div class="crumb">Munkaterület / <b>${labels[view]}</b></div><div class="top-actions"><button onclick="window.open('/foglalas?provider='+providerId(),'_blank')">↗ Foglalási oldalam</button><button onclick="logout()">Kilépés</button></div></header><div class="intro"><div><span class="eyebrow">${view === "calendar" ? "A NAPOD, ÁTLÁTHATÓAN" : "RÁÉRŐ MUNKATÉR"}</span><h1>${view === "calendar" ? "Minden időpont a helyén." : labels[view]}</h1><p>${view === "calendar" ? "Kevesebb szervezés. Több idő a vendégeidre." : "Minden fontos adat, egy helyen."}</p></div>${["calendar", "clients", "services", "staff"].includes(view) ? `<button class="primary" onclick="${{ calendar: "bookingForm()", clients: "clientForm()", services: "serviceForm()", staff: "staffForm()" }[view]}">＋ ${view === "calendar" ? "Új időpont" : view === "clients" ? "Új vendég" : view === "services" ? "Új szolgáltatás" : "Új munkatárs"}</button>` : ""}</div><div id="content"></div></main></div>`;
   document.querySelectorAll("[data-nav]").forEach(
     (b) =>
       (b.onclick = () => {
@@ -82,6 +86,9 @@ function render() {
     activity: activityPage,
     payments: paymentsPage,
     reports: reportsPage,
+    messages: messagesPage,
+    offers: offersPage,
+    profile: profilePage,
     settings: settingsPage,
     billing: billingPage,
   })[view]();
@@ -236,10 +243,10 @@ function clientRows(query) {
       )
       .map(
         (c) =>
-          `<tr><td><strong>${esc(c.name)}</strong></td><td>${esc(c.phone) || "—"}</td><td>${esc(c.email) || "—"}</td><td><button onclick="clientForm('${c.id}')">Szerkesztés</button></td></tr>`,
+          `<tr><td><strong>${esc(c.name)}</strong></td><td>${esc(c.phone) || "—"}</td><td>${esc(c.email) || "—"}</td><td><button onclick="clientDetail('${c.id}')">Adatlap</button><button onclick="clientForm('${c.id}')">Szerkesztés</button></td></tr>`,
       )
       .join("") ||
-    '<tr><td colspan="4">Még nincs megjeleníthető vendég.</td></tr>';
+    (query ? '<tr><td colspan="4">Nincs találat. Próbálj másik nevet vagy elérhetőséget, vagy válaszd az Új vendég gombot.</td></tr>' : '<tr><td colspan="4">Még nincs vendéged. Az Új vendég gombbal felveheted az elsőt, az Importálással pedig meglévő listát hozhatsz be.</td></tr>');
 }
 function clientForm(id) {
   const c = state.clients.find((c) => c.id === id) || {};
@@ -321,7 +328,7 @@ function servicesPage() {
 function serviceForm(id) {
   const old = state.services.find((s) => s.id === id) || {};
   showModal(
-    `<h2>${id ? "Szolgáltatás szerkesztése" : "Új szolgáltatás"}</h2><form id="service-form"><label>Megnevezés</label><input name="name" value="${esc(old.name || "")}" required><div class="form-grid"><div><label>Időtartam (perc)</label><input name="duration" type="number" min="5" required value="${old.duration || 60}"></div><div><label>Ár (Ft)</label><input name="price" type="number" min="0" step="1" required value="${old.price ?? 10000}"></div></div><label>Szakaszok: munka, hatóidő, munka (opcionális)</label><input name="phases" placeholder="30,35,30" value="${old.phases?.join(",") || ""}"><label class="check"><input name="automatic" type="checkbox" ${old.automatic ? "checked" : ""}>Automatikus megerősítés</label><label>Ki végzi?</label>${activePeople()
+    `<h2>${id ? "Szolgáltatás szerkesztése" : "Új szolgáltatás"}</h2><form id="service-form"><label>Megnevezés</label><input name="name" value="${esc(old.name || "")}" required><label>Szolgáltatás leírása</label><textarea name="description">${esc(old.description || "")}</textarea><div class="form-grid"><div><label>Időtartam (perc)</label><input name="duration" type="number" min="5" required value="${old.duration || 60}"></div><div><label>Ár (Ft)</label><input name="price" type="number" min="0" step="1" required value="${old.price ?? 10000}"></div></div><label>Szakaszok: munka, hatóidő, munka (opcionális)</label><input name="phases" placeholder="30,35,30" value="${old.phases?.join(",") || ""}"><label class="check"><input name="automatic" type="checkbox" ${old.automatic ? "checked" : ""}>Automatikus megerősítés</label><label>Ki végzi?</label>${activePeople()
       .map(
         (p) =>
           `<label class="check"><input type="checkbox" name="staff" value="${p.id}" ${!id || old.staff.includes(p.id) ? "checked" : ""}>${esc(p.name)}</label>`,
@@ -337,6 +344,7 @@ function serviceForm(id) {
       ...old,
       id: id || crypto.randomUUID(),
       name: f.get("name"),
+      description: f.get("description"),
       duration: Number(f.get("duration")),
       price: Number(f.get("price")),
       staff: f.getAll("staff"),
@@ -481,7 +489,7 @@ function activityPage() {
         )
         .map(
           (b) =>
-            `<tr><td>${esc(b.name)}</td><td>${new Date(b.start).toLocaleString("hu-HU")}</td><td>${esc(serviceNames(b))}</td><td><span class="status ${b.status}">${statusName[b.status]}</span></td><td><button onclick="bookingDetails('${b.id}')">Részletek</button></td></tr>`,
+            `<tr><td>${esc(b.name)}</td><td>${new Date(b.start).toLocaleString("hu-HU")}</td><td>${(b.serviceSnapshot || []).map(s => `<a class="text-link" href="#szolgaltatas-${esc(s.id)}" onclick="event.preventDefault();serviceDetail('${esc(s.id)}')">${esc(s.name)}</a>`).join(" + ")}</td><td><span class="status ${b.status}">${statusName[b.status]}</span></td><td><button onclick="bookingDetails('${b.id}')">Részletek</button></td></tr>`,
         )
         .join("") || '<tr><td colspan="5">Még nincs foglalás.</td></tr>'
     }</tbody></table></div>`;
@@ -896,7 +904,7 @@ async function socialButtons(container, mode = "guest") {
         .filter((k) => p[k])
         .map(
           (k) =>
-            `<a class="social-button" href="/auth/${k}?mode=${mode}">${k === "google" ? "Google" : "Facebook"}-fiókkal ${mode === "admin" ? "belépés" : "belépés / regisztráció"}</a>`,
+            `<a class="social-button" href="/auth/${k}?provider=${providerId()}&mode=${mode}">${k === "google" ? "Google" : "Facebook"}-fiókkal ${mode === "admin" ? "belépés" : "belépés / regisztráció"}</a>`,
         )
         .join("") ||
       '<p class="hint">A közösségi belépés a szolgáltatói kapcsolat beállítása után érhető el.</p>';
@@ -906,7 +914,7 @@ async function guestPage() {
   try {
     const g = await api("/api/guest");
     $("#app").innerHTML =
-      `<div class="public"><div class="brand"><span>◷</span>ráérő.</div><h1>Szia, ${esc(g.name)}!</h1><p>A fiókodhoz tartozó foglalások.</p><div class="row"><a href="/foglalas">Új foglalás</a><button onclick="guestLogout()">Kilépés</button></div>${g.bookings.map((b) => `<div class="card"><h3>${esc((b.serviceSnapshot || []).map((s) => s.name).join(" + "))}</h3><p>${new Date(b.start).toLocaleString("hu-HU")} · ${statusName[b.status]}</p><a href="/modositas?token=${b.token}">Foglalás kezelése →</a></div>`).join("") || '<div class="card">Még nincs a fiókodhoz kapcsolt foglalás.</div>'}</div>`;
+      `<div class="public"><div class="brand"><span>◷</span>ráérő.</div><h1>Szia, ${esc(g.name)}!</h1><p>A fiókodhoz tartozó foglalások.</p><div class="row"><a href="/foglalas">Új foglalás</a><button onclick="guestLogout()">Kilépés</button></div>${g.bookings.map((b) => `<div class="card"><h3>${esc((b.serviceSnapshot || []).map((s) => s.name).join(" + "))}</h3><p>${new Date(b.start).toLocaleString("hu-HU")} · ${statusName[b.status]}</p><a href="/modositas?provider=${providerId()}&token=${b.token}">Foglalás kezelése →</a></div>`).join("") || '<div class="card">Még nincs a fiókodhoz kapcsolt foglalás.</div>'}</div>`;
   } catch {
     $("#app").innerHTML =
       `<div class="public"><div class="brand"><span>◷</span>ráérő.</div><div class="card"><h1>Vendégfiók</h1><p>Lépj be Google- vagy Facebook-fiókkal. Első belépéskor vendégfiókot hozunk létre. Foglalni belépés nélkül is lehet.</p><div id="guest-social" class="social-buttons"></div>${new URLSearchParams(location.search).has("authError") ? '<p class="error">A belépés nem sikerült. Próbáld újra.</p>' : ""}<a href="/foglalas">Foglalás belépés nélkül →</a></div></div>`;
@@ -955,9 +963,7 @@ publicPage = function () {
     card.append(privacy);
   }
 };
-if (manageToken) managePage();
-else if (location.pathname.replace(/\/+$/, "") === "/fiokom") guestPage();
-else refresh().catch(loginPage);
+
 function trackingConsent() {
   if (!state?.settings) return;
   const s = state.settings;

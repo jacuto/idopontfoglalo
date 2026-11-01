@@ -63,6 +63,7 @@ class SalonController
                     $path,
                     [
                         "/api/public",
+                        "/api/quote",
                         "/api/slots",
                         "/api/manage",
                         "/api/manage/checkout",
@@ -79,6 +80,7 @@ class SalonController
                     401,
                 );
             }
+            if ($admin && (int) $request->session()->get("provider_id", 1) !== app(\App\Services\Tenant::class)->id) { $admin = false; }
             if ($path === "/api/manage/checkout" && $method === "POST") {
                 $token = $request->input("token");
                 if (
@@ -110,6 +112,10 @@ class SalonController
             if ($path === "/api/public" && $method === "GET") {
                 $s = $this->store->read();
                 return response()->json([
+                    "profile" => $s["profile"],
+                    "offers" => array_values(array_filter($s["coupons"], fn($c) => $c["active"] && $c["public"] && now()->between(CarbonImmutable::parse($c["startsAt"]), CarbonImmutable::parse($c["endsAt"])))),
+                    "passes" => array_values(array_filter($s["passes"], fn($p) => $p["active"])),
+                    "reviews" => array_map(fn($v) => array_intersect_key($v, array_flip(["score", "text", "createdAt"])), array_values(array_filter($s["reviews"], fn($v) => $v["direction"] === "guest"))),
                     "settings" => array_intersect_key(
                         $s["settings"],
                         array_flip([
@@ -149,6 +155,8 @@ class SalonController
                     ),
                 ]);
             }
+            if ($path === "/api/quote" && $method === "POST") return app(FeaturesController::class)->quote($request);
+            if (preg_match('#^/api/(profile|coupons|passes|client-passes)(/|$)#', $path) || $path === '/api/clients/search' || preg_match('#^/api/clients/[^/]+/detail$#', $path) || preg_match('#^/api/bookings/[^/]+/review$#', $path)) return app(FeaturesController::class)->handle($request);
             if (
                 preg_match(
                     "#^/api/(clients|staff|imports|payments|connections|deliveries|invoices|checkout|subscription)(/|$)#",
@@ -189,6 +197,9 @@ class SalonController
                 }
                 RateLimiter::hit($key, 60);
                 $data = $request->validate([
+                    "clientId" => "nullable|string|max:80",
+                    "coupon" => "nullable|string|max:80",
+                    "passId" => "nullable|string|max:80",
                     "name" => "required|string|max:150",
                     "phone" => "nullable|string|max:40",
                     "email" => "nullable|email|max:200",
@@ -207,6 +218,8 @@ class SalonController
                         "email" => $data["email"] ?? "",
                         "public" => !$admin || $request->boolean("public"),
                     ]);
+                    $b["guestId"] = $request->session()->get("guest_id");
+                    \App\Services\Clients::attach($s, $b, $data["clientId"] ?? null, !$b["public"]);
                     $this->rules->validate($b, $s);
                     $b["id"] = (string) Str::uuid();
                     $b["token"] = bin2hex(random_bytes(24));
@@ -220,29 +233,12 @@ class SalonController
                         fn($id) => $this->rules->service($s["services"], $id),
                         $b["services"],
                     );
-                    $b["guestId"] = $request->session()->get("guest_id");
                     $b["status"] = $b["public"]
                         ? $this->rules->status($b["services"], $s)
                         : "confirmed";
+                    $b["pricing"] = app(\App\Services\Offers::class)->quote($s, $b, $data["coupon"] ?? null);
+                    app(\App\Services\Offers::class)->reservePass($s, $b, $data["passId"] ?? null, !$b["public"]);
                     $s["bookings"][] = $b;
-                    $exists = false;
-                    foreach ($s["clients"] as $c) {
-                        if (
-                            $b["phone"]
-                                ? $c["phone"] === $b["phone"]
-                                : $c["email"] === $b["email"]
-                        ) {
-                            $exists = true;
-                        }
-                    }
-                    if (!$exists) {
-                        $s["clients"][] = [
-                            "id" => (string) Str::uuid(),
-                            "name" => $b["name"],
-                            "phone" => $b["phone"],
-                            "email" => $b["email"],
-                        ];
-                    }
                     app(\App\Services\Notifications::class)->enqueue(
                         $b,
                         $s,
@@ -259,6 +255,7 @@ class SalonController
                 $data = $request->validate([
                     "status" =>
                         "sometimes|in:pending,confirmed,cancelled,rejected",
+                    "attendance" => "sometimes|in:attended,no_show,unmarked",
                     "start" => "sometimes|required|date",
                 ]);
                 $result = $this->store->mutate(function (&$s) use (
@@ -272,7 +269,19 @@ class SalonController
                                     ->utc()
                                     ->toISOString(),
                             ]);
-                            if (
+                            if (isset($data["attendance"])) {
+                                if ($b["status"] !== "confirmed" || CarbonImmutable::parse($b["start"])->addMinutes(array_sum(array_column($b["serviceSnapshot"], "duration")))->isFuture()) {
+                                    throw new InvalidArgumentException("Megjelenést csak megerősített, befejeződött alkalomnál jelölhetsz. Függő múltbeli foglalást helyezz át vagy utasíts el.");
+                                }
+                                $next["attendanceAt"] = now()->toISOString();
+                            }
+                            if (($data["status"] ?? null) === "confirmed" && $b["status"] === "pending" && CarbonImmutable::parse($next["start"])->isPast()) {
+                                throw new InvalidArgumentException("Ez a függő időpont már elmúlt. Előbb adj meg új, jövőbeli időpontot, vagy válaszd az Elutasítás lehetőséget.");
+                            }
+                            if (isset($data["start"]) && (!empty($b["attendance"]) && $b["attendance"] !== "unmarked")) {
+                                throw new InvalidArgumentException("Igazolt látogatás időpontja nem módosítható. Új alkalomhoz vegyél fel új időpontot.");
+                            }
+                            if (!isset($data["attendance"]) &&
                                 !in_array(
                                     $next["status"],
                                     ["cancelled", "rejected"],
@@ -281,6 +290,7 @@ class SalonController
                             ) {
                                 $this->rules->validate($next, $s, $b["id"]);
                             }
+                            app(\App\Services\Offers::class)->transitionPass($s, $b, $next);
                             $b = $next;
                             app(\App\Services\Notifications::class)->enqueue(
                                 $b,
@@ -327,12 +337,7 @@ class SalonController
                                 ),
                                 "balance" => max(
                                     0,
-                                    array_sum(
-                                        array_column(
-                                            $b["serviceSnapshot"],
-                                            "price",
-                                        ),
-                                    ) -
+                                    \App\Services\Offers::total($b) -
                                         collect($s["payments"])
                                             ->where("bookingId", $b["id"])
                                             ->where("status", "paid")
@@ -369,8 +374,13 @@ class SalonController
                                     "Ez a foglalás már nem módosítható.",
                                 );
                             }
+                            if (CarbonImmutable::parse($b["start"])->isPast()) {
+                                throw new InvalidArgumentException("Az időpont már elkezdődött. Kérj segítséget a szolgáltatótól.");
+                            }
                             if ($request->boolean("cancel")) {
-                                $b["status"] = "cancelled";
+                                $next = array_replace($b, ["status" => "cancelled"]);
+                                app(\App\Services\Offers::class)->transitionPass($s, $b, $next);
+                                $b = $next;
                             } else {
                                 $next = array_merge($b, [
                                     "start" => $request->input("start"),
@@ -456,15 +466,16 @@ class SalonController
                     "settings.reminder" =>
                         "required_with:settings|integer|between:1,8760",
                     "staff" => "sometimes|array|min:1|max:100",
-                    "staff.*.id" => "required|string|max:80|distinct",
+                    "staff.*.id" => "required|string|alpha_dash:ascii|max:80|distinct",
                     "staff.*.name" => "required|string|max:150",
                     "staff.*.role" => "required|string|max:80",
                     "staff.*.email" => "nullable|email|max:200",
                     "staff.*.phone" => "nullable|string|max:40",
                     "staff.*.archived" => "sometimes|boolean",
                     "services" => "sometimes|array|max:500",
-                    "services.*.id" => "required|string|max:80|distinct",
+                    "services.*.id" => "required|string|alpha_dash:ascii|max:80|distinct",
                     "services.*.name" => "required|string|max:150",
+                    "services.*.description" => "nullable|string|max:3000",
                     "services.*.price" =>
                         "required|numeric|min:0|max:100000000",
                     "services.*.duration" => "required|integer|between:5,1440",
@@ -474,7 +485,7 @@ class SalonController
                     "services.*.phases" => "sometimes|array|size:3",
                     "services.*.phases.*" => "required|integer|min:0",
                     "clients" => "sometimes|array|max:10000",
-                    "clients.*.id" => "required|string|max:80|distinct",
+                    "clients.*.id" => "required|string|alpha_dash:ascii|max:80|distinct",
                     "clients.*.name" => "required|string|max:150",
                     "clients.*.phone" => "nullable|string|max:40",
                     "clients.*.email" => "nullable|email|max:200",
@@ -524,6 +535,7 @@ class SalonController
                             );
                         }
                     }
+                    if (isset($data['staff'])) \App\Services\Settings::checkCalendars($s,$data['staff']);
                     // Keep catalog records referenced by bookings; use a separate archive feature to remove them later.
                     foreach (["staff", "services"] as $key) {
                         if (isset($data[$key])) {
@@ -568,6 +580,17 @@ class SalonController
                                 $notificationChanged = true;
                             }
                         };
+                    }
+                    if (isset($data["clients"])) {
+                        $oldClients = collect($s["clients"])->keyBy("id");
+                        foreach ($data["clients"] as &$client) $client = array_replace($oldClients->get($client["id"], []), array_intersect_key($client, array_flip(["id", "name", "phone", "email"])));
+                        foreach ($s["clients"] as $oldClient) if (!in_array($oldClient["id"], array_column($data["clients"], "id"), true)) $data["clients"][]=$oldClient;
+                        unset($client);
+                        foreach ($s["bookings"] as $booking) {
+                            if (!empty($booking["clientId"]) && !in_array($booking["clientId"], array_column($data["clients"], "id"), true)) {
+                                throw new InvalidArgumentException("Foglaláshoz kapcsolt vendég nem törölhető. Az adatait a vendégadatlapján szerkesztheted.");
+                            }
+                        }
                     }
                     foreach (
                         ["settings", "staff", "services", "clients"]
@@ -647,7 +670,8 @@ class SalonController
                 429,
             );
         }
-        $hash = config("raero.admin_password_hash");
+        $tenant = app(\App\Services\Tenant::class)->id;
+        $hash = $tenant === 1 ? config("raero.admin_password_hash") : \Illuminate\Support\Facades\DB::table("providers")->where("id", $tenant)->value("password_hash");
         if (!$hash) {
             return response()->json(
                 [
@@ -664,6 +688,7 @@ class SalonController
         RateLimiter::clear($key);
         $request->session()->regenerate();
         $request->session()->put("admin", true);
+        $request->session()->put("provider_id", $tenant);
         return response()->json(["ok" => true]);
     }
     private function slots(Request $request): array

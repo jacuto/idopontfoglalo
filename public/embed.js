@@ -34,7 +34,7 @@
       }
     }
     async api(path, body) {
-      const r = await fetch(this.endpoint + path, {
+      const r = await fetch(this.endpoint + path + (path.includes("?") ? "&" : "?") + "provider=" + encodeURIComponent(this.getAttribute("provider") || "1"), {
         method: body ? "POST" : "GET",
         credentials: "omit",
         headers: {
@@ -150,7 +150,7 @@
             start: this.selectedSlot.start,
             public: true,
           });
-        const manage = this.endpoint + "/modositas?token=" + b.token;
+        const manage = this.endpoint + "/modositas?provider=" + encodeURIComponent(this.getAttribute("provider") || "1") + "&token=" + b.token;
         this.shadowRoot.querySelector("form").innerHTML =
           `<div class="success"><h2>${b.status === "pending" ? "Foglalási kérésed megérkezett!" : "Időpontod megerősítve!"}</h2><p>Mentsd el a hivatkozást, ezen később módosíthatsz vagy lemondhatsz.</p><a target="_blank" rel="noopener" href="${escape(manage)}">Foglalás kezelése →</a></div>`;
         this.dispatchEvent(

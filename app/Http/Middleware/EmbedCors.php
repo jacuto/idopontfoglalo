@@ -16,11 +16,13 @@ class EmbedCors
         $allowed = false;
         if ($origin && $public) {
             try {
-                $allowed = in_array(
+                $selector = $r->query('provider', 1);
+                if (!is_scalar($selector) || !preg_match('/^[1-9][0-9]{0,8}$/', (string) $selector)) abort(404);
+                $allowed = app(\App\Services\Tenant::class)->run((int) $selector, fn() => in_array(
                     $origin,
                     app(SalonStore::class)->read()["settings"]["embedOrigins"],
                     true,
-                );
+                ));
             } catch (\Throwable) {
             }
         }

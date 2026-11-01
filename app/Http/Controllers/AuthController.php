@@ -38,6 +38,7 @@ class AuthController
             "state" => $state,
             "verifier" => $verifier,
             "mode" => $mode,
+            "tenant" => app(\App\Services\Tenant::class)->id,
             "expires" => time() + 600,
         ]);
         $redirect =
@@ -89,6 +90,7 @@ class AuthController
         ) {
             return redirect("/fiokom?authError=state");
         }
+        app(\App\Services\Tenant::class)->id = (int) ($saved["tenant"] ?? 1);
         $target = $saved["mode"] === "admin" ? "/" : "/fiokom";
         $c = app(Connections::class)->all();
         $uri =
@@ -176,7 +178,8 @@ class AuthController
                 }
                 $r->session()->regenerate();
                 $r->session()->put("admin", true);
-                return redirect("/");
+                $r->session()->put("provider_id", app(\App\Services\Tenant::class)->id);
+                return redirect(app(\App\Services\Tenant::class)->id === 1 ? "/" : "/?provider=" . app(\App\Services\Tenant::class)->id);
             }
             $account = DB::table("guest_accounts")
                 ->where("provider", $provider)
@@ -212,7 +215,7 @@ class AuthController
             }
             $r->session()->regenerate();
             $r->session()->put("guest_id", $account->id);
-            return redirect("/fiokom");
+            return redirect(app(\App\Services\Tenant::class)->id === 1 ? "/fiokom" : "/fiokom?provider=" . app(\App\Services\Tenant::class)->id);
         } catch (\Throwable) {
             return redirect($target . "?authError=provider");
         }
@@ -231,14 +234,16 @@ class AuthController
         $bookings = array_values(
             array_filter(
                 app(SalonStore::class)->read()["bookings"],
-                fn($b) => ($b["guestId"] ?? null) === $account->id ||
-                    ($account->email_verified &&
-                        !empty($account->email) &&
-                        mb_strtolower($b["email"] ?? "") ===
-                            mb_strtolower($account->email)),
+                fn($b) => (int) ($b["guestId"] ?? 0) === (int) $account->id,
             ),
         );
         return response()->json([
+            "providers" => \Illuminate\Support\Facades\DB::table('salon_state')->get()->filter(function($row) use ($account) {
+                $s = json_decode($row->data, true);
+                return collect($s['clients'])->contains(fn($c) => (int) ($c['guestId'] ?? 0) === (int) $account->id) || collect($s['bookings'])->contains(fn($b) => (int) ($b['guestId'] ?? 0) === (int) $account->id);
+            })->map(fn($row) => ['id' => $row->id, 'name' => json_decode($row->data, true)['settings']['name']])->values(),
+            "id" => $account->id,
+            "avatar" => $account->avatar ? "/api/guest/avatar/" . $account->id : null,
             "name" => $account->name,
             "email" => $account->email,
             "bookings" => $bookings,

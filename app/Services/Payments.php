@@ -25,7 +25,7 @@ class Payments
             ->where("status", "paid")
             ->sum(fn($p) => $p["amount"] - ($p["refundedAmount"] ?? 0));
         $amount =
-            array_sum(array_column($b["serviceSnapshot"], "price")) - $paid;
+            \App\Services\Offers::total($b) - $paid;
         if ($amount <= 0) {
             throw new InvalidArgumentException(
                 "Nincs fennmaradó fizetendő összeg.",
@@ -64,10 +64,10 @@ class Payments
                 ],
                 "success_url" =>
                     $base .
-                    "/modositas?token=" .
+                    "/modositas?provider=" . app(Tenant::class)->id . "&token=" .
                     $b["token"] .
                     "&payment=success",
-                "cancel_url" => $base . "/modositas?token=" . $b["token"],
+                "cancel_url" => $base . "/modositas?provider=" . app(Tenant::class)->id . "&token=" . $b["token"],
                 "client_reference_id" => $b["id"],
                 "metadata" => ["booking_id" => $b["id"]],
                 "billing_address_collection" => "required",
@@ -109,11 +109,7 @@ class Payments
         }
         $s = $this->store->read();
         if (
-            in_array(
-                $s["subscription"]["status"] ?? "",
-                ["active", "trialing"],
-                true,
-            )
+            !empty($s["subscription"]["id"]) && in_array($s["subscription"]["status"] ?? "", ["active", "trialing"], true)
         ) {
             throw new InvalidArgumentException("Már van aktív előfizetés.");
         }
@@ -137,18 +133,20 @@ class Payments
             ->withHeaders([
                 "Idempotency-Key" =>
                     "salon-subscription-" .
-                    hash("sha256", config("app.url") . now()->format("Y-m-d")),
+                    hash("sha256", config("app.url") . app(Tenant::class)->id . now()->format("Y-m-d")),
             ])
             ->asForm()
             ->post("https://api.stripe.com/v1/checkout/sessions", [
                 "mode" => "subscription",
+                "metadata" => ["provider_id" => (string) app(Tenant::class)->id],
+                "subscription_data" => ["metadata" => ["provider_id" => (string) app(Tenant::class)->id]],
                 "line_items" => [["price" => $price, "quantity" => 1]],
                 "billing_address_collection" => "required",
                 "tax_id_collection" => ["enabled" => "true"],
                 "success_url" =>
-                    rtrim(config("app.url"), "/") . "/?subscription=success",
+                    rtrim(config("app.url"), "/") . "/?provider=" . app(Tenant::class)->id . "&subscription=success",
                 "cancel_url" =>
-                    rtrim(config("app.url"), "/") . "/?subscription=cancelled",
+                    rtrim(config("app.url"), "/") . "/?provider=" . app(Tenant::class)->id . "&subscription=cancelled",
             ]);
         if (!$r->successful()) {
             throw new InvalidArgumentException(
@@ -192,18 +190,37 @@ class Payments
         }
         $event = $request->json()->all();
         $object = $event["data"]["object"] ?? [];
+        if ($platform && isset($object["metadata"]["provider_id"])) {
+            $tenant = filter_var($object["metadata"]["provider_id"], FILTER_VALIDATE_INT, ["options" => ["min_range" => 1]]);
+            if (!$tenant || !\Illuminate\Support\Facades\DB::table("salon_state")->where("id", $tenant)->exists()) return response()->json(["error" => "Ismeretlen szolgáltató."], 400);
+            app(Tenant::class)->id = $tenant;
+        }
+        if ($platform && in_array($event['type'] ?? '', ['invoice.paid', 'invoice.payment_failed'], true)) {
+            $subscription = $object['subscription'] ?? $object['parent']['subscription_details']['subscription'] ?? null;
+            $found = false;
+            foreach (\Illuminate\Support\Facades\DB::table('salon_state')->get() as $row) {
+                $candidate = json_decode($row->data, true);
+                if ($subscription && ($candidate['subscription']['id'] ?? null) === $subscription) { app(Tenant::class)->id = (int) $row->id; $found = true; break; }
+            }
+            // Stripe may deliver invoice.paid before checkout completion. Ask it to retry.
+            if (!$found) return response()->json(['error' => 'Az előfizetés azonosítása még folyamatban. Újrapróbálás szükséges.'], 409);
+        }
         $this->store->mutate(function (&$s) use ($event, $object, $platform) {
+            $eventId = $event["id"] ?? null;
+            if ($eventId && in_array($eventId, $s["stripeEvents"] ?? [], true)) return;
+            if ($eventId) $s["stripeEvents"][] = $eventId;
             if ($event["type"] === "checkout.session.completed") {
                 $checkout = $s["checkouts"][$object["id"]] ?? null;
                 if (!$checkout) {
                     return;
                 }
-                if ($checkout["type"] === "subscription" && $platform) {
-                    $s["subscription"] = [
+                if ($checkout["type"] === "subscription" && $platform && ($object["payment_status"] ?? "") === "paid") {
+                    $s["subscription"] = array_replace($s["subscription"], [
                         "id" => $object["subscription"],
                         "customer" => $object["customer"],
-                        "status" => "active",
-                    ];
+                        "status" => ($event["created"] ?? 0) >= ($s["subscription"]["lastEventAt"] ?? 0) ? "active" : ($s["subscription"]["status"] ?? "active"),
+                        "lastEventAt" => max($event["created"] ?? 0, $s["subscription"]["lastEventAt"] ?? 0),
+                    ]);
                     return;
                 }
                 if (
@@ -247,6 +264,18 @@ class Payments
                     ],
                 ];
             }
+            if ($platform && ($event['type'] ?? '') === 'invoice.paid' && ($object['paid'] ?? false) === true && ($object['currency'] ?? '') === 'huf' && ($object['amount_paid'] ?? 0) === 400000) {
+                $reference = 'stripe-invoice:' . $object['id'];
+                $end = $object['lines']['data'][0]['period']['end'] ?? $object['period_end'] ?? null;
+                if (!$end) throw new InvalidArgumentException('A Stripe nem adta meg az előfizetési időszak végét.');
+                \Illuminate\Support\Facades\DB::table('platform_payments')->insertOrIgnore(['provider_id' => app(Tenant::class)->id, 'reference' => $reference, 'amount' => 4000, 'method' => 'card', 'paid_at' => now(), 'period_end' => \Carbon\CarbonImmutable::createFromTimestamp($end), 'created_at' => now(), 'updated_at' => now()]);
+                $paidUntil = \Carbon\CarbonImmutable::createFromTimestamp($end)->toISOString();
+                if (empty($s['subscription']['paidUntil']) || $paidUntil > $s['subscription']['paidUntil']) $s['subscription']['paidUntil'] = $paidUntil;
+                if (($event['created'] ?? 0) >= ($s['subscription']['lastEventAt'] ?? 0)) {
+                    $s['subscription']['status'] = 'active'; $s['subscription']['lastEventAt'] = $event['created'] ?? 0;
+                }
+            }
+            if ($platform && ($event['type'] ?? '') === 'invoice.payment_failed' && ($event['created'] ?? 0) >= ($s['subscription']['lastEventAt'] ?? 0)) { $s['subscription']['status'] = 'past_due'; $s['subscription']['lastEventAt'] = $event['created'] ?? 0; }
             if (!$platform && $event["type"] === "charge.refunded") {
                 foreach ($s["payments"] as &$p) {
                     if (
@@ -278,7 +307,10 @@ class Payments
                 ) &&
                 ($s["subscription"]["id"] ?? null) === $object["id"]
             ) {
-                $s["subscription"]["status"] = $object["status"];
+                if (($event["created"] ?? 0) >= ($s["subscription"]["lastEventAt"] ?? 0)) {
+                    $s["subscription"]["status"] = $object["status"];
+                    $s["subscription"]["lastEventAt"] = $event["created"] ?? time();
+                }
             }
         });
         return response()->json(["received" => true]);

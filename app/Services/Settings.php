@@ -52,8 +52,36 @@ final class Settings
             "checkouts" => [],
             "invoiceRequests" => [],
             "subscription" => [],
+            "reviews" => [],
+            "coupons" => [],
+            "passes" => [],
+            "clientPasses" => [],
+            "messages" => [],
+            "profile" => [],
         ];
+        if (($state['subscription']['status'] ?? '') === 'trialing' && !empty($state['subscription']['trialEndsAt']) && \Carbon\CarbonImmutable::parse($state['subscription']['trialEndsAt'])->isPast()) $state['subscription']['status'] = 'past_due';
+        if (($state['subscription']['status'] ?? '') === 'active' && !empty($state['subscription']['paidUntil']) && empty($state['subscription']['id']) && \Carbon\CarbonImmutable::parse($state['subscription']['paidUntil'])->isPast()) $state['subscription']['status'] = 'past_due';
+        // Legacy record association is local to the salon; it grants no account access.
+        foreach ($state["bookings"] as &$booking) {
+            if (!isset($booking["clientId"])) {
+                $matches = array_values(array_filter($state["clients"], fn($c) =>
+                    ($c["name"] ?? "") === ($booking["name"] ?? "") &&
+                    Clients::phone($c["phone"] ?? "") === Clients::phone($booking["phone"] ?? "") &&
+                    ($c["email"] ?? "") === ($booking["email"] ?? "")));
+                if (count($matches) === 1) $booking["clientId"] = $matches[0]["id"];
+            }
+        }
+        unset($booking);
         return $state;
+    }
+    public static function checkCalendars(array $state, array $people): void
+    {
+        if (!isset($state['subscription']['calendarLimit'])) return; // Preserve legacy entitlement until upgrade.
+        $limit=(int)$state['subscription']['calendarLimit'];
+        if (!in_array($state['subscription']['status']??'', ['active','trialing'], true)) $limit=1;
+        $current=count(array_filter($state['staff'], fn($p)=>empty($p['archived'])));
+        $next=count(array_filter($people, fn($p)=>empty($p['archived'])));
+        if ($next > max($current,$limit)) throw new \InvalidArgumentException('A csomagod naptárkerete betelt. Több munkatárshoz kérj nagyobb keretet az üzemeltetőtől az Előfizetés menüben.');
     }
     public static function minutes(string $time): int
     {

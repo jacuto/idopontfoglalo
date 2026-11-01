@@ -129,3 +129,22 @@ Artisan::command("raero:deliver {--limit=50}", function () {
 \Illuminate\Support\Facades\Schedule::command("raero:deliver")
     ->everyMinute()
     ->withoutOverlapping();
+
+Artisan::command('raero:platform-password', function () {
+ $password=$this->secret('Új főadminjelszó (legalább 12 karakter)');
+ if(mb_strlen($password??'')<12||$this->secret('Jelszó ismét')!==$password){$this->error('Rövid vagy eltérő jelszavak.');return 1;}
+ $path=base_path('.env');if(!is_file($path)){$this->error('Előbb készítsd el a .env fájlt.');return 1;}
+ $line='PLATFORM_ADMIN_PASSWORD_HASH="'.str_replace('$','\$',Hash::make($password)).'"';$content=file_get_contents($path);
+ $content=preg_match('/^PLATFORM_ADMIN_PASSWORD_HASH=.*/m',$content)?preg_replace_callback('/^PLATFORM_ADMIN_PASSWORD_HASH=.*/m',fn()=>$line,$content):$content."\n".$line."\n";
+ file_put_contents($path,$content,LOCK_EX);chmod($path,0600);$this->info('Főadminjelszó beállítva. Következő parancs: php artisan config:clear');
+})->purpose('Külön főadminjelszó beállítása rejtett helyi bevitellel');
+Artisan::command('raero:upgrade',function(){
+ if($this->call('migrate',['--force'=>true])!==0)return 1;
+ foreach(DB::table('salon_state')->pluck('id') as $id)app(\App\Services\Tenant::class)->run((int)$id,function(){app(SalonStore::class)->mutate(function(&$s){
+  if(empty($s['subscription']['status']))$s['subscription']=array_replace($s['subscription'],['status'=>'trialing','trialStartedAt'=>now()->toISOString(),'trialEndsAt'=>now()->addMonthsNoOverflow(2)->toISOString(),'price'=>4000,'calendarLimit'=>max(1,count(array_filter($s['staff'],fn($p)=>empty($p['archived']))))]);
+ });});
+ $this->info('Adatmegőrző frissítés kész.');
+})->purpose('Additív migráció és meglévő adatok frissítése törlés nélkül');
+
+Artisan::command('raero:newsletters {--limit=30}', function(){ $this->info(json_encode(app(\App\Services\Newsletters::class)->run(min(100,max(1,(int)$this->option('limit')))),JSON_UNESCAPED_UNICODE)); });
+\Illuminate\Support\Facades\Schedule::command('raero:newsletters')->everyMinute()->withoutOverlapping();

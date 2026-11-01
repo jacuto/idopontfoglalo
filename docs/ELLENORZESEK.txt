@@ -1,0 +1,34 @@
+Ráérő – végleges ellenőrzési naplók, 2026. november 1.
+
+MariaDB 11.4 – valódi InnoDB és párhuzamos folyamatok
+PHPUnit 11.5.57 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.2.32
+Configuration: /workspace/idopontfoglalo/phpunit.xml
+
+........................................................          56 / 56 (100%)
+
+Time: 00:18.653, Memory: 50.50 MB
+
+OK (56 tests, 309 assertions)
+
+SQLite – két MariaDB-versenyteszt szándékosan kihagyva
+PHPUnit 11.5.57 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.2.32
+Configuration: /workspace/idopontfoglalo/phpunit.xml
+
+............SS..........................................          56 / 56 (100%)
+
+Time: 00:16.652, Memory: 50.50 MB
+
+OK, but some tests were skipped!
+Tests: 56, Assertions: 298, Skipped: 2.
+
+Chromium / Playwright
+PASS: imported-client lookup, normalized phone, ArrowDown/ArrowUp/Enter/Esc, client details, mobile width, centered avatar, public service booking; no browser errors.
+
+PHP-szintaxis: 55 fájl sikeres ellenőrzése.
+JavaScript: app.js, workspace.js, features.js, embed.js és tests/browser.cjs szintaktikailag rendben.
+git diff --check: sikeres.
+Külső HTTP-szolgáltatások: szimulált válaszok; éles fizetés, számla és kiküldés nem történt.
