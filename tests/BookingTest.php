@@ -174,6 +174,7 @@ class BookingTest extends TestCase
             "/api/bookings",
             $this->booking([
                 "name" => "Másik",
+                "phone" => "+36307654321",
                 "services" => ["short"],
                 "start" => "2035-03-12T09:35:00Z",
             ]),

@@ -117,8 +117,6 @@ function calendarPage() {
     .filter((p) => datekey(new Date(p.paidAt)) === today)
     .reduce((n, p) => n + paymentNet(p), 0);
   const first = new Date(calendarAnchor);
-  if (calendarMode === "week")
-    first.setDate(first.getDate() - ((first.getDay() + 6) % 7));
   if (calendarMode === "month") first.setDate(1);
   const days = Array.from(
     { length: calendarMode === "day" ? 1 : 7 },
@@ -131,7 +129,7 @@ function calendarPage() {
   if (state.settings.businessMode === "solo") filter = "";
   const filtered = active.filter((b) => !filter || b.staff === filter);
   $("#content").innerHTML =
-    `<div class="stats calendar-summary"><div class="stat"><div><small>Mai időpontok</small><strong>${daily.length}</strong></div><div class="symbol">▦</div></div><button class="stat pending-summary" onclick="pendingBookings()" aria-label="Jóváhagyásra váró foglalások"><div><small>Jóváhagyásra vár</small><strong>${pending.length}</strong></div><div class="symbol">◷</div></button><div class="stat"><div><small>Mai befizetések</small><strong>${money(paid)}</strong><em>Tervezett: ${money(daily.reduce((n, b) => n + bookingValue(b), 0))}</em></div><div class="symbol">↗</div></div></div><div class="card calendar-card"><div class="calendar-tools"><div class="row"><h3>${calendarAnchor.toLocaleDateString("hu-HU", { year: "numeric", month: "long", ...(calendarMode === "day" ? { day: "numeric" } : {}) })}</h3><button aria-label="Előző időszak" onclick="calendarMove(-1)">‹</button><button aria-label="Következő időszak" onclick="calendarMove(1)">›</button><button onclick="calendarAnchor=new Date();calendarPage()">Ma</button></div><div class="row">${
+    `<div class="stats calendar-summary"><div class="stat"><div><small>Mai időpontok</small><strong>${daily.length}</strong></div><div class="symbol">▦</div></div><button class="stat pending-summary" onclick="pendingBookings()" aria-label="Jóváhagyásra váró foglalások"><div><small>Jóváhagyásra vár</small><strong>${pending.length}</strong></div><div class="symbol">◷</div></button><div class="stat"><div><small>Mai befizetések</small><strong>${money(paid)}</strong><em>Tervezett: ${money(daily.reduce((n, b) => n + bookingValue(b), 0))}</em></div><div class="symbol">↗</div></div></div><div class="card calendar-card"><div class="calendar-tools"><div class="row"><h3>${calendarMode === "week" ? days[0].toLocaleDateString("hu-HU",{year:"numeric",month:"short",day:"numeric"}) + " – " + days[6].toLocaleDateString("hu-HU",{month:"short",day:"numeric"}) : calendarAnchor.toLocaleDateString("hu-HU", { year: "numeric", month: "long", ...(calendarMode === "day" ? { day: "numeric" } : {}) })}</h3><button aria-label="Előző időszak" onclick="calendarMove(-1)">‹</button><button aria-label="Következő időszak" onclick="calendarMove(1)">›</button><button onclick="calendarAnchor=new Date();calendarPage()">Ma</button></div><div class="row">${
       state.settings.businessMode !== "solo" && activePeople().length > 1
         ? `<select aria-label="Munkatársszűrő" style="width:180px" onchange="filter=this.value;calendarPage()"><option value="">Minden munkatárs</option>${activePeople()
             .map(
@@ -152,6 +150,8 @@ function calendarPage() {
       .join(
         "",
       )}</div></div></div><div id="calendar-body"></div><div class="legend"><span><i class="dot"></i>Megerősített</span><span><i class="dot" style="background:#d28a12"></i>Jóváhagyásra vár</span><span>Kattints az üres idősávra a gyors felvitelhez.</span></div></div>`;
+  const tools = document.querySelector(".calendar-tools");
+  tools.insertAdjacentHTML("beforeend", `<div class="calendar-view-options">${calendarMode!=="month"?`<button aria-pressed="${calendarDetailed}" onclick="calendarDetailed=!calendarDetailed;calendarPage()">${calendarDetailed ? "Normál idősávok" : "Tágas idősávok"}</button>`:""}<button onclick="availabilityDialog(datekey(calendarAnchor),false)">Nyitvatartás és szünetek</button><small class="selection-help">Ctrl (Macen ⌘) + kattintás vagy húzás: több nap kijelölése.</small><span id="calendar-selection" role="status"></span><button id="calendar-clear-selection" hidden onclick="clearCalendarSelection()">Kijelölés törlése</button><span id="calendar-guide" role="status">Mutass egy idősávra: a napot és az időt együtt kiemeljük.</span></div>`);
   if (calendarMode === "month") {
     const start = new Date(first);
     start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
@@ -165,7 +165,7 @@ function calendarPage() {
           const bs = filtered
             .filter((b) => datekey(new Date(b.start)) === key)
             .sort((a, b) => a.start.localeCompare(b.start));
-          return `<div class="month-day ${d.getMonth() !== calendarAnchor.getMonth() ? "outside" : ""} ${key === today ? "today" : ""}"><button class="day-number" onclick="bookingForm('${key}T${state.settings.openingTime}')">${d.getDate()}</button>${bs
+          return `<div data-date="${key}" class="month-day ${d.getMonth() !== calendarAnchor.getMonth() ? "outside" : ""} ${key === today ? "today" : ""}"><button class="day-hours month-hours" aria-label="${key} időbeosztása" onclick="availabilityDialog('${key}',true)">⚙</button><button class="day-number" onclick="bookingForm('${key}T${state.settings.openingTime}')">${d.getDate()}</button>${bs
             .slice(0, 4)
             .map(
               (b) =>
@@ -176,10 +176,9 @@ function calendarPage() {
             )}${bs.length > 4 ? `<button class="more" onclick="calendarMode='day';calendarAnchor=new Date('${key}T12:00');calendarPage()">+ ${bs.length - 4} további</button>` : ""}</div>`;
         },
       ).join("")}</div>`;
+    bindCalendarSelection();
     return;
   }
-  const tools = document.querySelector(".calendar-tools");
-  tools.insertAdjacentHTML("beforeend", `<div class="calendar-view-options"><button aria-pressed="${calendarDetailed}" onclick="calendarDetailed=!calendarDetailed;calendarPage()">${calendarDetailed ? "Normál idősávok" : "Tágas idősávok"}</button><button onclick="availabilityDialog(datekey(calendarAnchor))">Nyitvatartás és szünetek</button><span id="calendar-guide" role="status">Mutass egy idősávra: a napot és az időt együtt kiemeljük.</span></div>`);
   const dayKeys = days.map(datekey),
     visible = filtered.filter((b) =>
       dayKeys.includes(datekey(new Date(b.start))),
@@ -211,7 +210,7 @@ function calendarPage() {
   const ticks = [];
   for (let m = open; m < close; m = (Math.floor(m / 30) + 1) * 30) ticks.push(m);
   $("#calendar-body").innerHTML =
-    `<div class="calendar-scroll ${calendarDetailed ? "calendar-detailed" : "calendar-fit"} ${scale < 0.42 ? "calendar-dense" : ""}"><div class="timeline" style="--cols:${days.length};--track-height:${height}px"><div class="timeline-heading"></div>${days.map((d) => `<div data-date="${datekey(d)}" class="timeline-heading ${datekey(d) === today ? "today" : ""}">${d.toLocaleDateString("hu-HU", { weekday: "short" })}<strong>${d.getDate()}</strong><button class="day-hours" aria-label="${datekey(d)} időbeosztása" onclick="availabilityDialog('${datekey(d)}')">⚙</button></div>`).join("")}<div class="time-rail">${ticks.map((m) => `<span data-minute="${m}" class="${m % 60 ? "half-hour" : "whole-hour"}" style="top:${(m - open) * scale}px">${minutesTime(m)}</span>`).join("")}</div>${days
+    `<div class="calendar-scroll ${calendarDetailed ? "calendar-detailed" : "calendar-fit"} ${scale < 0.42 ? "calendar-dense" : ""}"><div class="timeline" style="--cols:${days.length};--track-height:${height}px"><div class="timeline-heading"></div>${days.map((d) => `<div data-date="${datekey(d)}" class="timeline-heading ${datekey(d) === today ? "today" : ""}">${d.toLocaleDateString("hu-HU", { weekday: "short" })}<strong>${d.getDate()}</strong><button class="day-hours" aria-label="${datekey(d)} időbeosztása" onclick="availabilityDialog('${datekey(d)}',true)">⚙</button></div>`).join("")}<div class="time-rail">${ticks.map((m) => `<span data-minute="${m}" class="${m % 60 ? "half-hour" : "whole-hour"}" style="top:${(m - open) * scale}px">${minutesTime(m)}</span>`).join("")}</div>${days
       .map((d) => {
         const bookings = filtered
           .filter((b) => datekey(new Date(b.start)) === datekey(d))
@@ -233,6 +232,7 @@ function calendarPage() {
         return `<div class="day-track" data-date="${datekey(d)}">${ticks.map((m, i) => `<button data-minute="${m}" class="time-slot ${calendarSlotBlocked(datekey(d), m) ? "unavailable" : ""} ${m % 60 ? "" : "hour-start"} ${Math.floor(m / 60) % 2 ? "hour-shade" : ""}" ${calendarSlotBlocked(datekey(d), m) ? 'disabled title="Nem foglalható idő"' : ""} aria-label="Időpont felvétele: ${datekey(d)} ${minutesTime(m)}" style="top:${(m - open) * scale}px;height:${((ticks[i + 1] ?? close) - m) * scale}px" onclick="bookingForm('${datekey(d)}T${minutesTime(m)}')"></button>`).join("")}${calendarBlockedBands(datekey(d), open, close, scale)}${placed.map(({ b, start, duration, lane }) => `<button data-minute="${ticks.filter(m => m <= start).at(-1) ?? open}" class="calendar-event ${b.status === "pending" ? "pending" : ""}" style="top:${Math.max(0, start - open) * scale}px;height:${Math.max(24, Math.min(duration, close - start) * scale)}px;left:calc(${(lane / lanes) * 100}% + 3px);width:calc(${100 / lanes}% - 6px)" title="${esc(b.name + " · " + serviceNames(b))}" onclick="bookingDetails('${b.id}')"><strong>${new Date(b.start).toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" })} · ${esc(b.name)}</strong><span>${esc(serviceNames(b))}</span>${state.settings.businessMode !== "solo" ? `<small>${esc(state.staff.find((p) => p.id === b.staff)?.name || "")}</small>` : ""}</button>`).join("")}</div>`;
       })
       .join("")}</div></div>`;
+  bindCalendarSelection();
   const scroller = document.querySelector(".calendar-scroll");
   scroller.style.maxHeight = Math.max(180, window.innerHeight - scroller.getBoundingClientRect().top - 65) + "px";
   const grid = document.querySelector(".timeline");
@@ -660,8 +660,9 @@ async function connectionsForm() {
         ],
       ],
       [
-        "Google és Facebook belépés",
+        "Google, Facebook és Apple belépés",
         [
+          ["apple_client_id", "Apple Services ID"], ["apple_team_id", "Apple Team ID"], ["apple_key_id", "Apple Key ID"], ["apple_private_key", "Apple .p8 privát kulcs", "secret"], ["admin_apple_ids", "Adminnak engedélyezett Apple felhasználóazonosítók (vesszővel)"],
           ["google_client_id", "Google Client ID"],
           ["google_client_secret", "Google Client Secret", "secret"],
           ["facebook_client_id", "Facebook App ID"],
@@ -678,7 +679,7 @@ async function connectionsForm() {
       ],
     ];
     $("#connections-form").innerHTML =
-      `<form id="connection-settings">${groups.map(([title, fields]) => `<details><summary>${title}</summary><div class="form-grid">${fields.map(([key, label, secret]) => `<div><label>${label} ${c[key + "_configured"] ? '<span class="configured">megadva</span>' : ""}</label><input name="${key}" type="${secret ? "password" : "text"}" autocomplete="off" value="${secret ? "" : esc(c[key] || "")}" placeholder="${secret && c[key + "_configured"] ? "Már megadva — üresen hagyható" : ""}"></div>`).join("")}</div></details>`).join("")}<div class="notice">OAuth-visszahívási címek:<br><code>${esc(location.origin)}/auth/google/callback</code><br><code>${esc(location.origin)}/auth/facebook/callback</code><br>Stripe webhook: <code>${esc(location.origin)}/api/stripe/webhook</code><br>Vendégfiók létrehozható; adminbelépéshez külön engedélyezett fiók szükséges.</div><div class="error" id="connections-error"></div><div class="buttons"><button class="primary">Kapcsolatok mentése</button></div></form>`;
+      `<form id="connection-settings">${groups.map(([title, fields]) => `<details><summary>${title}</summary><div class="form-grid">${fields.map(([key, label, secret]) => connectionField(key,label,secret,c)).join("")}</div></details>`).join("")}<div class="notice">OAuth-visszahívási címek:<br><code>${esc(location.origin)}/auth/google/callback</code><br><code>${esc(location.origin)}/auth/facebook/callback</code><br><code>${esc(location.origin)}/auth/apple/callback</code><br>Stripe webhook: <code>${esc(location.origin)}/api/stripe/webhook</code><br>Vendégfiók létrehozható; adminbelépéshez külön engedélyezett fiók szükséges.</div><div class="error" id="connections-error"></div><div class="buttons"><button class="primary">Kapcsolatok mentése</button></div></form>`;
     $("#connection-settings").onsubmit = async (e) => {
       e.preventDefault();
       try {
@@ -953,7 +954,7 @@ async function guestPage() {
     document.querySelectorAll('.guest-review').forEach(button => button.onclick = () => reviewForm(button.dataset.id, true, button.dataset.provider));
   } catch {
     $("#app").innerHTML =
-      `<div class="public"><div class="brand"><span>◷</span>ráérő.</div><div class="card"><h1>Vendégfiók</h1><p>Lépj be Google- vagy Facebook-fiókkal. Első belépéskor vendégfiókot hozunk létre. Foglalni belépés nélkül is lehet.</p><div id="guest-social" class="social-buttons"></div>${new URLSearchParams(location.search).has("authError") ? '<p class="error">A belépés nem sikerült. Próbáld újra.</p>' : ""}<a href="/foglalas">Foglalás belépés nélkül →</a></div></div>`;
+      `<div class="public"><div class="brand"><span>◷</span>ráérő.</div><div class="card"><h1>Vendégfiók</h1><p>Lépj be a választott fiókoddal. Első belépéskor vendégfiókot hozunk létre. Foglalni belépés nélkül is lehet.</p><div id="guest-social" class="social-buttons"></div>${new URLSearchParams(location.search).has("authError") ? '<p class="error">A belépés nem sikerült. Próbáld újra.</p>' : ""}<a href="/foglalas">Foglalás belépés nélkül →</a></div></div>`;
     socialButtons("#guest-social");
   }
 }
@@ -987,7 +988,7 @@ publicPage = function () {
     const link = document.createElement("p");
     link.className = "guest-login-link";
     link.innerHTML =
-      '<a href="/fiokom">Google / Facebook-belépés és saját foglalásaim →</a>';
+      '<a href="/fiokom">Belépés Google-, Facebook- vagy Apple-fiókkal →</a>';
     card.prepend(link);
   }
 

@@ -17,6 +17,7 @@ return [
         "twilio_sid" => env("TWILIO_ACCOUNT_SID"),
         "twilio_token" => env("TWILIO_AUTH_TOKEN"),
         "twilio_from" => env("TWILIO_FROM"),
+        "apple_client_id"=>env("APPLE_CLIENT_ID"), "apple_team_id"=>env("APPLE_TEAM_ID"), "apple_key_id"=>env("APPLE_KEY_ID"), "apple_private_key"=>env("APPLE_PRIVATE_KEY"), "admin_apple_ids"=>env("ADMIN_APPLE_IDS", ""),
         "google_client_id" => env("GOOGLE_CLIENT_ID"),
         "google_client_secret" => env("GOOGLE_CLIENT_SECRET"),
         "facebook_client_id" => env("FACEBOOK_CLIENT_ID"),

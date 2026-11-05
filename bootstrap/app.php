@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Public booking and secret-link management also work in embedded frames.
         $middleware->validateCsrfTokens(
             except: [
+                "auth/apple/callback",
                 "api/bookings",
                 "api/manage",
                 "api/manage/checkout",

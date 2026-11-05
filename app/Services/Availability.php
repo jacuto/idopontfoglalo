@@ -5,7 +5,7 @@ use InvalidArgumentException;
 
 final class Availability
 {
-    public static function defaults(): array { return ['overrides'=>[], 'blocks'=>[], 'lunch'=>['enabled'=>false,'from'=>'12:00','to'=>'12:30','weekdays'=>[1,2,3,4,5],'staffId'=>null]]; }
+    public static function defaults(): array { return ['overrides'=>[], 'blocks'=>[], 'dayLunches'=>[], 'lunch'=>['enabled'=>false,'from'=>'12:00','to'=>'12:30','weekdays'=>[1,2,3,4,5],'staffId'=>null]]; }
     public static function hours(array $state, string $date): array
     {
         foreach ($state['availability']['overrides'] ?? [] as $day) if ($day['date'] === $date) return [$day['closed'] ? null : Settings::minutes($day['openingTime']), $day['closed'] ? null : Settings::minutes($day['closingTime'])];
@@ -18,8 +18,10 @@ final class Availability
             if ($date < $block['fromDate'] || $date > $block['toDate'] || (!empty($block['staffId']) && $block['staffId'] !== $staff)) continue;
             $ranges[]=$block['allDay'] ? [0,1440] : [Settings::minutes($block['fromTime']),Settings::minutes($block['toTime'])];
         }
-        $lunch=$state['availability']['lunch'] ?? [];
-        if (!empty($lunch['enabled']) && (empty($lunch['staffId']) || $lunch['staffId'] === $staff) && in_array(CarbonImmutable::parse($date)->dayOfWeekIso,$lunch['weekdays'],true)) $ranges[]=[Settings::minutes($lunch['from']),Settings::minutes($lunch['to'])];
+        $lunch=$state['availability']['lunch'] ?? [];$daily=null;
+        foreach($state['availability']['dayLunches']??[] as $item)if($item['date']===$date && (empty($item['staffId'])||$item['staffId']===$staff)){if(!$daily||!empty($item['staffId']))$daily=$item;}
+        if($daily!==null)$lunch=$daily;
+        if (!empty($lunch['enabled']) && (empty($lunch['staffId']) || $lunch['staffId'] === $staff) && ($daily!==null || in_array(CarbonImmutable::parse($date)->dayOfWeekIso,$lunch['weekdays'],true))) $ranges[]=[Settings::minutes($lunch['from']),Settings::minutes($lunch['to'])];
         return $ranges;
     }
     public static function validate(array $booking, array $state, int $duration): void

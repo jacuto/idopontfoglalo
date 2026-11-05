@@ -19,6 +19,7 @@ final class AvailabilityController
             'blocks.*.id'=>'required|uuid|distinct','blocks.*.fromDate'=>'required|date_format:Y-m-d','blocks.*.toDate'=>'required|date_format:Y-m-d',
             'blocks.*.fromTime'=>'required|date_format:H:i','blocks.*.toTime'=>'required|date_format:H:i','blocks.*.allDay'=>'required|boolean',
             'blocks.*.staffId'=>'present|nullable|string|max:80','blocks.*.label'=>'required|string|max:100',
+            'dayLunches'=>'sometimes|array|max:500','dayLunches.*'=>'array:date,enabled,from,to,staffId','dayLunches.*.date'=>'required|date_format:Y-m-d','dayLunches.*.enabled'=>'required|boolean','dayLunches.*.from'=>'required|date_format:H:i','dayLunches.*.to'=>'required|date_format:H:i','dayLunches.*.staffId'=>'present|nullable|string|max:80',
             'lunch'=>'required|array:enabled,from,to,weekdays,staffId','lunch.enabled'=>'required|boolean','lunch.from'=>'required|date_format:H:i','lunch.to'=>'required|date_format:H:i',
             'lunch.weekdays'=>'present|array|max:7','lunch.weekdays.*'=>'integer|between:1,7|distinct','lunch.staffId'=>'present|nullable|string|max:80',
         ], [
@@ -36,6 +37,8 @@ final class AvailabilityController
             }
             if($data['lunch']['enabled'] && ($data['lunch']['from'] >= $data['lunch']['to'] || !$data['lunch']['weekdays'])) throw new \InvalidArgumentException('Adj meg érvényes ebédszünetet és legalább egy napot.');
             if(!empty($data['lunch']['staffId']) && !in_array($data['lunch']['staffId'],array_column($state['staff'],'id'),true)) throw new \InvalidArgumentException('A munkatárs nem található.');
+            $data['dayLunches']=$data['dayLunches']??($state['availability']['dayLunches']??[]);$seen=[];
+            foreach($data['dayLunches'] as $day){$key=$day['date'].':'.($day['staffId']??'');if(isset($seen[$key]))throw new \InvalidArgumentException('Egy napra és munkatársra csak egy ebédszünet adható meg.');$seen[$key]=true;if($day['enabled']&&$day['from'] >= $day['to'])throw new \InvalidArgumentException('Az ebédszünet vége legyen később, mint a kezdete.');if(!empty($day['staffId'])&&!in_array($day['staffId'],array_column($state['staff'],'id'),true))throw new \InvalidArgumentException('A munkatárs nem található.');}
             $state['availability']=$data;$conflicts=[];
             foreach($state['bookings'] as $b){
                 if(in_array($b['status'],['cancelled','rejected'],true) || \Carbon\CarbonImmutable::parse($b['start'])->isPast())continue;

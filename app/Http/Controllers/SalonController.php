@@ -116,7 +116,7 @@ class SalonController
                 $s = $this->store->read();
                 return response()->json([
                     "hasCoupons" => collect($s['coupons'])->contains(fn($c)=>$c['active'] && now()->between(CarbonImmutable::parse($c['startsAt']),CarbonImmutable::parse($c['endsAt']))),
-                    "hasPasses" => collect($s['passes'])->contains(fn($p)=>$p['active']) || collect($s['clientPasses'])->contains(fn($p)=>$p['remaining']>0 && CarbonImmutable::parse($p['expiresAt'])->isFuture()),
+                    "hasPasses" => collect($s['passes'])->contains(fn($p)=>$p['active']) || collect($s['clientPasses'])->contains(fn($p)=>$p['remaining']>0 && (empty($p['expiresAt'])||CarbonImmutable::parse($p['expiresAt'])->isFuture())),
                     "profile" => $s["profile"],
                     "offers" => array_values(array_filter($s["coupons"], fn($c) => $c["active"] && $c["public"] && now()->between(CarbonImmutable::parse($c["startsAt"]), CarbonImmutable::parse($c["endsAt"])))),
                     "passes" => array_values(array_filter($s["passes"], fn($p) => $p["active"])),
@@ -588,6 +588,7 @@ class SalonController
                         $oldClients = collect($s["clients"])->keyBy("id");
                         foreach ($data["clients"] as &$client) {
                             $previous=$oldClients->get($client['id'],[]);\App\Services\Clients::editable($previous,$client);
+                            if(!$previous || ($previous['email']??'')!==($client['email']??'') || ($previous['phone']??'')!==($client['phone']??''))\App\Services\Clients::preventDuplicate(array_merge($s['clients'],$data['clients']),$client);
                             $client=array_replace($previous,array_intersect_key($client,array_flip(['id','name','phone','email'])));
                         }
                         foreach ($s["clients"] as $oldClient) if (!in_array($oldClient["id"], array_column($data["clients"], "id"), true)) $data["clients"][]=$oldClient;
@@ -728,7 +729,7 @@ class SalonController
         $slots = [];
         [$open, $close] = \App\Services\Availability::hours($s, $date);
         if ($open === null) return [];
-        for ($minute = $open; $minute < $close; $minute += 15) {
+        for ($minute = $open; $minute < $close; $minute += 10) {
             $start = $day->addMinutes($minute)->utc()->toISOString();
             foreach (\App\Services\Settings::activeStaff($s) as $p) {
                 if ($person && $person !== "any" && $p["id"] !== $person) {

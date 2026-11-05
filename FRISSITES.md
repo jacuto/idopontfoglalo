@@ -64,9 +64,10 @@ test -f /home/digitmar/raero-frissites/app/Services/Tenant.php
 test -f /home/digitmar/raero-frissites/public/features.js
 test -f /home/digitmar/raero-frissites/public/refinements.js
 test -f /home/digitmar/raero-frissites/public/availability.js
+test -f /home/digitmar/raero-frissites/public/polish.js
 ```
 
-Mind az öt parancsnak hiba nélkül kell lefutnia. Ezután:
+Mind a hat parancsnak hiba nélkül kell lefutnia. Ezután:
 
 ```sh
 cp -a /home/digitmar/raero-frissites/app /home/digitmar/idopontfoglalo-php/
@@ -84,6 +85,8 @@ cp -a /home/digitmar/raero-frissites/composer.lock /home/digitmar/idopontfoglalo
 A másolás összefésüli a mappákat; nem törli a meglévő feltöltéseket. A `.env`, a `storage`, a saját titkosított kulcsfájlok és a `vendor` nem szerepelnek a másolási listában. **Ne másold rá a teljes ZIP tartalmát olyan programmal, amely előbb kiüríti a célmappát.**
 
 ## 6. Telepítsd a függőségeket és frissítsd az adatbázist
+
+Az Apple-belépéshez új Composer-függőség került a csomagba. A `composer.json` és `composer.lock` feltöltése, valamint az alábbi `composer install` lépés ennél a kiadásnál különösen fontos. Az Apple beállítása opcionális; Google-/Facebook-kulcsot emiatt nem kell módosítani. Részletes útmutató: [Apple-belépés](docs/APPLE_BELEPES.md).
 
 ```sh
 cd /home/digitmar/idopontfoglalo-php

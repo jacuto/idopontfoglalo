@@ -39,8 +39,9 @@ final class Offers
                 $owner = !empty($b['guestId']) && (int) ($client['guestId'] ?? 0) === (int) $b['guestId'];
             }
             abort_unless($owner, 404);
-            if ((now()->gt(CarbonImmutable::parse($pass['expiresAt'])) || CarbonImmutable::parse($b['start'])->gt(CarbonImmutable::parse($pass['expiresAt']))) || $pass['remaining'] < 1) throw new InvalidArgumentException('A bérlet lejárt vagy elfogyott.');
-            if (array_diff($b['services'], $pass['services'])) throw new InvalidArgumentException('A bérlet nem érvényes ezekre a szolgáltatásokra.');
+            if($pass['remaining']<1)throw new InvalidArgumentException('A bérlet alkalmai elfogytak.');
+            PassValidity::recalculate($pass,$s,$b);PassValidity::check($pass,$b);
+            if (!empty($pass['services']) && array_diff($b['services'], $pass['services'])) throw new InvalidArgumentException('A bérlet nem érvényes ezekre a szolgáltatásokra.');
             $pass['remaining']--;
             $pass['reservations'][$b['id']] = 'reserved';
             $b['passId'] = $id;
@@ -58,7 +59,8 @@ final class Offers
         if (in_array($old['status'], ['cancelled', 'rejected'], true) && !in_array($next['status'], ['cancelled', 'rejected'], true)) throw new InvalidArgumentException('Lemondott bérletes foglalás helyett vegyél fel új időpontot.');
         foreach ($s['clientPasses'] as &$pass) {
             if ($pass['id'] !== $old['passId']) continue;
-            if (isset($next['start']) && $next['start'] !== $old['start'] && CarbonImmutable::parse($next['start'])->gt(CarbonImmutable::parse($pass['expiresAt']))) throw new InvalidArgumentException('Az új időpont a bérlet lejárata után lenne. Válassz korábbi időpontot.');
+            PassValidity::recalculate($pass,$s,$next);
+            if($next['start']!==$old['start'] && !in_array($next['status'],['cancelled','rejected'],true))PassValidity::check($pass,$next);
             $current = $pass['reservations'][$old['id']] ?? 'reserved';
             if (in_array($next['status'], ['cancelled', 'rejected'], true) && $current === 'reserved') {
                 $pass['remaining']++;

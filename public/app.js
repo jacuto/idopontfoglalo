@@ -69,15 +69,30 @@ function showModal(html) {
   $("#modal").showModal();
 }
 function serviceChecks() {
-  return state.services
-    .filter((s) => !s.archived)
-    .map(
-      (s) =>
-        `<label class="check"><input type="checkbox" name="services" value="${s.id}" onchange="serviceSelectionChanged()">${esc(s.name)}<span>${s.duration} p · ${money(s.price)}</span></label>`,
-    )
-    .join("");
+ return `<div class="booking-service-picker"><div class="selected-services"></div><select aria-label="Szolgáltatás hozzáadása" onchange="addBookingService(this.value)"><option value="">Válassz szolgáltatást…</option>${state.services.filter(s=>!s.archived).map(s=>`<option value="${esc(s.id)}">${esc(s.name)} · ${s.duration} perc · ${money(s.price)}</option>`).join('')}</select><div hidden>${state.services.filter(s=>!s.archived).map(s=>`<input type="checkbox" name="services" value="${esc(s.id)}">`).join('')}</div></div>`;
+}
+function renderBookingServices(){
+ const root=document.querySelector('.booking-service-picker');if(!root)return;
+ const chosen=[...root.querySelectorAll('[name=services]:checked')].map(el=>el.value);
+ root.querySelector('.selected-services').innerHTML=chosen.map(id=>{const s=state.services.find(s=>s.id===id);return `<div class="service-choice"><span><strong>${esc(s.name)}</strong><small>${s.duration} perc · ${money(s.price)}</small></span><button type="button" data-remove-service="${esc(id)}" aria-label="${esc(s.name)} eltávolítása">×</button></div>`;}).join('');
+ root.querySelectorAll('[data-remove-service]').forEach(button=>button.onclick=()=>{root.querySelector(`[name=services][value="${CSS.escape(button.dataset.removeService)}"]`).checked=false;serviceSelectionChanged();});
+ const select=root.querySelector('select');select.innerHTML='<option value="">'+(chosen.length?'Másik szolgáltatás hozzáadása…':'Válassz szolgáltatást…')+'</option>'+state.services.filter(s=>!s.archived&&!chosen.includes(s.id)).map(s=>`<option value="${esc(s.id)}">${esc(s.name)} · ${s.duration} perc · ${money(s.price)}</option>`).join('');select.disabled=chosen.length===state.services.filter(s=>!s.archived).length;
+}
+function addBookingService(id){if(!id)return;const field=document.querySelector(`.booking-service-picker [name=services][value="${CSS.escape(id)}"]`);if(field){field.checked=true;serviceSelectionChanged();}}
+let adminSlotTicket=0;
+async function loadAdminTimes(){
+ const form=$('#booking-form'),date=$('#admin-booking-date'),select=$('#admin-booking-time');if(!form||!date||!select)return;
+ const ticket=++adminSlotTicket,ids=[...form.querySelectorAll('[name=services]:checked')].map(e=>e.value),start=form.elements.namedItem('start');
+ const previous=start.value||form.dataset.wanted||'';start.value='';
+ if(!ids.length){select.innerHTML='<option value="">Először válassz szolgáltatást</option>';return;}
+ select.innerHTML='<option value="">Szabad időpontok keresése…</option>';
+ try{const slots=await api('/api/slots?'+new URLSearchParams({date:date.value,services:ids.join(','),staff:form.elements.namedItem('staff').value}));if(ticket!==adminSlotTicket||!form.isConnected)return;
+  select.innerHTML=slots.length?'<option value="">Válassz időpontot…</option>'+slots.map(s=>`<option value="${esc(s.start)}">${esc(s.time)}</option>`).join(''):'<option value="">Nincs szabad időpont ezen a napon</option>';
+  if(previous){const wanted=new Date(previous).getTime();const slot=slots.find(s=>new Date(s.start).getTime()>=wanted);if(slot){select.value=slot.start;start.value=slot.start;}}
+ }catch(err){if(ticket===adminSlotTicket)select.innerHTML=`<option value="">${esc(err.message)}</option>`;}
 }
 function updateStaff() {
+  renderBookingServices();
   const selected = [
     ...document.querySelectorAll("[name=services]:checked"),
   ].map((x) => x.value);
@@ -117,11 +132,12 @@ function updateStaff() {
       wrap.hidden = staff.length <= 1 || state.settings.businessMode === "solo";
     loadSlots();
   }
+  if(!isPublic && el){el.onchange=loadAdminTimes;loadAdminTimes();}
   if ($("#total"))
     $("#total").textContent = total[0] + " perc · " + money(total[1]);
 }
 function bookingFields(dt) {
-  return `<label>Szolgáltatások</label>${serviceChecks()}<p id="total" style="margin-top:12px">Válassz szolgáltatást</p><div class="staff-field"><label>Munkatárs</label><select name="staff"></select></div>${isPublic ? `<section id="booking-day-step" hidden><label>Nap kiválasztása</label><input type="date" id="booking-date" min="${datekey(new Date())}" value="" onchange="bookingDaySelected()"></section><section id="booking-slot-step" hidden><label>Szabad időpontok</label><div class="row" id="available-slots"></div></section><input type="hidden" name="start" required>` : `<label>Időpont</label><input type="datetime-local" name="start" required value="${dt || localdt(new Date())}">`}<label>Vendég neve</label><input name="name" required placeholder="Pl. Szabó Kata" ${!isPublic ? 'list="clients" oninput="fillClient(this.value)"' : ""}><datalist id="clients">${(state.clients || []).map((c) => `<option value="${esc(c.name)}">${esc(c.phone)}</option><option value="${esc(c.phone)}">${esc(c.name)}</option>`).join("")}</datalist><div class="row"><div style="flex:1"><label>Telefonszám</label><input name="phone" type="tel" placeholder="+36 30 123 4567" ${!isPublic ? 'list="clients" oninput="fillClient(this.value)"' : ""}></div><div style="flex:1"><label>E-mail</label><input name="email" type="email" placeholder="nev@pelda.hu"></div></div><p style="font-size:11px;margin-top:10px">Telefonszám vagy e-mail megadása szükséges.</p><div class="error" id="form-error"></div>`;
+  return `<label>Szolgáltatások</label>${serviceChecks()}<p id="total" style="margin-top:12px">Válassz szolgáltatást</p><div class="staff-field"><label>Munkatárs</label><select name="staff"></select></div>${isPublic ? `<section id="booking-day-step" hidden><label>Nap kiválasztása</label><input type="date" id="booking-date" min="${datekey(new Date())}" value="" onchange="bookingDaySelected()"></section><section id="booking-slot-step" hidden><label>Szabad időpontok</label><div class="row" id="available-slots"></div></section><input type="hidden" name="start" required>` : `<div class="form-grid appointment-time-fields"><div><label>Nap</label><input id="admin-booking-date" type="date" required min="${datekey(new Date())}" value="${(dt || localdt(new Date())).slice(0,10)}" onchange="loadAdminTimes()"></div><div><label>Időpont</label><select id="admin-booking-time" onchange="this.form.elements.start.value=this.value" required><option value="">Először válassz szolgáltatást</option></select></div></div><input type="hidden" name="start" value="">`}<label>Vendég neve</label><input name="name" required placeholder="Pl. Szabó Kata" ${!isPublic ? 'list="clients" oninput="fillClient(this.value)"' : ""}><datalist id="clients">${(state.clients || []).map((c) => `<option value="${esc(c.name)}">${esc(c.phone)}</option><option value="${esc(c.phone)}">${esc(c.name)}</option>`).join("")}</datalist><div class="row"><div style="flex:1"><label>Telefonszám</label><input name="phone" type="tel" placeholder="+36 30 123 4567" ${!isPublic ? 'list="clients" oninput="fillClient(this.value)"' : ""}></div><div style="flex:1"><label>E-mail</label><input name="email" type="email" placeholder="nev@pelda.hu"></div></div><p style="font-size:11px;margin-top:10px">Telefonszám vagy e-mail megadása szükséges.</p><div class="error" id="form-error"></div>`;
 }
 function fillClient(value) {
   const c = state.clients.find((c) => c.name === value || c.phone === value);
@@ -131,8 +147,9 @@ function fillClient(value) {
 }
 function bookingForm(dt) {
   showModal(
-    `<h2>Új időpont</h2><p>Néhány adat, és már a naptáradban is van.</p><form id="booking-form">${bookingFields(dt)}<div class="buttons"><button type="button" onclick="$('#modal').close()">Mégse</button><button class="primary">Időpont mentése</button></div></form>`,
+    `<h2>Új időpont</h2><form id="booking-form">${bookingFields(dt)}<div class="buttons"><button type="button" onclick="$('#modal').close()">Mégse</button><button class="primary">Időpont mentése</button></div></form>`,
   );
+  $("#booking-form").dataset.wanted=dt || "";
   updateStaff();
   $("#booking-form").onsubmit = submitBooking;
 }
@@ -212,7 +229,7 @@ async function configSave(body) {
 }
 function publicPage() {
   $("#app").innerHTML =
-    `<div class="public"><div class="brand"><span>◷</span>ráérő.</div><div style="text-align:center"><span class="badge">ONLINE IDŐPONTFOGLALÁS</span><h1 style="margin-top:20px">${esc(state.settings.name)}</h1><p>Egy kis idő, ami csak rólad szól.</p></div><div class="card" id="public-form"><h2>Foglalj időpontot</h2><p>Válassz szolgáltatást és időpontot. Regisztráció nem szükséges.</p><form id="booking-form">${bookingFields()}<div class="notice">Az időpontok magyarországi idő szerint jelennek meg. Foglalásod a visszaigazoló hivatkozással később kezelhető.</div><div class="buttons"><button class="primary">Időpont lefoglalása →</button></div></form></div></div>`;
+    `<div class="public"><div class="brand"><span>◷</span>ráérő.</div><div style="text-align:center"><span class="badge">ONLINE IDŐPONTFOGLALÁS</span><h1 style="margin-top:20px">${esc(state.settings.name)}</h1><p>Egy kis idő, ami csak rólad szól.</p></div><div class="card" id="public-form"><h2>Foglalj időpontot</h2><p>Válassz szolgáltatást és időpontot. Regisztráció nem szükséges.</p><form id="booking-form">${bookingFields()}<div class="buttons"><button class="primary">Időpont lefoglalása →</button></div></form></div></div>`;
   updateStaff();
   $("#booking-form").onsubmit = submitBooking;
 }

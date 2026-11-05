@@ -50,7 +50,9 @@ final class FeaturesController
             return response()->json($data, 201);
         }
         if ($path === 'api/passes' && $method === 'POST') {
-            $data = $r->validate(['id' => 'nullable|uuid', 'name' => 'required|string|max:150', 'description' => 'nullable|string|max:3000', 'price' => 'required|integer|min:0|max:100000000', 'visits' => 'required|integer|between:1,1000', 'days' => 'required|integer|between:1,3650', 'services' => 'required|array|min:1', 'services.*' => 'string', 'active' => 'required|boolean', 'terms' => 'nullable|string|max:3000']);
+            $data = $r->validate(['id' => 'nullable|uuid', 'name' => 'required|string|max:150', 'description' => 'nullable|string|max:3000', 'price' => 'required|integer|min:0|max:100000000', 'visits' => 'required|integer|between:1,1000', 'days' => 'required|integer|between:1,3650', 'services' => 'present|array', 'services.*' => 'string', 'active' => 'required|boolean', 'terms' => 'nullable|string|max:3000', 'validityMode'=>'sometimes|in:assigned,first_use','validFrom'=>'nullable|date_format:Y-m-d','validUntil'=>'nullable|date_format:Y-m-d']);
+            if(!empty($data['validFrom'])&&!empty($data['validUntil'])&&$data['validFrom']>$data['validUntil'])throw new InvalidArgumentException('A bérlet záró dátuma nem lehet a kezdő dátum előtt.');
+            $data['validityMode']=$data['validityMode']??'assigned';
             $data['id'] = $data['id'] ?? (string) Str::uuid();
             $this->store->mutate(function (&$s) use ($data) {
                 if (array_diff($data['services'], array_column($s['services'], 'id'))) throw new InvalidArgumentException('Ismeretlen szolgáltatás.');
@@ -63,7 +65,8 @@ final class FeaturesController
             return response()->json($this->store->mutate(function (&$s) use ($data) {
                 abort_unless(collect($s['clients'])->firstWhere('id', $data['clientId']), 404);
                 $p = collect($s['passes'])->firstWhere('id', $data['passId']); abort_unless($p && $p['active'], 404);
-                $assigned = ['id' => (string) Str::uuid(), 'clientId' => $data['clientId'], 'name' => $p['name'], 'services' => $p['services'], 'remaining' => $p['visits'], 'price' => $p['price'], 'terms' => $p['terms'] ?? '', 'expiresAt' => now()->addDays($p['days'])->toISOString(), 'reservations' => []];
+                $assigned = ['id' => (string) Str::uuid(), 'clientId' => $data['clientId'], 'name' => $p['name'], 'services' => $p['services'], 'remaining' => $p['visits'], 'price' => $p['price'], 'terms' => $p['terms'] ?? '', 'validityMode'=>$p['validityMode']??'assigned','days'=>$p['days'],'validFrom'=>$p['validFrom']??null,'validUntil'=>$p['validUntil']??null,'startsAt'=>null,'expiresAt'=>null,'reservations' => []];
+                \App\Services\PassValidity::assigned($assigned);
                 $s['clientPasses'][] = $assigned; return $assigned;
             }), 201);
         }

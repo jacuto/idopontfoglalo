@@ -1,7 +1,7 @@
 // Daily-work refinements. All handlers register before the first application render.
 function offerFields() {
  const now=new Date(), coupons=state.hasCoupons ?? (state.coupons||[]).some(c=>c.active&&new Date(c.startsAt)<=now&&new Date(c.endsAt)>=now);
- const passes=state.hasPasses ?? ((state.passes||[]).some(p=>p.active)||(state.clientPasses||[]).some(p=>p.remaining>0&&new Date(p.expiresAt)>now));
+ const passes=state.hasPasses ?? ((state.passes||[]).some(p=>p.active)||(state.clientPasses||[]).some(p=>p.remaining>0&&(!p.expiresAt||new Date(p.expiresAt)>now)));
  if(!coupons&&!passes)return '';
  return `<details id="booking-offers"><summary>Kedvezmény vagy bérlet</summary>${coupons?'<label>Kuponkód</label><input name="coupon"><button type="button" onclick="previewPrice()">Ár ellenőrzése</button>':''}${passes?'<label>Bérlet</label><select name="passId" onchange="previewPrice()"><option value="">Nem használok bérletet</option></select><p class="hint">Saját bérlethez lépj be, vagy szolgáltatóként válassz vendéget. Lemondáskor a lefoglalt alkalom visszajár.</p>':''}<p id="price-preview" aria-live="polite"></p></details>`;
 }
@@ -38,7 +38,7 @@ settingsPage=function(){
  const hint=document.createElement('p');hint.className='hint settings-help';hint.textContent={basic:'Itt állíthatod be a vállalkozást, a szokásos nyitvatartást és az értesítéseket. Kivételes napot, szabadságot vagy ebédszünetet a Naptárban adj meg.',offers:'Kedvezmények és bérletek létrehozása, kezelése.',profile:'Ezeket az adatokat látják a vendégek a foglalóoldalon.',integrations:'Külső kapcsolatok: levelezés, közösségi belépés, fizetés és számlázás. Az üres titkos mező megőrzi a korábbi kulcsot.'}[settingsTab];nav.after(hint);
 };
 async function socialButtons(container,mode='guest'){
- try{const configured=await api('/api/auth/providers');const el=$(container);if(!el)return;el.innerHTML=['google','facebook'].map(k=>configured[k]?`<a class="social-button" href="/auth/${k}?provider=${providerId()}&mode=${mode}${mode === "guest" && ["booking","messages","operatorMessages"].includes(new URLSearchParams(location.search).get("returnTo")) ? "&returnTo=" + new URLSearchParams(location.search).get("returnTo") : ""}">${k==='google'?'Google / Gmail':'Facebook'}-fiókkal ${mode==='admin'?'belépés':'belépés / regisztráció'}</a>`:`<button type="button" class="social-button" disabled>${k==='google'?'Google / Gmail':'Facebook'} · még nincs beállítva</button>`).join('')+(!configured.google&&!configured.facebook?'<p class="hint">A szolgáltató még nem kapcsolta be a közösségi belépést. Foglalni továbbra is lehet regisztráció nélkül.</p>':'');}catch(e){if($(container))$(container).textContent='A belépési lehetőségek most nem tölthetők be.';}
+ try{const configured=await api('/api/auth/providers');const el=$(container);if(!el)return;el.innerHTML=['google','facebook','apple'].map(k=>socialButtonMarkup(k,configured[k],mode)).join('')+(!configured.google&&!configured.facebook&&!configured.apple?'<p class="hint">A szolgáltató még nem kapcsolta be a közösségi belépést. Foglalni továbbra is lehet regisztráció nélkül.</p>':'');}catch(e){if($(container))$(container).textContent='A belépési lehetőségek most nem tölthetők be.';}
 }
 const accountBeforeContacts=guestPage;
 guestPage=async function(){await accountBeforeContacts();if(!$('#avatar-form'))return;try{const g=await api('/api/guest');const section=document.createElement('section');section.className='card item';section.innerHTML=`<h2>Saját elérhetőségeim</h2><p>Az itt megadott elérhetőségeket a hozzád kapcsolt szolgáltatók látják. Ők nem írhatják át őket. A korábbi foglalások eredeti adatai megmaradnak.</p><form id="guest-contact-form"><label>Telefonszám</label><input name="phone" type="tel" maxlength="40" value="${esc(g.phone||'')}"><label>Kapcsolattartási email</label><input name="email" type="email" maxlength="200" value="${esc(g.email||'')}"><p class="hint">Ez a kapcsolattartási cím; a Google-/Facebook-belépési azonosítódat nem módosítja.</p><p id="contact-error" class="error"></p><button class="primary">Elérhetőségek mentése</button></form>`;$('.public').append(section);$('#guest-contact-form').onsubmit=async e=>{e.preventDefault();try{await api('/api/guest/profile','PATCH',Object.fromEntries(new FormData(e.target)));toast('Saját elérhetőségek mentve.');}catch(err){$('#contact-error').textContent=err.message;}};}catch{}};
@@ -76,13 +76,12 @@ publicPage = function() {
   const login = document.querySelector('#public-form a[href^="/fiokom"]');
   if (login) {
     login.href = '/fiokom?provider=' + encodeURIComponent(providerId()) + '&returnTo=booking';
-    login.addEventListener('click', () => {
-      const data = new FormData(form);
-      try { sessionStorage.setItem('raero-booking-draft:' + providerId(), JSON.stringify({time: Date.now(), services: data.getAll('services'), staff: data.get('staff'), date: $('#booking-date')?.value, start: data.get('start')})); } catch {}
-    });
+    login.addEventListener('click', () => rememberBookingDraft(form));
   }
+  $('#guest-account-nav')?.addEventListener('click',()=>rememberBookingDraft(form));
   fillOwnBookingDetails(form, login);
 };
+function rememberBookingDraft(form){const data=new FormData(form);try{sessionStorage.setItem('raero-booking-draft:'+providerId(),JSON.stringify({time:Date.now(),services:data.getAll('services'),staff:data.get('staff'),date:$('#booking-date')?.value,start:data.get('start')}));}catch{}}
 async function fillOwnBookingDetails(form, login) {
   let guest;
   try { guest = await api('/api/guest'); } catch { return; }
@@ -91,6 +90,7 @@ async function fillOwnBookingDetails(form, login) {
     const field = form.elements.namedItem(key);
     if (field && !field.value) field.value = guest[key] || '';
   }
+  const accountNav=$('#guest-account-nav');if(accountNav){accountNav.href=providerLink('/fiokom');accountNav.innerHTML='Saját fiókom →';}
   if (login) { login.textContent = 'Saját fiókom és foglalásaim →'; login.href = providerLink('/fiokom'); }
   const notice = document.createElement('div');
   notice.className = 'notice guest-autofill';

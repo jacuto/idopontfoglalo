@@ -114,3 +114,7 @@ A Google `picture` és a Facebook `picture.type(large)` profiladatából átvess
 Nem kell új kulcs vagy külön OAuth-jogosultság: a meglévő Google `openid email profile`, illetve Facebook `email,public_profile` hozzáférést használjuk. A kép hiánya, letöltési hibája vagy elutasítása nem akadályozza a belépést; ilyenkor alapértelmezett avatar látszik, és saját kép tölthető fel. A Facebook által jelzett alapértelmezett sziluettet nem importáljuk.
 
 A letöltés csak HTTPS-en, a Google és a Meta képkiszolgálóinak engedélyezett domainjeiről történhet, átirányítás követése nélkül. JPEG, PNG vagy WebP fogadható el, legfeljebb 2 MB fájlmérettel és 4096 × 4096 képponttal; a tartalmat is ellenőrizzük. A feltöltési könyvtár és az alkalmazáskulcs megőrzése továbbra is szükséges. Az adatbázis korábbi avatar-migrációjának futtatása nélkül az import kimarad, a belépés működik.
+
+## Apple-belépés
+
+A Google és a Facebook mellett Apple-gomb és felismerhető szolgáltatói ikonok is elérhetők. Az Apple-beállításokhoz külön útmutató készült: [APPLE_BELEPES.md](APPLE_BELEPES.md). A nyilvános foglalóoldal fejlécében jól látható Belépés / Saját fiók hivatkozás van; innen indítva is megmarad a kiválasztott szolgáltató és a foglalási folyamat.

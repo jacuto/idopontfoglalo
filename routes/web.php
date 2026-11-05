@@ -14,6 +14,14 @@ Route::post("/api/guest/logout", [
     \App\Http\Controllers\AuthController::class,
     "logout",
 ]);
+Route::get('/auth/apple', [\App\Http\Controllers\AppleAuthController::class,'start']);
+Route::get('/auth/apple/callback',[\App\Http\Controllers\AppleAuthController::class,'callback']);
+Route::post('/auth/apple/callback',[\App\Http\Controllers\AppleAuthController::class,'callback'])->withoutMiddleware([
+    \Illuminate\Session\Middleware\StartSession::class,
+    \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+    \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+    \App\Http\Middleware\TenantContext::class,
+]);
 Route::get("/auth/{provider}/callback", [
     \App\Http\Controllers\AuthController::class,
     "callback",

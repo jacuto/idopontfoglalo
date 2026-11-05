@@ -439,4 +439,78 @@ class FeaturesTest extends TestCase {
   $this->getJson('/api/availability')->assertJsonPath('overrides.0.closed',true);
   $this->provider(2);$this->getJson('/api/availability?provider=2')->assertJsonCount(0,'overrides');
  }
+ public function test_provider_prevents_new_duplicate_clients_and_reuses_booking_contact_without_linking_guest_accounts():void {
+  $this->provider();$client=['id'=>'original','name'=>'Kiss Anna','phone'=>'06 30 123-4567','email'=>'anna@example.com'];
+  $this->putJson('/api/config',['clients'=>[$client]])->assertOk();
+  $this->putJson('/api/config',['clients'=>[array_replace($client,['id'=>'duplicate','phone'=>'+36 30 123 4567','email'=>'ANNA@example.com'])]])->assertUnprocessable();
+  $b=$this->postJson('/api/bookings',$this->booking(['email'=>'anna@example.com','phone'=>'+36301234567']))->assertCreated()->json();$this->assertSame('original',$b['clientId']);
+  $this->getJson('/api/state')->assertJsonCount(1,'clients');
+  $this->postJson('/api/imports/clients',['records'=>[array_replace($client,['id'=>'new-import','phone'=>'+36-30-123-4567'])]])->assertOk();$this->getJson('/api/state')->assertJsonCount(1,'clients');
+  $this->provider(2);$this->putJson('/api/config?provider=2',['clients'=>[array_replace($client,['id'=>'second-provider'])]])->assertOk();
+  $this->guest();$this->postJson('/api/bookings?provider=2',$this->booking(['email'=>'anna@example.com','phone'=>'+36301234567']))->assertCreated();
+  $this->getJson('/api/guest?provider=2')->assertJsonCount(1,'bookings');
+ }
+ public function test_daily_lunch_overrides_weekly_lunch_without_affecting_other_dates_or_staff():void {
+  $this->provider();$a=$this->availability();$a['lunch']=['enabled'=>true,'from'=>'12:00','to'=>'13:00','weekdays'=>[1,2,3,4,5,6,7],'staffId'=>null];
+  $a['dayLunches']=[['date'=>'2035-03-12','enabled'=>false,'from'=>'12:00','to'=>'13:00','staffId'=>'anna'],['date'=>'2035-03-13','enabled'=>true,'from'=>'14:00','to'=>'15:00','staffId'=>null]];
+  $this->putJson('/api/availability',$a)->assertOk();
+  $this->postJson('/api/bookings',$this->booking(['start'=>'2035-03-12T12:00:00+01:00']))->assertCreated();
+  $this->postJson('/api/bookings',$this->booking(['start'=>'2035-03-12T12:00:00+01:00','staff'=>'eszter','services'=>['massage']]))->assertUnprocessable();
+  $this->postJson('/api/bookings',$this->booking(['start'=>'2035-03-13T12:00:00+01:00']))->assertCreated();
+  $this->postJson('/api/bookings',$this->booking(['start'=>'2035-03-13T14:00:00+01:00']))->assertUnprocessable();
+  $this->postJson('/api/bookings',$this->booking(['start'=>'2035-03-14T12:00:00+01:00']))->assertUnprocessable();
+ }
+ public function test_first_use_pass_dates_follow_reserved_visits_and_reset_after_cancellation():void {
+  $this->provider();$this->putJson('/api/config',['clients'=>[['id'=>'member','name'=>'Bérletes','phone'=>'1234567','email'=>'']]])->assertOk();
+  $p=$this->postJson('/api/passes',['name'=>'Első alkalomtól','price'=>10000,'visits'=>3,'days'=>30,'services'=>[],'active'=>true,'validityMode'=>'first_use'])->assertCreated()->json();
+  $pass=$this->postJson('/api/client-passes',['clientId'=>'member','passId'=>$p['id']])->assertCreated()->assertJsonPath('expiresAt',null)->json();
+  $b=$this->postJson('/api/bookings',$this->booking(['clientId'=>'member','passId'=>$pass['id']]))->assertCreated()->json();
+  $this->getJson('/api/state')->assertJsonPath('clientPasses.0.remaining',2)->assertJsonPath('clientPasses.0.startsAt',$b['start']);
+  $this->postJson('/api/bookings',$this->booking(['clientId'=>'member','passId'=>$pass['id'],'start'=>'2035-04-15T09:00:00Z']))->assertUnprocessable();
+  $this->getJson('/api/state')->assertJsonPath('clientPasses.0.remaining',2)->assertJsonCount(1,'bookings');
+  $this->patchJson('/api/bookings/'.$b['id'],['status'=>'cancelled'])->assertOk();$this->getJson('/api/state')->assertJsonPath('clientPasses.0.remaining',3)->assertJsonPath('clientPasses.0.expiresAt',null);
+  $this->postJson('/api/bookings',$this->booking(['clientId'=>'member','passId'=>$pass['id'],'start'=>'2035-05-01T09:00:00Z']))->assertCreated();
+ }
+ public function test_fixed_pass_date_bounds_and_empty_service_scope_are_enforced():void {
+  $this->provider();$this->putJson('/api/config',['clients'=>[['id'=>'member','name'=>'Bérletes','phone'=>'1234567','email'=>'']]])->assertOk();
+  $data=['name'=>'Dátumos','price'=>10000,'visits'=>3,'days'=>90,'services'=>[],'active'=>true,'validFrom'=>'2035-03-10','validUntil'=>'2035-04-10'];
+  $this->postJson('/api/passes',array_replace($data,['validUntil'=>'2035-02-01']))->assertUnprocessable();
+  $p=$this->postJson('/api/passes',$data)->assertCreated()->json();$pass=$this->postJson('/api/client-passes',['clientId'=>'member','passId'=>$p['id']])->assertCreated()->json();
+  foreach(['2035-03-09T09:00:00Z','2035-04-11T09:00:00Z'] as $date)$this->postJson('/api/bookings',$this->booking(['clientId'=>'member','passId'=>$pass['id'],'start'=>$date]))->assertUnprocessable();
+  $this->postJson('/api/bookings',$this->booking(['clientId'=>'member','passId'=>$pass['id'],'staff'=>'eszter','services'=>['massage']]))->assertCreated()->assertJsonPath('pricing.payable',0);
+ }
+ private function appleTestKeys():array {
+  $key=openssl_pkey_new(['private_key_type'=>OPENSSL_KEYTYPE_RSA,'private_key_bits'=>2048]);openssl_pkey_export($key,$private);$details=openssl_pkey_get_details($key);$b64=fn($s)=>rtrim(strtr(base64_encode($s),'+/','-_'),'=');
+  $ec=openssl_pkey_new(['private_key_type'=>OPENSSL_KEYTYPE_EC,'curve_name'=>'prime256v1']);openssl_pkey_export($ec,$clientPrivate);
+  app(\App\Services\Connections::class)->save(['apple_client_id'=>'test.services','apple_team_id'=>'TEAM123','apple_key_id'=>'EC123','apple_private_key'=>$clientPrivate]);
+  return [$private,['keys'=>[['kty'=>'RSA','kid'=>'apple-test','alg'=>'RS256','n'=>$b64($details['rsa']['n']),'e'=>$b64($details['rsa']['e'])]]],openssl_pkey_get_details($ec)['key']];
+ }
+ public function test_apple_code_flow_verifies_identity_returns_to_booking_and_rejects_replayed_relay():void {
+  [$key,$jwks,$clientPublic]=$this->appleTestKeys();\Illuminate\Support\Facades\Cache::flush();
+  $r=$this->get('/auth/apple?returnTo=booking');parse_str(parse_url($r->headers->get('Location'),PHP_URL_QUERY),$query);$saved=session('apple_oauth');$this->assertSame('form_post',$query['response_mode']);
+  $jwt=\Firebase\JWT\JWT::encode(['iss'=>'https://appleid.apple.com','aud'=>'test.services','sub'=>'apple-person','nonce'=>$saved['nonce'],'iat'=>time(),'exp'=>time()+300,'email'=>'private@privaterelay.appleid.com','email_verified'=>'true'],$key,'RS256','apple-test');
+  \Illuminate\Support\Facades\Http::fake(['appleid.apple.com/auth/token'=>\Illuminate\Support\Facades\Http::response(['id_token'=>$jwt]),'appleid.apple.com/auth/keys'=>\Illuminate\Support\Facades\Http::response($jwks)]);
+  $posted=$this->post('/auth/apple/callback',['state'=>$saved['state'],'code'=>'once','user'=>json_encode(['name'=>['firstName'=>'Apple','lastName'=>'Vendég']])])->assertStatus(303)->assertHeaderMissing('Set-Cookie');$relay=$posted->headers->get('Location');
+  $this->get($relay)->assertRedirect('/foglalas?provider=1#public-form');$this->getJson('/api/guest')->assertOk()->assertJsonPath('name','Apple Vendég')->assertJsonPath('email','private@privaterelay.appleid.com');
+  \Illuminate\Support\Facades\Http::assertSent(function($request)use($clientPublic){if(!str_ends_with($request->url(),'/token'))return false;$client=\Firebase\JWT\JWT::decode($request['client_secret'],new \Firebase\JWT\Key($clientPublic,'ES256'));return $client->iss==='TEAM123'&&$client->sub==='test.services'&&$client->aud==='https://appleid.apple.com';});
+  $this->getJson('/api/state')->assertUnauthorized();$this->get($relay)->assertRedirect('/fiokom?authError=state');$this->assertSame(1,DB::table('guest_accounts')->count());
+  $this->provider();$this->getJson('/api/connections')->assertJsonMissingPath('apple_private_key')->assertJsonPath('apple_private_key_configured',true);
+ }
+ public function test_apple_rejects_wrong_nonce_audience_and_expired_tokens():void {
+  [$key,$jwks]=$this->appleTestKeys();\Illuminate\Support\Facades\Cache::flush();$jwt='';
+  \Illuminate\Support\Facades\Http::fake(function($request)use(&$jwt,$jwks){return \Illuminate\Support\Facades\Http::response(str_ends_with($request->url(),'/keys')?$jwks:['id_token'=>$jwt]);});
+  foreach(['nonce','aud','exp','iss','signature','algorithm'] as $bad){
+   $this->get('/auth/apple');$saved=session('apple_oauth');$claims=['iss'=>'https://appleid.apple.com','aud'=>'test.services','sub'=>'invalid-person','nonce'=>$saved['nonce'],'iat'=>time()-60,'exp'=>time()+300];$claims[$bad]=match($bad){'nonce'=>'other','aud'=>'other-client','exp'=>time()-10,default=>'invalid'};$signingKey=$key;if($bad==='signature'){openssl_pkey_export(openssl_pkey_new(['private_key_type'=>OPENSSL_KEYTYPE_RSA,'private_key_bits'=>2048]),$signingKey);}$jwt=\Firebase\JWT\JWT::encode($claims,$bad==='algorithm'?'not-a-valid-key':$signingKey,$bad==='algorithm'?'HS256':'RS256','apple-test');
+   $posted=$this->post('/auth/apple/callback',['state'=>$saved['state'],'code'=>'code']);$this->get($posted->headers->get('Location'))->assertRedirect('/fiokom?authError=provider');
+  }
+  $this->assertSame(0,DB::table('guest_accounts')->count());
+ }
+ public function test_conflicting_contact_matches_are_never_silently_merged_on_booking_or_import():void {
+  $this->provider();$clients=[['id'=>'first','name'=>'Első','phone'=>'+36301111111','email'=>'first@example.com'],['id'=>'second','name'=>'Második','phone'=>'+36202222222','email'=>'second@example.com']];
+  $this->putJson('/api/config',['clients'=>$clients])->assertOk();
+  $this->postJson('/api/bookings',$this->booking(['name'=>'Más személy','phone'=>'+36301111111','email'=>'']))->assertUnprocessable();
+  $this->postJson('/api/imports/clients',['records'=>[['id'=>'mixed','name'=>'Keveredés','phone'=>'+36301111111','email'=>'second@example.com']]])->assertUnprocessable();
+  $this->getJson('/api/state')->assertOk()->assertJsonCount(2,'clients')->assertJsonPath('clients.0.email','first@example.com');
+  $this->postJson('/api/imports/clients',['records'=>$clients])->assertOk();$this->getJson('/api/state')->assertJsonCount(2,'clients');
+ }
 }

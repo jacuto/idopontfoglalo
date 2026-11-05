@@ -9,6 +9,7 @@ class AuthController
     {
         $c = app(Connections::class)->all();
         return response()->json([
+            "apple" => AppleAuthController::ready($c),
             "google" =>
                 !empty($c["google_client_id"]) &&
                 !empty($c["google_client_secret"]),

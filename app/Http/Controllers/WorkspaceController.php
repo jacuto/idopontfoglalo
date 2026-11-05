@@ -48,6 +48,7 @@ class WorkspaceController
                 "twilio_sid" => "nullable|alpha_num|max:100",
                 "twilio_token" => "nullable|string|max:200",
                 "twilio_from" => "nullable|string|max:100",
+                "apple_client_id"=>"nullable|string|max:300", "apple_team_id"=>"nullable|string|max:100", "apple_key_id"=>"nullable|string|max:100", "apple_private_key"=>"nullable|string|max:10000", "admin_apple_ids"=>"nullable|string|max:2000",
                 "google_client_id" => "nullable|string|max:300",
                 "google_client_secret" => "nullable|string|max:500",
                 "facebook_client_id" => "nullable|numeric",
@@ -125,7 +126,7 @@ class WorkspaceController
                     if ($row["id"] === $id) {
                         if ($kind === 'clients' && !\App\Services\Clients::visible($row)) { if($method==='DELETE') return ['ok'=>true]; abort(404,'A vendég nincs a saját listádban.'); }
                         if ($method === "PATCH") {
-                            if($kind==="clients") \App\Services\Clients::editable($row,$data);
+                            if($kind==="clients") { \App\Services\Clients::editable($row,$data); if(($row['phone']??'')!==($data['phone']??'')||($row['email']??'')!==($data['email']??''))\App\Services\Clients::preventDuplicate($s['clients'],array_replace($row,$data)); }
                             $row = array_replace($row, $data);
                             $row["phone"] = $row["phone"] ?? "";
                             $row["email"] = $row["email"] ?? "";
@@ -307,28 +308,21 @@ class WorkspaceController
                         ]);
                     }
                     $match = null;
-                    foreach ($s[$kind] as $i => $old) {
-                        if (
-                            $old["id"] === $id ||
-                            ($kind === "clients" &&
-                                (($record["phone"] !== "" &&
-                                    $old["phone"] === $record["phone"]) ||
-                                    ($record["email"] !== "" &&
-                                        $old["email"] === $record["email"]))) ||
-                            ($kind === "staff" &&
-                                mb_strtolower($old["name"]) ===
-                                    mb_strtolower($record["name"]))
-                        ) {
-                            $match = $i;
-                            break;
+                    if ($kind === 'clients') {
+                        foreach($s[$kind] as $i=>$old)if($old['id']===$id){$match=$i;break;}
+                        if($match===null){$matches=[];foreach($s[$kind] as $i=>$old)if(\App\Services\Clients::sameContact($old,$record))$matches[]=$i;
+                            if(count($matches)>1)throw new \InvalidArgumentException('Több egyező vendég van az importban. A megfelelő meglévő vendég azonosítójával importálj, vagy ellenőrizd az elérhetőségeket.');
+                            $match=$matches[0]??null;
                         }
+                    } else foreach ($s[$kind] as $i => $old) {
+                        if ($old['id'] === $id || mb_strtolower($old['name']) === mb_strtolower($record['name'])) { $match=$i;break; }
                     }
                     if ($match === null) {
                         $s[$kind][] = $record;
                         $added++;
                     } else {
                         $record["id"] = $s[$kind][$match]["id"];
-                        if($kind==="clients") \App\Services\Clients::editable($s[$kind][$match],$record);
+                        if($kind==='clients'){\App\Services\Clients::editable($s[$kind][$match],$record);if(($s[$kind][$match]['email']??'')!==($record['email']??'')||($s[$kind][$match]['phone']??'')!==($record['phone']??''))\App\Services\Clients::preventDuplicate($s[$kind],$record);}
                         $s[$kind][$match] = array_replace(
                             $s[$kind][$match],
                             $record,
