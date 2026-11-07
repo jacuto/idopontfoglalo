@@ -29,7 +29,7 @@ final class Availability
         $start=CarbonImmutable::parse($booking['start'])->setTimezone('Europe/Budapest');
         $date=$start->format('Y-m-d');$minute=$start->hour*60+$start->minute;
         [$open,$close]=self::hours($state,$date);
-        if (!empty($booking['public']) && $open !== null) {
+        if (!empty($booking['public']) && empty($booking['groupSessionId']) && $open !== null) {
             $step=(int)($state['settings']['slotStep']??10);$first=$step===60?(int)(ceil($open/60)*60):$open;
             if (($minute-$first)%$step!==0 || $start->second!==0) throw new InvalidArgumentException('Válassz a felajánlott kezdési időpontok közül.');
         }

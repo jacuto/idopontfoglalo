@@ -157,3 +157,5 @@ A felület és a 21 napos előfizetési határidő részletes szabályai: [FINOM
 ## November 7-i újdonságok
 
 A képekhez, Excelhez, Google Naptárhoz és központi HTML levelekhez lásd: [beállítási és használati útmutató](docs/NOVEMBER7.md). A frissítés új additív táblákat készít, ezért a migrációt is futtasd. A privát üzemeltetői JSON külön fájl, nem a nyilvános ZIP része.
+
+Újabb foglalási módok, név nélküli szalonfoglalás és vendégoldali naptárajánló: [használati útmutató](docs/FOGLALASI_MODOK.md). A `raero:upgrade` az új, additív vendégfiók-migrációt is futtatja.

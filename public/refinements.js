@@ -94,7 +94,7 @@ async function fillOwnBookingDetails(form, login) {
   if (login) { login.textContent = 'Saját fiókom és foglalásaim →'; login.href = providerLink('/fiokom'); }
   const notice = document.createElement('div');
   notice.className = 'notice guest-autofill';
-  notice.innerHTML = `<p>Bejelentkezve: <strong>${esc(guest.name)}</strong>. A fiókodban megadott adatokat kitöltöttük.</p><label class="check"><input type="checkbox" name="rememberContact" value="1" checked>Elérhetőségeim megjegyzése sikeres foglalás után</label><p class="hint">A Google és a Facebook általában nem ad át telefonszámot. Ha most megadod, legközelebb ezt is kitöltjük. Más személynek történő foglalásnál vedd ki a pipát.</p>`;
+  notice.innerHTML = `<p>Bejelentkezve: <strong>${esc(guest.name)}</strong>. A fiókodban megadott adatokat kitöltöttük.</p><label class="check"><input type="checkbox" name="rememberContact" value="1" checked>Elérhetőségeim megjegyzése sikeres foglalás után</label><span class="contact-tip" tabindex="0" role="button" aria-label="Tudnivalók az elérhetőségek megjegyzéséről">ⓘ<span class="tip-content">A Google és a Facebook általában nem ad át telefonszámot. Ha most megadod, legközelebb ezt is kitöltjük. Más személynek történő foglalásnál vedd ki a pipát.</span></span>`;
   form.querySelector('[name=name]').before(notice);
   const key = 'raero-booking-draft:' + providerId();
   try {

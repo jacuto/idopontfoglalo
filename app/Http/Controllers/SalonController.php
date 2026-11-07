@@ -117,6 +117,8 @@ class SalonController
                 return response()->json([
                     "hasCoupons" => collect($s['coupons'])->contains(fn($c)=>$c['active'] && now()->between(CarbonImmutable::parse($c['startsAt']),CarbonImmutable::parse($c['endsAt']))),
                     "hasPasses" => collect($s['passes'])->contains(fn($p)=>$p['active']) || collect($s['clientPasses'])->contains(fn($p)=>$p['remaining']>0 && (empty($p['expiresAt'])||CarbonImmutable::parse($p['expiresAt'])->isFuture())),
+                    "groupSessions"=>array_values(array_map(fn($g)=>["id"=>$g["id"],"serviceId"=>$g["serviceId"],"staff"=>$g["staff"],"start"=>$g["start"],"remaining"=>$g["serviceSnapshot"]["capacity"]-\App\Services\GroupSessions::booked($g,$s)],array_filter($s["groupSessions"],fn($g)=>empty($g["cancelled"])&&CarbonImmutable::parse($g["start"])->isFuture()))),
+                    "publicFooter"=>\App\Services\PublicFooter::get(),
                     "profile" => $s["profile"],
                     "offers" => array_values(array_filter($s["coupons"], fn($c) => $c["active"] && $c["public"] && now()->between(CarbonImmutable::parse($c["startsAt"]), CarbonImmutable::parse($c["endsAt"])))),
                     "passes" => array_values(array_filter($s["passes"], fn($p) => $p["active"])),
@@ -201,12 +203,12 @@ class SalonController
                     "clientId" => "nullable|string|max:80",
                     "coupon" => "nullable|string|max:80",
                     "passId" => "nullable|string|max:80",
-                    "name" => "required|string|max:150",
+                    "name" => "nullable|string|max:150", "allowUnnamed"=>"sometimes|boolean", "rememberUnnamed"=>"sometimes|boolean",
                     "phone" => "nullable|string|max:40",
                     "email" => "nullable|email|max:200",
                     "start" => "required|date",
                     "staff" => "required|string",
-                    "services" => "required|array|min:1|max:20",
+                    "services" => "sometimes|array|min:1|max:20",
                     "services.*" => "required|string",
                 ]);
                 $data=\App\Services\Contact::apply($data);
@@ -221,6 +223,16 @@ class SalonController
                         "public" => !$admin || $request->boolean("public"),
                     ]);
                     $b["guestId"] = $request->session()->get("guest_id");
+                    if(empty($b['services'])&& !$b['public']&&!empty($s['settings']['defaultServiceId']))$b['services']=[$s['settings']['defaultServiceId']];
+                    if(empty($b['services']))throw new InvalidArgumentException('Válassz szolgáltatást.');
+                    if(empty(trim($b['name']??''))&&empty($data['clientId'])){
+                        if($b['public'])throw new InvalidArgumentException('Add meg a vendég nevét.');
+                        if(empty($data['allowUnnamed'])&&empty($s['settings']['skipUnnamedWarning']))throw new InvalidArgumentException('Nem adtad meg a vendég nevét. Erősítsd meg a név nélküli mentést.');
+                        $b['name']='Név nélküli vendég';$b['anonymous']=true;
+                        if(!empty($data['rememberUnnamed']))$s['settings']['skipUnnamedWarning']=true;
+                    }
+                    unset($b['allowUnnamed'],$b['rememberUnnamed']);
+                    \App\Services\GroupSessions::prepare($b,$s);
                     \App\Services\Clients::attach($s, $b, $data["clientId"] ?? null, !$b["public"]);
                     \App\Services\Subscriptions::guard($s,!$b["public"]);
                     $this->rules->validate($b, $s);
@@ -232,7 +244,7 @@ class SalonController
                     $b["createdAt"] = $b["updatedAt"] = CarbonImmutable::now()
                         ->utc()
                         ->toISOString();
-                    $b["serviceSnapshot"] = array_map(
+                    $b["serviceSnapshot"] = $b["serviceSnapshot"]??array_map(
                         fn($id) => $this->rules->service($s["services"], $id),
                         $b["services"],
                     );
@@ -296,6 +308,7 @@ class SalonController
                                     true,
                                 )
                             ) {
+                                \App\Services\GroupSessions::prepare($next,$s);
                                 $this->rules->validate($next, $s, $b["id"]);
                             }
                             app(\App\Services\Offers::class)->transitionPass($s, $b, $next);
@@ -394,7 +407,9 @@ class SalonController
                                 $next = array_merge($b, [
                                     "start" => $request->input("start"),
                                 ]);
+                                \App\Services\GroupSessions::prepare($next,$s);
                                 $this->rules->validate($next, $s, $b["id"]);
+                                if(isset($next["groupSessionId"])){$b["groupSessionId"]=$next["groupSessionId"];$b["serviceSnapshot"]=$next["serviceSnapshot"];}
                                 $b["start"] = CarbonImmutable::parse(
                                     $next["start"],
                                 )
@@ -427,6 +442,7 @@ class SalonController
                     "settings" => "sometimes|array",
                     "settings.openingTime" => "sometimes|date_format:H:i",
                     "settings.closingTime" => "sometimes|date_format:H:i",
+                    "settings.defaultServiceId"=>"nullable|string|max:80", "settings.skipUnnamedWarning"=>"sometimes|boolean",
                     "settings.slotStep"=>"sometimes|integer|in:5,10,15,20,30,60", "settings.noShowFee"=>"sometimes|integer|min:0|max:100000000",
                     "settings.businessMode" => "sometimes|in:solo,team",
                     "settings.primaryStaffId" => "sometimes|string",
@@ -492,7 +508,7 @@ class SalonController
                     "services.*.duration" => "required|integer|between:5,1440",
                     "services.*.staff" => "required|array|min:1",
                     "services.*.staff.*" => "required|string",
-                    "services.*.automatic" => "sometimes|boolean",
+                    "services.*.automatic" => "sometimes|boolean", "services.*.bookingMode"=>"sometimes|in:individual,parallel,group", "services.*.capacity"=>"sometimes|integer|between:1,100",
                     "services.*.phases" => "sometimes|array|size:3",
                     "services.*.phases.*" => "required|integer|min:0",
                     "clients" => "sometimes|array|max:10000",
@@ -546,6 +562,9 @@ class SalonController
                             );
                         }
                     }
+                    if(isset($data['services']))foreach($data['services'] as $service){if(($service['bookingMode']??'individual')!=='group'&&collect($s['groupSessions'])->contains(fn($g)=>$g['serviceId']===$service['id']&&empty($g['cancelled'])&&CarbonImmutable::parse($g['start'])->isFuture()))throw new InvalidArgumentException('Előbb mondd le a szolgáltatás meghirdetett csoportos óráit.');if(($service['bookingMode']??'individual')==='group'&&!empty($service['phases']))throw new InvalidArgumentException('Csoportos órához ne adj meg hatóidős szakaszokat.');}
+                    if(!empty($data['settings']['defaultServiceId'])){ $catalog=$data['services']??$s['services'];if(!collect($catalog)->contains(fn($v)=>$v['id']===$data['settings']['defaultServiceId']&&empty($v['archived'])&&($v['bookingMode']??'individual')!=='group'))throw new InvalidArgumentException('Alapértelmezettnek aktív, nem csoportos szolgáltatást válassz.');}
+                    \App\Services\GroupSessions::checkCatalog($s,$data['services']??$s['services'],$data['staff']??$s['staff']);
                     foreach(['staff','services'] as $kind)if(isset($data[$kind])){foreach($data[$kind] as &$entity){$old=collect($s[$kind])->firstWhere('id',$entity['id'])??[];if($kind==='staff')$entity=\App\Services\Contact::apply($entity,$old);if(isset($entity['description']))$entity['description']=\App\Services\SafeHtml::clean($entity['description']);if(!empty($old['image']))$entity['image']=$old['image'];}unset($entity);}
                     if (isset($data['staff'])) \App\Services\Settings::checkCalendars($s,$data['staff']);
                     // Keep catalog records referenced by bookings; use a separate archive feature to remove them later.
@@ -741,6 +760,12 @@ class SalonController
         $slots = [];
         [$open, $close] = \App\Services\Availability::hours($s, $date);
         if ($open === null) return [];
+        if(collect($s['services'])->contains(fn($v)=>in_array($v['id'],$ids,true)&&($v['bookingMode']??'individual')==='group')){
+            if(count($ids)!==1)return [];
+            foreach($s['groupSessions'] as $g){if(!empty($g['cancelled'])||$g['serviceId']!==array_values($ids)[0]||($person&&$person!=='any'&&$person!==$g['staff'])||CarbonImmutable::parse($g['start'])->setTimezone('Europe/Budapest')->format('Y-m-d')!==$date)continue;
+                try{$b=['name'=>'slot','phone'=>'slot','start'=>$g['start'],'staff'=>$g['staff'],'services'=>array_values($ids),'public'=>!$request->session()->get('admin'),'guestId'=>$request->session()->get('guest_id')];\App\Services\GroupSessions::prepare($b,$s);$this->rules->validate($b,$s);$slots[]=['start'=>$g['start'],'staff'=>$g['staff'],'time'=>CarbonImmutable::parse($g['start'])->setTimezone('Europe/Budapest')->format('H:i'),'remaining'=>$g['serviceSnapshot']['capacity']-\App\Services\GroupSessions::booked($g,$s)];}catch(InvalidArgumentException){}
+            }return $slots;
+        }
         $step=(int)($s['settings']['slotStep']??10);
         $first=$step===60?(int)(ceil($open/60)*60):$open;
         for ($minute = $first; $minute < $close; $minute += $step) {

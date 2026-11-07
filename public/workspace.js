@@ -386,7 +386,7 @@ function serviceForm(id) {
       duration: Number(f.get("duration")),
       price: Number(f.get("price")),
       staff: f.getAll("staff"),
-      automatic: f.has("automatic"),
+      automatic: f.has("automatic"), bookingMode:f.get("bookingMode")||"individual",capacity:Number(f.get("capacity")||1),
     };
     if (f.get("phases").trim())
       v.phases = f.get("phases").split(",").map(Number);
@@ -417,7 +417,7 @@ const csvFields = {
     "staff",
     "services",
     "serviceSnapshot",
-    "status",
+    "status", "anonymous", "noShowFee", "groupSessionId",
   ],
 };
 function exportData(kind) {
@@ -494,7 +494,7 @@ function parseCsv(raw) {
           key,
           ["services", "serviceSnapshot"].includes(key)
             ? JSON.parse(r[i] || "[]")
-            : r[i] || "",
+            : key==="anonymous" ? ["true","1"].includes(r[i]) : key==="noShowFee" ? Number(r[i]||0) : r[i] || "",
         ]),
       ),
     );
@@ -590,7 +590,7 @@ function settingsPage() {
       "confirmation",
       "notifyGuest",
       "notifyProvider",
-      "reminderGuest",
+      "reminderGuest", "skipUnnamedWarning",
     ])
       v[k] = f.has(k);
     v.reminder = Number(v.reminder);

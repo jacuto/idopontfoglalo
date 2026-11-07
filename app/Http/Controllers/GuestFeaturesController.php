@@ -5,6 +5,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\{DB, Storage};
 final class GuestFeaturesController
 {
+    public function calendarPrompt(Request $r){
+        $id=(int)$r->session()->get('guest_id',0);abort_unless($id&&!$r->session()->get('admin')&&DB::table('guest_accounts')->where('id',$id)->exists(),403);
+        if($r->isMethod('POST')){DB::table('guest_accounts')->where('id',$id)->whereNull('calendar_prompt_seen_at')->update(['calendar_prompt_seen_at'=>now()]);return response()->json(['ok'=>true]);}
+        $shared=\App\Services\SharedConnections::all();$seen=DB::table('guest_accounts')->where('id',$id)->value('calendar_prompt_seen_at');return response()->json(['offer'=>!$seen&&!empty($shared['google_client_id'])&&!empty($shared['google_client_secret'])&&!DB::table('calendar_connections')->where('owner_type','guest')->where('owner_id',(string)$id)->exists()]);
+    }
     public function profile(Request $r){
         $id=(int)$r->session()->get('guest_id',0);abort_unless($id&&DB::table('guest_accounts')->where('id',$id)->exists(),401);
         $v=$r->validate(['email'=>'present|nullable|email|max:200','phone'=>'present|nullable|string|max:40']);

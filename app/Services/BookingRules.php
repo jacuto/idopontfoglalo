@@ -49,7 +49,7 @@ class BookingRules
     ): void {
         if (
             !trim($booking["name"] ?? "") ||
-            (!trim($booking["phone"] ?? "") && !trim($booking["email"] ?? ""))
+            (!trim($booking["phone"] ?? "") && !trim($booking["email"] ?? "") && (empty($booking["anonymous"]) || !empty($booking["public"])))
         ) {
             throw new InvalidArgumentException(
                 "Név és legalább egy elérhetőség szükséges.",
@@ -120,25 +120,7 @@ class BookingRules
             );
         }
         if (!$historical) { Availability::validate($booking, $state, $duration);app(GoogleCalendar::class)->validate($booking,$state,$duration,$ignore); }
-        $ranges = $this->occupied($booking, $state);
-        foreach ($state["bookings"] as $old) {
-            if (
-                $old["id"] === $ignore ||
-                $old["staff"] !== $booking["staff"] ||
-                in_array($old["status"], ["cancelled", "rejected"], true)
-            ) {
-                continue;
-            }
-            foreach ($this->occupied($old, $state) as $a) {
-                foreach ($ranges as $b) {
-                    if ($a[0] < $b[1] && $b[0] < $a[1]) {
-                        throw new InvalidArgumentException(
-                            "Ez az időpont már foglalt. Válassz másikat.",
-                        );
-                    }
-                }
-            }
-        }
+        Capacity::validate($booking,$state,$this->occupied($booking,$state),$ignore);
     }
     public function status(array $services, array $state): string
     {

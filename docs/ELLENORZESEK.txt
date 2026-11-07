@@ -48,3 +48,13 @@ Playwright / Chromium: új operations.cjs, továbbá refinements.cjs, browser.cj
 Ellenőrizve: mobil naptárpozíció, oldalmenü/vezérlők zárása, több naptár, képfeltöltés, központi kulcsok elrejtése, órák/percek, foglalási piszkozat visszaállítása, telefonformátum, befizetéskereső.
 Szerveroldalon ellenőrizve: időhöz kötött meg nem jelenés és opcionális díj, túlfizetés tiltása, tulajdonosi határok, valódi XLSX ZIP/XML, képletinjektálás elleni szövegcellák, ICS, HTML/XSS-szűrés, OAuth state/PKCE, titkos token, Google felküldés/hiba/újrapróbálás/foglaltság.
 Valós Google-fiókos engedélyezés, éles SMTP/SMS/fizetés és éles tárhelyi terhelésmérés nem történt. A külső HTTP-integrációkat szimulált válaszokkal vizsgáltuk. Az éles tárhely nem változott.
+
+Gyors szalonfoglalás és csoportos órák – újabb ellenőrzés
+MariaDB 11.4 / PHP 8.2.35: 117 teszt, 781 állítás, mind sikeres.
+A párhuzamos folyamatok között szerepel 8 kérés 3 férőhelyre és 2 kérés az utolsó csoportos helyre; pontosan a megengedett létszám mentődött.
+Célzott új funkciók: 30 teszt, 205 állítás; utolsó teljes futásban is szerepelnek.
+Chromium / Playwright: refinements.cjs, guest-flow.cjs, usability.cjs, workflows.cjs és calendar-offer.cjs sikeres.
+Ellenőrizve: alapértelmezett szolgáltatás csak a szalonnak; megerősített név nélküli mentés; figyelmeztetés kikapcsolása/visszaállítása; név nélküli foglalás nem gyárt üres kontaktot; munkaszakaszok; egyidejű létszám; meghirdetett csoportos alkalmak és szabad helyek; csoportos átfoglalás és férőhelyfelszabadítás; teljes óra lemondása; vendégnaptár szerepkörvédelme és egyszeri felajánlása; telefonos súgó; mobil lábléc; megőrzött foglalási piszkozat; CSV-adatok és férőhelykorlát.
+Valós Google-hitelesítés és éles tárhelymódosítás továbbra sem történt.
+Végső teljes MariaDB-futás a privát lábléckonfigurációval: 118 teszt, 787 állítás, mind sikeres. A láblécimport külön, kifejezetten nyilvános mezőket enged; titkos mezőt a tesztben sem tett közzé.
+A végleges, konfigurációból töltött lábléccel a workflows.cjs és calendar-offer.cjs böngészőteszt is sikeres.

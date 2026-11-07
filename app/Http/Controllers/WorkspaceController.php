@@ -151,6 +151,7 @@ class WorkspaceController
                                 "Az utolsó aktív munkatárs nem törölhető.",
                             );
                         }
+                        \App\Services\GroupSessions::checkCatalog($s,$s["services"],array_map(fn($p)=>$p["id"]===$id?array_replace($p,["archived"=>true]):$p,$s["staff"]));
                         foreach ($s["bookings"] as $b) {
                             if (
                                 $b["staff"] === $id &&
@@ -241,9 +242,14 @@ class WorkspaceController
                             "serviceSnapshot.*.phases.*" =>
                                 "required|integer|min:0",
                             "status" =>
-                                "sometimes|in:pending,confirmed,cancelled,rejected",
+                                "sometimes|in:pending,confirmed,cancelled,rejected,no_show",
+                            "groupSessionId"=>"sometimes|nullable|string|max:80", "anonymous"=>"sometimes|boolean", "noShowFee"=>"sometimes|integer|min:0|max:100000000",
+                            "serviceSnapshot.*.bookingMode"=>"sometimes|in:individual,parallel,group", "serviceSnapshot.*.capacity"=>"sometimes|integer|between:1,100",
                         ])->validate();
                         $old = collect($s["bookings"])->firstWhere("id", $id);
+                        if(!empty($old['groupSessionId'])&&empty($record['groupSessionId']))$record['groupSessionId']=$old['groupSessionId'];
+                        if(!empty($record['groupSessionId'])){ $g=collect($s['groupSessions'])->firstWhere('id',$record['groupSessionId']);if(!$g||$g['staff']!==$record['staff']||[$g['serviceId']]!==$record['services']||strtotime($g['start'])!==strtotime($record['start']))throw new InvalidArgumentException('A csoportos foglalás saját meghirdetett alkalma hiányzik vagy eltér az importban.');$record['serviceSnapshot']=[$g['serviceSnapshot']];}
+                        if(($record['status']??'')==='no_show')$record['attendance']='no_show';
                         $record = array_merge($record, [
                             "id" => $id,
                             "phone" => $record["phone"] ?? "",

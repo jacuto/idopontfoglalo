@@ -21,4 +21,13 @@ class ConcurrencyTest extends TestCase {
   $state=app(Tenant::class)->run(77,fn()=>app(SalonStore::class)->read());$this->assertCount(1,$state['bookings']);if($kind==='pass')$this->assertSame(0,$state['clientPasses'][0]['remaining']);
   DB::table('salon_state')->where('id',77)->delete();
  }
+ public function test_eight_parallel_requests_cannot_overbook_three_places():void{$this->capacityRace('parallel',3,8);}
+ public function test_two_parallel_requests_cannot_take_the_last_group_seat():void{$this->capacityRace('group',1,2);}
+ private function capacityRace(string $mode,int $limit,int $requests):void{
+  if(config('database.default')!=='mysql')$this->markTestSkipped('Valódi MySQL/MariaDB szükséges.');$this->assertStringEndsWith('_test',config('database.connections.mysql.database'));Artisan::call('migrate',['--force'=>true]);
+  $s=SalonStore::initial();$s['services'][0]['bookingMode']=$mode;$s['services'][0]['capacity']=$limit;$s['groupSessions']=$mode==='group'?[['id'=>'race-group','serviceId'=>'cut','staff'=>'anna','start'=>'2035-03-12T09:00:00Z','serviceSnapshot'=>$s['services'][0],'cancelled'=>false]]:[];DB::table('salon_state')->updateOrInsert(['id'=>78],['data'=>json_encode($s)]);
+  $start=microtime(true)+1;$processes=[];for($i=0;$i<$requests;$i++){$p=new Process([PHP_BINARY,'-c',php_ini_loaded_file(),__DIR__.'/support/capacity-worker.php',$mode,(string)$i,(string)$start],base_path(),['APP_ENV'=>'testing','APP_KEY'=>config('app.key'),'DB_CONNECTION'=>'mysql','DB_DATABASE'=>config('database.connections.mysql.database'),'DB_HOST'=>config('database.connections.mysql.host'),'DB_PORT'=>(string)config('database.connections.mysql.port'),'DB_USERNAME'=>config('database.connections.mysql.username'),'DB_PASSWORD'=>config('database.connections.mysql.password')]);$p->setTimeout(20);$p->start();$processes[]=$p;}
+  $results=[];foreach($processes as $p){$p->wait();$this->assertTrue($p->isSuccessful(),$p->getErrorOutput());$results[]=$p->getOutput();}$this->assertSame($limit,count(array_filter($results,fn($r)=>$r==='OK')));$this->assertSame($requests-$limit,count(array_filter($results,fn($r)=>$r==='UNAVAILABLE')));$state=app(Tenant::class)->run(78,fn()=>app(SalonStore::class)->read());$this->assertCount($limit,$state['bookings']);DB::table('salon_state')->where('id',78)->delete();
+ }
+
 }

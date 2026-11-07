@@ -26,6 +26,7 @@ final class Clients
     public static function attach(array &$state, array &$booking, ?string $selected, bool $provider): void
     {
         if ($provider) $booking['guestId'] = null;
+        if($provider&&!empty($booking['anonymous'])&&empty($booking['phone'])&&empty($booking['email'])){$booking['clientId']=null;return;}
         if ($provider && $selected) {
             foreach ($state['clients'] as $c) {
                 if ($c['id'] === $selected && self::visible($c)) {

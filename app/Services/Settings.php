@@ -7,7 +7,7 @@ final class Settings
         return [
             "businessMode" => "team",
             "primaryStaffId" => "anna",
-            "slotStep"=>10,"noShowFee"=>0,
+            "slotStep"=>10,"noShowFee"=>0,"defaultServiceId"=>null,"skipUnnamedWarning"=>false,
             "openingTime" => "08:00",
             "closingTime" => "20:00",
             "providerEmail" => "",
@@ -49,7 +49,7 @@ final class Settings
         $defaults["primaryStaffId"] = $state["staff"][0]["id"] ?? "";
         $state["settings"] = array_replace($defaults, $old);
         $state += [
-            "availability" => Availability::defaults(),
+            "availability" => Availability::defaults(), "groupSessions"=>[],
             "payments" => [],
             "checkouts" => [],
             "invoiceRequests" => [],

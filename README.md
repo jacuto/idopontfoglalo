@@ -48,3 +48,5 @@ A jelszavakat a parancsok rejtett helyi bevitellel kérik; ne küldd őket besz�
 A GitHubra feltöltés **nem frissíti** a foglalo.digitmarketing.hu weboldalt. Az éles frissítést a felhasználó végzi a mentés után.
 
 A november 7-i naptárkapcsolat, export, képek, meg nem jelenés és központi levelezés: [beállítás és használat](docs/NOVEMBER7.md).
+
+[Gyors szalonfoglalás, párhuzamos szolgáltatások és csoportos órák](docs/FOGLALASI_MODOK.md).

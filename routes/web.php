@@ -2,6 +2,8 @@
 use App\Http\Controllers\SalonController;
 use App\Http\Middleware\ApiHeaders;
 use Illuminate\Support\Facades\Route;
+Route::match(['GET','POST'],'/api/group-sessions',[\App\Http\Controllers\GroupSessionController::class,'handle']);
+Route::match(['GET','POST'],'/api/guest/calendar-prompt',[\App\Http\Controllers\GuestFeaturesController::class,'calendarPrompt']);
 Route::match(['GET','PATCH','DELETE'],'/api/calendar/connection',[\App\Http\Controllers\CalendarConnectionController::class,'handle']);
 Route::get('/auth/google-calendar',[\App\Http\Controllers\CalendarConnectionController::class,'start']);
 Route::get('/auth/google-calendar/callback',[\App\Http\Controllers\CalendarConnectionController::class,'callback']);
