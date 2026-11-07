@@ -34,7 +34,12 @@ class AuthController
             "=",
         );
         $mode = $r->query("mode") === "admin" ? "admin" : "guest";
+        $photo=null;if($r->query('mode')==='photo'){
+            abort_unless($r->session()->get('admin')===true&&(int)$r->session()->get('provider_id',1)===app(\App\Services\Tenant::class)->id,403);
+            $target=$r->query('target');$entity=$r->query('entityId');abort_unless(in_array($target,['logo','staff'],true),422);if($target==='staff')abort_unless(is_string($entity)&&collect(app(\App\Services\SalonStore::class)->read()['staff'])->contains(fn($p)=>$p['id']===$entity&&empty($p['archived'])),404);$photo=['target'=>$target,'entity'=>$entity];$mode='photo';
+        }
         $r->session()->put("oauth", [
+            "photo"=>$photo,
             "provider" => $provider,
             "state" => $state,
             "verifier" => $verifier,
@@ -150,6 +155,12 @@ class AuthController
             if (!$id || !is_string($id)) {
                 throw new \RuntimeException();
             }
+            if($saved['mode']==='photo'){
+                abort_unless($r->session()->get('admin')===true&&(int)$r->session()->get('provider_id',1)===app(\App\Services\Tenant::class)->id,403);
+                $photo=$saved['photo'];$picture=$provider==='google'?($user['picture']??null):(empty($user['picture']['data']['is_silhouette'])?($user['picture']['data']['url']??null):null);
+                $ok=app(\App\Services\BusinessAvatar::class)->import(app(\App\Services\Tenant::class)->id,$photo['target'],$photo['entity'],$provider,$picture,true);
+                return redirect('/?provider='.app(\App\Services\Tenant::class)->id.'&'.($photo['target']==='staff'?'staffPhotos':'profilePhotos').'=1&'.($ok?'photoUpdated=1':'photoError=unavailable'));
+            }
             if ($saved["mode"] === "admin") {
                 $allowed =
                     $provider === "google"
@@ -181,6 +192,8 @@ class AuthController
                 $r->session()->regenerate();
                 $r->session()->put("admin", true);
                 $r->session()->put("provider_id", app(\App\Services\Tenant::class)->id);
+                $picture=$provider==='google'?($user['picture']??null):(empty($user['picture']['data']['is_silhouette'])?($user['picture']['data']['url']??null):null);
+                app(\App\Services\BusinessAvatar::class)->import(app(\App\Services\Tenant::class)->id,'logo',null,$provider,$picture);
                 return redirect(app(\App\Services\Tenant::class)->id === 1 ? "/" : "/?provider=" . app(\App\Services\Tenant::class)->id);
             }
             $account = DB::table("guest_accounts")

@@ -37,3 +37,14 @@ PHP-szintaxis: 58 fájl ellenőrizve.
 JavaScript: app.js, workspace.js, features.js, refinements.js, embed.js és a böngészőtesztek szintaktikailag rendben.
 Külső HTTP-integrációk: szimulált válaszok; nem történt éles fizetés, számlázás vagy kiküldés.
 Mintaadatok: kizárólag külön work/ alatti SQLite tesztpéldányba; nem az éles adatbázisba.
+
+2026. november 7. – új funkciók ellenőrzése
+PHP 8.2.35, PHPUnit 11.5.57, MariaDB 11.4.
+Teljes SQLite-futás: 100 teszt, 666 állítás; 2 MySQL-zárteszt szándékosan kihagyva.
+Teljes MariaDB-futás: 100 teszt, 677 állítás, mind sikeres; két valódi párhuzamos folyamat bérlet-/kuponversenytesztje is lefutott.
+Utolsó célzott futás: 20 teszt, 158 állítás (új funkciók, elérhetőség-tulajdonlás, bérlet és email).
+Utolsó teljes MariaDB-futás: 102 teszt, 685 állítás, mind sikeres (privát bankadatimport és régi telefonszámok jogosultságkezelése is).
+Playwright / Chromium: új operations.cjs, továbbá refinements.cjs, browser.cjs, guest-flow.cjs, usability.cjs sikeres.
+Ellenőrizve: mobil naptárpozíció, oldalmenü/vezérlők zárása, több naptár, képfeltöltés, központi kulcsok elrejtése, órák/percek, foglalási piszkozat visszaállítása, telefonformátum, befizetéskereső.
+Szerveroldalon ellenőrizve: időhöz kötött meg nem jelenés és opcionális díj, túlfizetés tiltása, tulajdonosi határok, valódi XLSX ZIP/XML, képletinjektálás elleni szövegcellák, ICS, HTML/XSS-szűrés, OAuth state/PKCE, titkos token, Google felküldés/hiba/újrapróbálás/foglaltság.
+Valós Google-fiókos engedélyezés, éles SMTP/SMS/fizetés és éles tárhelyi terhelésmérés nem történt. A külső HTTP-integrációkat szimulált válaszokkal vizsgáltuk. Az éles tárhely nem változott.

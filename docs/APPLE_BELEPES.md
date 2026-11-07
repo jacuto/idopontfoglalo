@@ -18,7 +18,9 @@ A domain és a visszahívási cím a tényleges telepítéshez tartozzon. Ha az 
 
 ## 2. Beállítás a Ráérőben
 
-**Beállítások → Integrációk → Google, Facebook és Apple belépés**:
+November 7-től az Apple-kulcsok kizárólag a `/foadmin` központi kapcsolatainál állíthatók; minden szolgáltató közösen használja őket. Az admin-hozzáférési azonosítókat a főadmin szolgáltatónként külön adja meg.
+
+**/foadmin → Üzemeltető központi kapcsolatai → Google, Facebook és Apple belépés**:
 
 - Apple Services ID
 - Apple Team ID

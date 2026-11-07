@@ -78,7 +78,9 @@ class SalonStore
             $state = Settings::upgrade(
                 json_decode($row->data, true, 512, JSON_THROW_ON_ERROR),
             );
+            $before=GoogleCalendar::versions($state);
             $result = $callback($state);
+            app(GoogleCalendar::class)->enqueue($state,$before);
             DB::table("salon_state")
                 ->where("id", app(Tenant::class)->id)
                 ->update([

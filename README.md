@@ -46,3 +46,5 @@ php artisan config:clear
 A jelszavakat a parancsok rejtett helyi bevitellel kérik; ne küldd őket beszélgetésben, ne töltsd fel őket GitHubra. A webkiszolgáló dokumentumgyökere a `public` könyvtár.
 
 A GitHubra feltöltés **nem frissíti** a foglalo.digitmarketing.hu weboldalt. Az éles frissítést a felhasználó végzi a mentés után.
+
+A november 7-i naptárkapcsolat, export, képek, meg nem jelenés és központi levelezés: [beállítás és használat](docs/NOVEMBER7.md).

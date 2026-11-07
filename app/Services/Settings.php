@@ -7,6 +7,7 @@ final class Settings
         return [
             "businessMode" => "team",
             "primaryStaffId" => "anna",
+            "slotStep"=>10,"noShowFee"=>0,
             "openingTime" => "08:00",
             "closingTime" => "20:00",
             "providerEmail" => "",
@@ -74,6 +75,7 @@ final class Settings
         Subscriptions::refresh($state);
         // Legacy record association is local to the salon; it grants no account access.
         foreach ($state["bookings"] as &$booking) {
+            if(($booking['attendance']??'')==='no_show'&&$booking['status']==='confirmed')$booking['status']='no_show';
             if (!isset($booking["clientId"])) {
                 $matches = array_values(array_filter($state["clients"], fn($c) =>
                     ($c["name"] ?? "") === ($booking["name"] ?? "") &&

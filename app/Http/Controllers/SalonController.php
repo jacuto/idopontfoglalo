@@ -149,7 +149,7 @@ class SalonController
                     "staff" => array_map(
                         fn($p) => array_intersect_key(
                             $p,
-                            array_flip(["id", "name", "role"]),
+                            array_flip(["id", "name", "role", "image", "description"]),
                         ),
                         \App\Services\Settings::activeStaff($s),
                     ),
@@ -209,6 +209,7 @@ class SalonController
                     "services" => "required|array|min:1|max:20",
                     "services.*" => "required|string",
                 ]);
+                $data=\App\Services\Contact::apply($data);
                 $b = $this->store->mutate(function (&$s) use (
                     $data,
                     $admin,
@@ -256,8 +257,9 @@ class SalonController
             ) {
                 $data = $request->validate([
                     "status" =>
-                        "sometimes|in:pending,confirmed,cancelled,rejected",
+                        "sometimes|in:pending,confirmed,cancelled,rejected,no_show",
                     "attendance" => "sometimes|in:attended,no_show,unmarked",
+                    "noShowFee"=>"sometimes|integer|min:0|max:100000000",
                     "start" => "sometimes|required|date",
                 ]);
                 $result = $this->store->mutate(function (&$s) use (
@@ -271,12 +273,16 @@ class SalonController
                                     ->utc()
                                     ->toISOString(),
                             ]);
-                            if (isset($data["attendance"])) {
-                                if ($b["status"] !== "confirmed" || CarbonImmutable::parse($b["start"])->addMinutes(array_sum(array_column($b["serviceSnapshot"], "duration")))->isFuture()) {
-                                    throw new InvalidArgumentException("Megjelenést csak megerősített, befejeződött alkalomnál jelölhetsz. Függő múltbeli foglalást helyezz át vagy utasíts el.");
+                            if(($data['status']??'')==='no_show')$data['attendance']='no_show';
+                            if (isset($data['attendance'])) {
+                                $noShow=$data['attendance']==='no_show';
+                                $limit=CarbonImmutable::parse($b['start']);if(!$noShow)$limit=$limit->addMinutes(array_sum(array_column($b['serviceSnapshot'],'duration')));
+                                if(!in_array($b['status'],['confirmed','no_show'],true)||$limit->isFuture())throw new InvalidArgumentException($noShow?'Nem jelent meg állapot csak megerősített, már elkezdődött időpontnál jelölhető.':'Megjelenést csak megerősített, befejeződött alkalomnál jelölhetsz.');
+                                $next['attendance']=$data['attendance'];$next['attendanceAt']=now()->toISOString();
+                                if($noShow){$next['status']='no_show';$next['noShowFee']=$data['noShowFee']??($b['noShowFee']??$s['settings']['noShowFee']??0);
+                                    if($b['status']==='no_show'&&$next['noShowFee']!==($b['noShowFee']??0))throw new InvalidArgumentException('A lezárt meg nem jelenési díj utólag nem módosítható.');
                                 }
-                                $next["attendanceAt"] = now()->toISOString();
-                            }
+                            } elseif(isset($data['noShowFee'])) throw new InvalidArgumentException('Meg nem jelenési díjat a Nem jelent meg állapot jelölésekor adhatsz meg.');
                             if (($data["status"] ?? null) === "confirmed" && $b["status"] === "pending" && CarbonImmutable::parse($next["start"])->isPast()) {
                                 throw new InvalidArgumentException("Ez a függő időpont már elmúlt. Előbb adj meg új, jövőbeli időpontot, vagy válaszd az Elutasítás lehetőséget.");
                             }
@@ -421,6 +427,7 @@ class SalonController
                     "settings" => "sometimes|array",
                     "settings.openingTime" => "sometimes|date_format:H:i",
                     "settings.closingTime" => "sometimes|date_format:H:i",
+                    "settings.slotStep"=>"sometimes|integer|in:5,10,15,20,30,60", "settings.noShowFee"=>"sometimes|integer|min:0|max:100000000",
                     "settings.businessMode" => "sometimes|in:solo,team",
                     "settings.primaryStaffId" => "sometimes|string",
                     "settings.providerEmail" => "nullable|email|max:200",
@@ -471,6 +478,7 @@ class SalonController
                     "staff" => "sometimes|array|min:1|max:100",
                     "staff.*.id" => "required|string|alpha_dash:ascii|max:80|distinct",
                     "staff.*.name" => "required|string|max:150",
+                    "staff.*.description"=>"nullable|string|max:5000",
                     "staff.*.role" => "required|string|max:80",
                     "staff.*.email" => "nullable|email|max:200",
                     "staff.*.phone" => "nullable|string|max:40",
@@ -538,6 +546,7 @@ class SalonController
                             );
                         }
                     }
+                    foreach(['staff','services'] as $kind)if(isset($data[$kind])){foreach($data[$kind] as &$entity){$old=collect($s[$kind])->firstWhere('id',$entity['id'])??[];if($kind==='staff')$entity=\App\Services\Contact::apply($entity,$old);if(isset($entity['description']))$entity['description']=\App\Services\SafeHtml::clean($entity['description']);if(!empty($old['image']))$entity['image']=$old['image'];}unset($entity);}
                     if (isset($data['staff'])) \App\Services\Settings::checkCalendars($s,$data['staff']);
                     // Keep catalog records referenced by bookings; use a separate archive feature to remove them later.
                     foreach (["staff", "services"] as $key) {
@@ -587,7 +596,7 @@ class SalonController
                     if (isset($data["clients"])) {
                         $oldClients = collect($s["clients"])->keyBy("id");
                         foreach ($data["clients"] as &$client) {
-                            $previous=$oldClients->get($client['id'],[]);\App\Services\Clients::editable($previous,$client);
+                            $previous=$oldClients->get($client['id'],[]);$client=\App\Services\Contact::apply($client,$previous);\App\Services\Clients::editable($previous,$client);
                             if(!$previous || ($previous['email']??'')!==($client['email']??'') || ($previous['phone']??'')!==($client['phone']??''))\App\Services\Clients::preventDuplicate(array_merge($s['clients'],$data['clients']),$client);
                             $client=array_replace($previous,array_intersect_key($client,array_flip(['id','name','phone','email'])));
                         }
@@ -726,10 +735,15 @@ class SalonController
             return [];
         }
         $s = $this->store->read();
+        $dayStart=$day->getTimestamp();$dayEnd=$day->addDay()->getTimestamp();
+        $s['bookings']=array_values(array_filter($s['bookings'],function($b)use($dayStart,$dayEnd,$s){$start=CarbonImmutable::parse($b['start'])->getTimestamp();$snapshot=$b['serviceSnapshot']??array_values(array_filter($s['services'],fn($service)=>in_array($service['id'],$b['services'],true)));$duration=array_sum(array_column($snapshot,'duration'))*60;return !in_array($b['status'],['cancelled','rejected'],true)&&$start<$dayEnd&&$start+$duration>$dayStart;}));
+        $s['_googleBusy']=app(\App\Services\GoogleCalendar::class)->busy($s,(int)$request->session()->get('guest_id',0));
         $slots = [];
         [$open, $close] = \App\Services\Availability::hours($s, $date);
         if ($open === null) return [];
-        for ($minute = $open; $minute < $close; $minute += 10) {
+        $step=(int)($s['settings']['slotStep']??10);
+        $first=$step===60?(int)(ceil($open/60)*60):$open;
+        for ($minute = $first; $minute < $close; $minute += $step) {
             $start = $day->addMinutes($minute)->utc()->toISOString();
             foreach (\App\Services\Settings::activeStaff($s) as $p) {
                 if ($person && $person !== "any" && $p["id"] !== $person) {
@@ -739,6 +753,7 @@ class SalonController
                     $this->rules->validate(
                         [
                             "name" => "slot",
+                            "public"=>$request->boolean('public')||!$request->session()->get('admin'),"guestId"=>(int)$request->session()->get('guest_id',0),
                             "phone" => "slot",
                             "services" => array_values($ids),
                             "staff" => $p["id"],

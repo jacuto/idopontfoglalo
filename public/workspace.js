@@ -6,7 +6,7 @@ let calendarMode = window.innerWidth < 650 ? "day" : "week",
   reportTo = datekey(new Date());
 const activePeople = () => state.staff.filter((p) => !p.archived);
 const bookingValue = (b) =>
-  b.pricing?.payable ?? (b.serviceSnapshot || state.services.filter((s) => b.services.includes(s.id))).reduce((n, s) => n + Number(s.price), 0);
+  b.status==='no_show'?Number(b.noShowFee||0):(b.pricing?.payable ?? (b.serviceSnapshot || state.services.filter((s) => b.services.includes(s.id))).reduce((n, s) => n + Number(s.price), 0));
 const serviceNames = (b) =>
   (b.serviceSnapshot || state.services.filter((s) => b.services.includes(s.id)))
     .map((s) => s.name)
@@ -118,7 +118,7 @@ function calendarPage() {
     .reduce((n, p) => n + paymentNet(p), 0);
   const first = new Date(calendarAnchor);
   if (calendarMode === "month") first.setDate(1);
-  const days = Array.from(
+  const days = calendarMode==='day'&&calendarStaffView&&state.settings.businessMode!=='solo'?activePeople().filter(p=>!selectedCalendars.length||selectedCalendars.includes(p.id)).map(p=>{const d=new Date(first);d.calendarStaff=p.id;return d;}):Array.from(
     { length: calendarMode === "day" ? 1 : 7 },
     (_, i) => {
       const d = new Date(first);
@@ -127,7 +127,7 @@ function calendarPage() {
     },
   );
   if (state.settings.businessMode === "solo") filter = "";
-  const filtered = active.filter((b) => !filter || b.staff === filter);
+  const filtered = active.filter((b) => (!filter || b.staff === filter)&&(!selectedCalendars.length||selectedCalendars.includes(b.staff)));
   $("#content").innerHTML =
     `<div class="stats calendar-summary"><div class="stat"><div><small>Mai időpontok</small><strong>${daily.length}</strong></div><div class="symbol">▦</div></div><button class="stat pending-summary" onclick="pendingBookings()" aria-label="Jóváhagyásra váró foglalások"><div><small>Jóváhagyásra vár</small><strong>${pending.length}</strong></div><div class="symbol">◷</div></button><div class="stat"><div><small>Mai befizetések</small><strong>${money(paid)}</strong><em>Tervezett: ${money(daily.reduce((n, b) => n + bookingValue(b), 0))}</em></div><div class="symbol">↗</div></div></div><div class="card calendar-card"><div class="calendar-tools"><div class="row"><h3>${calendarMode === "week" ? days[0].toLocaleDateString("hu-HU",{year:"numeric",month:"short",day:"numeric"}) + " – " + days[6].toLocaleDateString("hu-HU",{month:"short",day:"numeric"}) : calendarAnchor.toLocaleDateString("hu-HU", { year: "numeric", month: "long", ...(calendarMode === "day" ? { day: "numeric" } : {}) })}</h3><button aria-label="Előző időszak" onclick="calendarMove(-1)">‹</button><button aria-label="Következő időszak" onclick="calendarMove(1)">›</button><button onclick="calendarAnchor=new Date();calendarPage()">Ma</button></div><div class="row">${
       state.settings.businessMode !== "solo" && activePeople().length > 1
@@ -210,10 +210,10 @@ function calendarPage() {
   const ticks = [];
   for (let m = open; m < close; m = (Math.floor(m / 30) + 1) * 30) ticks.push(m);
   $("#calendar-body").innerHTML =
-    `<div class="calendar-scroll ${calendarDetailed ? "calendar-detailed" : "calendar-fit"} ${scale < 0.42 ? "calendar-dense" : ""}"><div class="timeline" style="--cols:${days.length};--track-height:${height}px"><div class="timeline-heading"></div>${days.map((d) => `<div data-date="${datekey(d)}" class="timeline-heading ${datekey(d) === today ? "today" : ""}">${d.toLocaleDateString("hu-HU", { weekday: "short" })}<strong>${d.getDate()}</strong><button class="day-hours" aria-label="${datekey(d)} időbeosztása" onclick="availabilityDialog('${datekey(d)}',true)">⚙</button></div>`).join("")}<div class="time-rail">${ticks.map((m) => `<span data-minute="${m}" class="${m % 60 ? "half-hour" : "whole-hour"}" style="top:${(m - open) * scale}px">${minutesTime(m)}</span>`).join("")}</div>${days
+    `<div class="calendar-scroll ${calendarDetailed ? "calendar-detailed" : "calendar-fit"} ${scale < 0.42 ? "calendar-dense" : ""}"><div class="timeline" style="--cols:${days.length};--track-height:${height}px"><div class="timeline-heading"></div>${days.map((d) => `<div data-date="${datekey(d)}" class="timeline-heading ${datekey(d) === today ? "today" : ""}">${d.calendarStaff?esc(state.staff.find(p=>p.id===d.calendarStaff)?.name||''):d.toLocaleDateString("hu-HU", { weekday: "short" })}<strong>${d.getDate()}</strong><button class="day-hours" aria-label="${datekey(d)} időbeosztása" onclick="availabilityDialog('${datekey(d)}',true)">⚙</button></div>`).join("")}<div class="time-rail">${ticks.map((m) => `<span data-minute="${m}" class="${m % 60 ? "half-hour" : "whole-hour"}" style="top:${(m - open) * scale}px">${minutesTime(m)}</span>`).join("")}</div>${days
       .map((d) => {
         const bookings = filtered
-          .filter((b) => datekey(new Date(b.start)) === datekey(d))
+          .filter((b) => datekey(new Date(b.start)) === datekey(d)&&(!d.calendarStaff||b.staff===d.calendarStaff))
           .sort((a, b) => a.start.localeCompare(b.start));
         let ends = [];
         const placed = bookings.map((b) => {
@@ -229,7 +229,7 @@ function calendarPage() {
           return { b, start, duration, lane };
         });
         const lanes = Math.max(1, ends.length);
-        return `<div class="day-track" data-date="${datekey(d)}">${ticks.map((m, i) => `<button data-minute="${m}" class="time-slot ${calendarSlotBlocked(datekey(d), m) ? "unavailable" : ""} ${m % 60 ? "" : "hour-start"} ${Math.floor(m / 60) % 2 ? "hour-shade" : ""}" ${calendarSlotBlocked(datekey(d), m) ? 'disabled title="Nem foglalható idő"' : ""} aria-label="Időpont felvétele: ${datekey(d)} ${minutesTime(m)}" style="top:${(m - open) * scale}px;height:${((ticks[i + 1] ?? close) - m) * scale}px" onclick="bookingForm('${datekey(d)}T${minutesTime(m)}')"></button>`).join("")}${calendarBlockedBands(datekey(d), open, close, scale)}${placed.map(({ b, start, duration, lane }) => `<button data-minute="${ticks.filter(m => m <= start).at(-1) ?? open}" class="calendar-event ${b.status === "pending" ? "pending" : ""}" style="top:${Math.max(0, start - open) * scale}px;height:${Math.max(24, Math.min(duration, close - start) * scale)}px;left:calc(${(lane / lanes) * 100}% + 3px);width:calc(${100 / lanes}% - 6px)" title="${esc(b.name + " · " + serviceNames(b))}" onclick="bookingDetails('${b.id}')"><strong>${new Date(b.start).toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" })} · ${esc(b.name)}</strong><span>${esc(serviceNames(b))}</span>${state.settings.businessMode !== "solo" ? `<small>${esc(state.staff.find((p) => p.id === b.staff)?.name || "")}</small>` : ""}</button>`).join("")}</div>`;
+        return `<div class="day-track" data-date="${datekey(d)}">${ticks.map((m, i) => `<button data-minute="${m}" class="time-slot ${calendarSlotBlocked(datekey(d), m,d.calendarStaff) ? "unavailable" : ""} ${m % 60 ? "" : "hour-start"} ${Math.floor(m / 60) % 2 ? "hour-shade" : ""}" ${calendarSlotBlocked(datekey(d), m,d.calendarStaff) ? 'disabled title="Nem foglalható idő"' : ""} aria-label="Időpont felvétele: ${datekey(d)} ${minutesTime(m)}" style="top:${(m - open) * scale}px;height:${((ticks[i + 1] ?? close) - m) * scale}px" onclick="bookingForm('${datekey(d)}T${minutesTime(m)}','${esc(d.calendarStaff||'')}')"></button>`).join("")}${calendarBlockedBands(datekey(d), open, close, scale,d.calendarStaff)}${placed.map(({ b, start, duration, lane }) => `<button data-minute="${ticks.filter(m => m <= start).at(-1) ?? open}" class="calendar-event ${b.status === "pending" ? "pending" : b.status==='no_show'?'no-show':''}" style="top:${Math.max(0, start - open) * scale}px;height:${Math.max(24, Math.min(duration, close - start) * scale)}px;left:calc(${(lane / lanes) * 100}% + 3px);width:calc(${100 / lanes}% - 6px)" title="${esc(b.name + " · " + serviceNames(b))}" onclick="bookingDetails('${b.id}')"><strong>${new Date(b.start).toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" })} · ${esc(b.name)}</strong><span>${esc(serviceNames(b))}</span>${state.settings.businessMode !== "solo" ? `<small>${esc(state.staff.find((p) => p.id === b.staff)?.name || "")}</small>` : ""}</button>`).join("")}</div>`;
       })
       .join("")}</div></div>`;
   bindCalendarSelection();
@@ -313,7 +313,7 @@ function staffPage() {
     `<div class="toolbar"><p>${activePeople().length} aktív munkatárs</p><button onclick="exportData('staff')">↓ Exportálás</button><button onclick="importPicker('staff')">↑ Importálás</button></div><div class="entity-grid">${activePeople()
       .map(
         (p) =>
-          `<article class="card item"><div class="avatar">${esc(initials(p.name))}</div><h3>${esc(p.name)}</h3><p>${esc(p.role)}</p><p>${esc(p.email || "")}<br>${esc(p.phone || "")}</p><p>${state.services.filter((v) => !v.archived && v.staff.includes(p.id)).length} szolgáltatás</p><div class="row item-actions"><button onclick="staffForm('${p.id}')">Szerkesztés</button><button class="danger" onclick="archiveStaff('${p.id}')">Törlés</button></div></article>`,
+          `<article class="card item">${photoAvatar(p)}<h3>${esc(p.name)}</h3><p>${esc(p.role)}</p><p>${esc(p.email || "")}<br>${esc(phoneFormatted(p.phone || ""))}</p><p>${state.services.filter((v) => !v.archived && v.staff.includes(p.id)).length} szolgáltatás</p><div class="row item-actions"><button onclick="staffForm('${p.id}')">Szerkesztés</button><button class="danger" onclick="archiveStaff('${p.id}')">Törlés</button></div></article>`,
       )
       .join("")}</div>`;
 }
@@ -359,7 +359,7 @@ function servicesPage() {
     .filter((s) => !s.archived)
     .map(
       (s) =>
-        `<article class="card item"><span class="badge">${s.duration} PERC</span><h3>${esc(s.name)}</h3><p>${s.staff.map((id) => esc(state.staff.find((p) => p.id === id)?.name)).join(", ")}</p><div class="price">${money(s.price)}</div>${s.phases ? `<p>${s.phases[0]} p munka · ${s.phases[1]} p hatóidő · ${s.phases[2]} p munka</p>` : ""}<button onclick="serviceForm('${s.id}')">Szerkesztés</button></article>`,
+        `<article class="card item">${serviceVisual(s)}<span class="badge">${s.duration} PERC</span><h3>${esc(s.name)}</h3><p>${s.staff.map((id) => esc(state.staff.find((p) => p.id === id)?.name)).join(", ")}</p><div class="price">${money(s.price)}</div>${s.phases ? `<p>${s.phases[0]} p munka · ${s.phases[1]} p hatóidő · ${s.phases[2]} p munka</p>` : ""}<button onclick="serviceForm('${s.id}')">Szerkesztés</button></article>`,
     )
     .join("")}</div>`;
 }
@@ -623,17 +623,6 @@ async function connectionsForm() {
     if (!$("#connections-form")) return;
     const groups = [
       [
-        "E-mail / SMTP",
-        [
-          ["smtp_host", "SMTP-kiszolgáló"],
-          ["smtp_port", "Port (általában 587 vagy 465)"],
-          ["smtp_username", "Felhasználónév"],
-          ["smtp_password", "SMTP-jelszó", "secret"],
-          ["mail_from", "Feladó e-mail-címe"],
-          ["mail_name", "Feladó neve"],
-        ],
-      ],
-      [
         "Számlázók",
         [
           ["billingo_key", "Billingo API-kulcs", "secret"],
@@ -648,38 +637,9 @@ async function connectionsForm() {
           ["stripe_webhook_secret", "Webhook aláírási titok", "secret"],
         ],
       ],
-      [
-        "SMS / Twilio",
-        [
-          ["twilio_sid", "Account SID", "secret"],
-          ["twilio_token", "Auth Token", "secret"],
-          [
-            "twilio_from",
-            "Feladó telefonszám vagy Messaging Service azonosító",
-          ],
-        ],
-      ],
-      [
-        "Google, Facebook és Apple belépés",
-        [
-          ["apple_client_id", "Apple Services ID"], ["apple_team_id", "Apple Team ID"], ["apple_key_id", "Apple Key ID"], ["apple_private_key", "Apple .p8 privát kulcs", "secret"], ["admin_apple_ids", "Adminnak engedélyezett Apple felhasználóazonosítók (vesszővel)"],
-          ["google_client_id", "Google Client ID"],
-          ["google_client_secret", "Google Client Secret", "secret"],
-          ["facebook_client_id", "Facebook App ID"],
-          ["facebook_client_secret", "Facebook App Secret", "secret"],
-          [
-            "admin_google_emails",
-            "Adminnak engedélyezett Google e-mailek (vesszővel)",
-          ],
-          [
-            "admin_facebook_ids",
-            "Adminnak engedélyezett Facebook felhasználóazonosítók (vesszővel)",
-          ],
-        ],
-      ],
     ];
     $("#connections-form").innerHTML =
-      `<form id="connection-settings">${groups.map(([title, fields]) => `<details><summary>${title}</summary><div class="form-grid">${fields.map(([key, label, secret]) => connectionField(key,label,secret,c)).join("")}</div></details>`).join("")}<div class="notice">OAuth-visszahívási címek:<br><code>${esc(location.origin)}/auth/google/callback</code><br><code>${esc(location.origin)}/auth/facebook/callback</code><br><code>${esc(location.origin)}/auth/apple/callback</code><br>Stripe webhook: <code>${esc(location.origin)}/api/stripe/webhook</code><br>Vendégfiók létrehozható; adminbelépéshez külön engedélyezett fiók szükséges.</div><div class="error" id="connections-error"></div><div class="buttons"><button class="primary">Kapcsolatok mentése</button></div></form>`;
+      `<form id="connection-settings">${groups.map(([title, fields]) => `<details><summary>${title}</summary><div class="form-grid">${fields.map(([key, label, secret]) => connectionField(key,label,secret,c)).join("")}</div></details>`).join("")}<div class="notice">A közös levelezést, SMS-t és közösségi belépést a főadmin állítja be. Stripe webhook: <code>${esc(location.origin)}/api/stripe/webhook</code></div><div class="error" id="connections-error"></div><div class="buttons"><button class="primary">Kapcsolatok mentése</button></div></form>`;
     $("#connection-settings").onsubmit = async (e) => {
       e.preventDefault();
       try {

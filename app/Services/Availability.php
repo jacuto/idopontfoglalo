@@ -29,6 +29,10 @@ final class Availability
         $start=CarbonImmutable::parse($booking['start'])->setTimezone('Europe/Budapest');
         $date=$start->format('Y-m-d');$minute=$start->hour*60+$start->minute;
         [$open,$close]=self::hours($state,$date);
+        if (!empty($booking['public']) && $open !== null) {
+            $step=(int)($state['settings']['slotStep']??10);$first=$step===60?(int)(ceil($open/60)*60):$open;
+            if (($minute-$first)%$step!==0 || $start->second!==0) throw new InvalidArgumentException('Válassz a felajánlott kezdési időpontok közül.');
+        }
         if ($open === null) throw new InvalidArgumentException('Ezen a napon zárva tartunk. Válassz másik napot.');
         if ($minute < $open || $minute+$duration > $close) throw new InvalidArgumentException('Az időpont nem fér az adott nap nyitvatartásába. Válassz másik időpontot.');
         foreach(self::blocked($state,$date,$booking['staff']) as [$from,$to]) if($minute < $to && $minute+$duration > $from) throw new InvalidArgumentException('Ez az időszak szünet, szabadság vagy más elfoglaltság miatt nem foglalható. Válassz másik időpontot.');

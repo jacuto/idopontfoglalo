@@ -155,3 +155,12 @@ Artisan::command('raero:sample-data {--provider=1}',function(){
  $id=filter_var($this->option('provider'),FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);if(!$id){$this->error('Érvénytelen szolgáltatóazonosító.');return 1;}
  try{$result=app(\App\Services\Tenant::class)->run($id,fn()=>app(\App\Services\SampleData::class)->add());$this->info(json_encode($result,JSON_UNESCAPED_UNICODE));}catch(InvalidArgumentException $e){$this->error($e->getMessage());return 1;}
 })->purpose('Mesterséges tesztadatok, kizárólag külön tesztadatbázisba');
+
+Artisan::command('raero:calendar-sync {--limit=20}',function(){$this->info(json_encode(app(\App\Services\GoogleCalendar::class)->run(min(100,max(1,(int)$this->option('limit')))),JSON_UNESCAPED_UNICODE));});
+\Illuminate\Support\Facades\Schedule::command('raero:calendar-sync')->everyMinute()->withoutOverlapping();
+
+Artisan::command('raero:operator-import {file : Privát JSON-fájl teljes útvonala}',function(){
+ $file=$this->argument('file');if(!is_file($file)||!is_readable($file)){$this->error('A megadott helyi fájl nem olvasható.');return 1;}
+ try{$data=json_decode(file_get_contents($file),true,32,JSON_THROW_ON_ERROR);$rules=[];foreach(['name','country','zip','city','address','taxNumber','registrationNumber','bank','account','iban','bic'] as $key)$rules[$key]='required|string|max:250';$v=\Illuminate\Support\Facades\Validator::make($data,$rules)->validate();$v['vat']='AAM';DB::table('platform_settings')->updateOrInsert(['id'=>1],['data'=>json_encode($v,JSON_THROW_ON_ERROR)]);$this->info('Üzemeltetői adatok elmentve. A privát forrásfájlt ezután eltávolíthatod.');}
+ catch(\Throwable){$this->error('A fájl nem megfelelő JSON, vagy hiányosak az üzemeltetői adatok.');return 1;}
+})->purpose('Üzemeltető banki és számlázási adatainak privát helyi importja');

@@ -33,6 +33,7 @@ class WorkspaceTest extends TestCase
             throw new \RuntimeException("Külön _test adatbázis szükséges.");
         }
         Artisan::call("migrate", ["--force" => true]);
+        foreach(['calendar_tasks','calendar_connections','media_assets','mail_templates'] as $table)DB::table($table)->delete();
         DB::table("salon_state")->delete();
         DB::table("deliveries")->delete();
         DB::table("guest_accounts")->delete();
@@ -90,7 +91,7 @@ class WorkspaceTest extends TestCase
         $this->patchJson("/api/clients/" . $id, [
             "name" => "Changed",
             "email" => "changed@example.com",
-            "phone" => "456",
+            "phone" => "06309998888",
         ])->assertOk();
         $this->assertSame("Changed", $this->state()["clients"][0]["name"]);
         $this->assertSame("Guest", $this->state()["bookings"][0]["name"]);
@@ -217,7 +218,6 @@ class WorkspaceTest extends TestCase
         $this->admin();
         $this->putJson("/api/connections", [
             "stripe_key" => "sk_test_private",
-            "google_client_secret" => "private",
         ])->assertOk();
         $this->assertStringNotContainsString(
             "sk_test_private",

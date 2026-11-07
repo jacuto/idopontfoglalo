@@ -30,7 +30,9 @@ final class FeaturesController
                 'logo' => 'nullable|url:http,https|max:1000', 'cover' => 'nullable|url:http,https|max:1000', 'photos' => 'sometimes|array|max:12', 'photos.*' => 'url:http,https|max:1000',
                 'hours' => 'nullable|string|max:1500', 'terms' => 'nullable|string|max:5000',
             ]);
-            $this->store->mutate(function (&$s) use ($data) { $s['profile'] = $data; });
+            $data=\App\Services\Contact::apply($data);
+            foreach(['description','terms'] as $key)if(isset($data[$key]))$data[$key]=\App\Services\SafeHtml::clean($data[$key]);
+            $this->store->mutate(function (&$s) use ($data) { $s['profile'] = array_replace($s['profile']??[], $data); });
             return response()->json(['ok' => true]);
         }
         if ($path === 'api/coupons' && $method === 'POST') {
@@ -52,6 +54,7 @@ final class FeaturesController
         if ($path === 'api/passes' && $method === 'POST') {
             $data = $r->validate(['id' => 'nullable|uuid', 'name' => 'required|string|max:150', 'description' => 'nullable|string|max:3000', 'price' => 'required|integer|min:0|max:100000000', 'visits' => 'required|integer|between:1,1000', 'days' => 'required|integer|between:1,3650', 'services' => 'present|array', 'services.*' => 'string', 'active' => 'required|boolean', 'terms' => 'nullable|string|max:3000', 'validityMode'=>'sometimes|in:assigned,first_use','validFrom'=>'nullable|date_format:Y-m-d','validUntil'=>'nullable|date_format:Y-m-d']);
             if(!empty($data['validFrom'])&&!empty($data['validUntil'])&&$data['validFrom']>$data['validUntil'])throw new InvalidArgumentException('A bérlet záró dátuma nem lehet a kezdő dátum előtt.');
+            foreach(['description','terms'] as $key)if(isset($data[$key]))$data[$key]=\App\Services\SafeHtml::clean($data[$key]);
             $data['validityMode']=$data['validityMode']??'assigned';
             $data['id'] = $data['id'] ?? (string) Str::uuid();
             $this->store->mutate(function (&$s) use ($data) {

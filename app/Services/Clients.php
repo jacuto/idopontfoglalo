@@ -6,7 +6,7 @@ final class Clients
 {
     public static function editable(array $client,array $input):void {
         if(empty($client['guestId']))return;
-        foreach(['email','phone'] as $field)if(array_key_exists($field,$input)&&(string)($input[$field]??'')!==(string)($client[$field]??'')) throw new InvalidArgumentException('A regisztrált vendég emailjét és telefonszámát csak a vendég módosíthatja a saját fiókjában.');
+        foreach(['email','phone'] as $field)if(array_key_exists($field,$input)&&($field==='phone'?self::phone((string)($input[$field]??''))!==self::phone((string)($client[$field]??'')):mb_strtolower(trim((string)($input[$field]??'')))!==mb_strtolower(trim((string)($client[$field]??''))))) throw new InvalidArgumentException('A regisztrált vendég emailjét és telefonszámát csak a vendég módosíthatja a saját fiókjában.');
     }
     public static function visible(array $client):bool {return empty($client['deletedAt']);}
     public static function phone(string $value): string {
@@ -67,7 +67,7 @@ final class Clients
         $stats = ['total' => count($bookings), 'cancelled' => 0, 'attended' => 0, 'no_show' => 0];
         foreach ($bookings as $b) {
             if ($b['status'] === 'cancelled') $stats['cancelled']++;
-            if ($b['status'] === 'confirmed' && isset($stats[$b['attendance'] ?? ''])) $stats[$b['attendance']]++;
+            if (in_array($b['status'],['confirmed','no_show'],true) && isset($stats[$b['attendance'] ?? ''])) $stats[$b['attendance']]++;
         }
         $avatar = null;
         if (!empty($c['guestId'])) $avatar = \Illuminate\Support\Facades\DB::table('guest_accounts')->where('id', $c['guestId'])->value('avatar');

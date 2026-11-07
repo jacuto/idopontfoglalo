@@ -163,7 +163,9 @@ class Notifications
                 if (($p['kind'] ?? '') === 'platform_message') {
                     if (!app(Newsletters::class)->ready()) { $this->finish($job->id, 'blocked', ['error' => 'Hiányzó központi SMTP-kapcsolat.', 'available_at' => now()->addMinutes(5)]); $counts['blocked']++; continue; }
                     $url = rtrim(config('app.url'), '/') . ($p['platformRecipient'] ? '/foadmin' : ($p['recipientType'] === 'guest' ? '/uzenetek' : '/')) . '?provider=' . ($p['recipientType'] === 'provider' ? $p['recipientId'] : 1) . '&platformMessages=1';
-                    app(Newsletters::class)->send($p['recipient'], 'Új üzemeltetői üzenet — Ráérő', 'Új belső üzeneted érkezett. Beszélgetés: ' . $url);
+                    $template=app(MailTemplates::class)->render('platform_message',['business'=>'Ráérő','name'=>'','details'=>'Új belső üzeneted érkezett.','manage_url'=>$url,'account_url'=>$url,'provider_url'=>$url]);
+                    if(!$template['enabled']){$this->finish($job->id,'skipped');$counts['skipped']++;continue;}
+                    app(Newsletters::class)->send($p['recipient'],$template['subject'],$template['html'],true);
                     $this->finish($job->id, 'sent', ['attempts' => $job->attempts + 1]); $counts['sent']++; continue;
                 }
                 $s = app(SalonStore::class)->read();
@@ -171,8 +173,9 @@ class Notifications
                     $message = collect($s['messages'])->firstWhere('id', $p['messageId']);
                     if (!$message) { $this->finish($job->id, 'skipped'); $counts['skipped']++; continue; }
                     if (!$this->connections->mailReady()) { $this->finish($job->id, 'blocked', ['error' => 'Hiányzó küldőkapcsolat.', 'available_at' => now()->addMinutes(5)]); $counts['blocked']++; continue; }
-                    $this->sendMail($this->connections->all(), $p['recipient'], 'Új belső üzenet — Ráérő',
+                    $delivered=$this->sendMail($this->connections->all(), $p['recipient'], 'Új belső üzenet — Ráérő',
                         'Új üzeneted érkezett. Beszélgetés: ' . rtrim(config('app.url'), '/') . ($p['guest'] ? '/uzenetek' : '/') . '?provider=' . app(Tenant::class)->id . '&messages=1');
+                    if(!$delivered){$this->finish($job->id,'skipped');$counts['skipped']++;continue;}
                     $this->finish($job->id, 'sent', ['attempts' => $job->attempts + 1]); $counts['sent']++; continue;
                 }
                 $b = collect($s["bookings"])->firstWhere("id", $p["bookingId"]);
@@ -224,6 +227,7 @@ class Notifications
                     "confirmed" => "Megerősítve",
                     "cancelled" => "Lemondva",
                     "rejected" => "Elutasítva",
+                    "no_show" => "Nem jelent meg",
                 ];
                 $subject =
                     ($labels[$p["event"]] ?? "Foglalás frissítve") .
@@ -277,11 +281,12 @@ class Notifications
                             $c["mail_name"] ?: $s["settings"]["name"],
                     ]);
                     Mail::purge("smtp");
-                    Mail::raw(
-                        $text,
-                        fn($m) => $m->to($p["recipient"])->subject($subject),
-                    );
+                    $manage=rtrim(config('app.url'),'/').($p['audience']==='guest'?'/modositas?provider='.app(Tenant::class)->id.'&token='.$b['token']:'/?provider='.app(Tenant::class)->id);
+                    $template=app(MailTemplates::class)->render($b['status']==='no_show'?'no_show':$p['event'],['business'=>$s['settings']['name'],'name'=>$b['name'],'details'=>$text,'manage_url'=>$manage,'account_url'=>rtrim(config('app.url'),'/').'/fiokom','provider_url'=>rtrim(config('app.url'),'/').'/foglalas?provider='.app(Tenant::class)->id]);
+                    if(!$template['enabled']){$this->finish($job->id,'skipped');$counts['skipped']++;continue;}
+                    Mail::to($p['recipient'])->send(new \App\Mail\NotificationMail($template['subject'],$template['html'],filter_var($s['settings']['providerEmail']??'',FILTER_VALIDATE_EMAIL)?$s['settings']['providerEmail']:null,$s['settings']['name']));
                 } else {
+                    $p["recipient"]=Contact::e164($p["recipient"]);
                     if (!preg_match('/^\+[1-9]\d{7,14}$/', $p["recipient"])) {
                         throw new \RuntimeException(
                             "Az SMS-hez nemzetközi telefonszám szükséges.",
@@ -325,13 +330,14 @@ class Notifications
         }
         return $counts;
     }
-    private function sendMail(array $c, string $recipient, string $subject, string $text): void
+    private function sendMail(array $c, string $recipient, string $subject, string $text): bool
     {
         config(['mail.default' => 'smtp', 'mail.mailers.smtp.host' => $c['smtp_host'], 'mail.mailers.smtp.port' => (int) ($c['smtp_port'] ?: 587),
             'mail.mailers.smtp.username' => $c['smtp_username'] ?: null, 'mail.mailers.smtp.password' => $c['smtp_password'] ?: null,
             'mail.mailers.smtp.scheme' => (int) $c['smtp_port'] === 465 ? 'smtps' : 'smtp', 'mail.from.address' => $c['mail_from'], 'mail.from.name' => $c['mail_name'] ?: 'Ráérő']);
         Mail::purge('smtp');
-        Mail::raw($text, fn($m) => $m->to($recipient)->subject($subject));
+        $state=app(SalonStore::class)->read();$template=app(MailTemplates::class)->render('message',['business'=>$state['settings']['name'],'name'=>'','details'=>$text,'manage_url'=>rtrim(config('app.url'),'/').'/uzenetek','account_url'=>rtrim(config('app.url'),'/').'/fiokom','provider_url'=>rtrim(config('app.url'),'/').'/foglalas?provider='.app(Tenant::class)->id]);
+        if(!$template['enabled'])return false;Mail::to($recipient)->send(new \App\Mail\NotificationMail($template['subject'],$template['html'],$state['settings']['providerEmail']??null,$state['settings']['name']));return true;
     }
     private function finish(int $id, string $status, array $extra = []): void
     {

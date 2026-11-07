@@ -2,6 +2,14 @@
 use App\Http\Controllers\SalonController;
 use App\Http\Middleware\ApiHeaders;
 use Illuminate\Support\Facades\Route;
+Route::match(['GET','PATCH','DELETE'],'/api/calendar/connection',[\App\Http\Controllers\CalendarConnectionController::class,'handle']);
+Route::get('/auth/google-calendar',[\App\Http\Controllers\CalendarConnectionController::class,'start']);
+Route::get('/auth/google-calendar/callback',[\App\Http\Controllers\CalendarConnectionController::class,'callback']);
+Route::get('/api/exports/{kind}',[\App\Http\Controllers\ExportController::class,'handle'])->whereIn('kind',['statistics','calendar']);
+Route::post('/api/media',[\App\Http\Controllers\MediaController::class,'upload']);
+Route::get('/media/{id}',[\App\Http\Controllers\MediaController::class,'image'])->whereUuid('id');
+Route::post('/api/platform/templates/preview',[\App\Http\Controllers\TemplateController::class,'handle']);
+Route::match(['GET','PUT'],'/api/platform/templates',[\App\Http\Controllers\TemplateController::class,'handle']);
 Route::get("/api/auth/providers", [
     \App\Http\Controllers\AuthController::class,
     "providers",

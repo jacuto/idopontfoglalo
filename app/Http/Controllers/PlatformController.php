@@ -20,8 +20,13 @@ final class PlatformController {
   }
   if($path==='api/platform/connections'&&$method==='GET')return response()->json(app(\App\Services\PlatformConnections::class)->status());
   if($path==='api/platform/connections'&&$method==='PUT'){
-   $v=$r->validate(['stripe_key'=>'nullable|string|max:1000','stripe_price'=>'nullable|string|max:200','stripe_webhook_secret'=>'nullable|string|max:1000','billingo_key'=>'nullable|string|max:1000','billingo_block'=>'nullable|integer|min:1','smtp_host'=>'nullable|string|max:200','smtp_port'=>'nullable|integer|between:1,65535','smtp_username'=>'nullable|string|max:250','smtp_password'=>'nullable|string|max:1000','mail_from'=>'nullable|email|max:200','mail_name'=>'nullable|string|max:150']);
+   $v=$r->validate(['google_client_id'=>'nullable|string|max:300','google_client_secret'=>'nullable|string|max:1000','facebook_client_id'=>'nullable|string|max:300','facebook_client_secret'=>'nullable|string|max:1000','apple_client_id'=>'nullable|string|max:300','apple_team_id'=>'nullable|string|max:100','apple_key_id'=>'nullable|string|max:100','apple_private_key'=>'nullable|string|max:10000','twilio_sid'=>'nullable|string|max:200','twilio_token'=>'nullable|string|max:1000','twilio_from'=>'nullable|string|max:200','stripe_key'=>'nullable|string|max:1000','stripe_price'=>'nullable|string|max:200','stripe_webhook_secret'=>'nullable|string|max:1000','billingo_key'=>'nullable|string|max:1000','billingo_block'=>'nullable|integer|min:1','smtp_host'=>'nullable|string|max:200','smtp_port'=>'nullable|integer|between:1,65535','smtp_username'=>'nullable|string|max:250','smtp_password'=>'nullable|string|max:1000','mail_from'=>'nullable|email|max:200','mail_name'=>'nullable|string|max:150']);
    app(\App\Services\PlatformConnections::class)->save($v);return response()->json(['ok'=>true]);
+  }
+  if(preg_match('#^api/platform/providers/([1-9][0-9]*)/access$#',$path,$m)){
+   abort_unless(DB::table('salon_state')->where('id',$m[1])->exists(),404);
+   if($method==='GET')return response()->json(app(Tenant::class)->run((int)$m[1],fn()=>array_intersect_key(app(\App\Services\Connections::class)->all(),array_flip(['admin_google_emails','admin_facebook_ids','admin_apple_ids']))));
+   $v=$r->validate(['admin_google_emails'=>'nullable|string|max:2000','admin_facebook_ids'=>'nullable|string|max:2000','admin_apple_ids'=>'nullable|string|max:2000']);app(Tenant::class)->run((int)$m[1],fn()=>app(\App\Services\Connections::class)->save($v));return response()->json(['ok'=>true]);
   }
   if(preg_match('#^api/platform/providers/([1-9][0-9]*)/plan$#',$path,$m)&&$method==='PATCH') {
    $v=$r->validate(['calendarLimit'=>'required|integer|between:1,100']);

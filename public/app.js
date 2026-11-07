@@ -106,6 +106,7 @@ function updateStaff() {
       ),
   );
   const el = $("[name=staff]");
+  const previousStaff=el?.value;
   if (el)
     el.innerHTML =
       (isPublic && staff.length > 1
@@ -114,6 +115,7 @@ function updateStaff() {
       staff
         .map((p) => `<option value="${p.id}">${esc(p.name)}</option>`)
         .join("");
+  if(el&&[...el.options].some(option=>option.value===previousStaff))el.value=previousStaff;
   const total = selected.reduce(
     (a, id) => {
       const s = state.services.find((x) => x.id === id);
@@ -204,7 +206,7 @@ async function submitBooking(e) {
 function bookingDetails(id) {
   const b = state.bookings.find((x) => x.id === id);
   showModal(
-    `<h2>${esc(b.name)}</h2><p>${new Date(b.start).toLocaleString("hu-HU")}</p><div class="notice">${statusName[b.status]}</div><p>${b.services.map((id) => esc(state.services.find((s) => s.id === id)?.name)).join(" + ")}<br>${esc(b.phone)} · ${esc(b.email)}</p><label>Időpont módosítása</label><input type="datetime-local" id="edit-start" value="${localdt(new Date(b.start))}"><button style="margin-top:10px" onclick="saveBookingTime('${b.id}')">Új időpont mentése</button><label>Vendég módosítási hivatkozása</label><input readonly value="${location.origin}/modositas?provider=${providerId()}&token=${b.token}"><div class="buttons"><button onclick="$('#modal').close()">Bezárás</button><button onclick="setStatus('${id}','cancelled')">Lemondás</button>${b.status === "pending" ? `<button onclick="setStatus('${id}','rejected')">Elutasítás</button><button class="primary" onclick="setStatus('${id}','confirmed')">Jóváhagyás</button>` : ""}</div>`,
+    `<h2>${esc(b.name)}</h2><p>${new Date(b.start).toLocaleString("hu-HU")}</p><div class="notice">${statusName[b.status]}</div><p>${b.services.map((id) => esc(state.services.find((s) => s.id === id)?.name)).join(" + ")}<br>${esc(phoneFormatted(b.phone))} · ${esc(b.email)}</p><label>Időpont módosítása</label><input type="datetime-local" id="edit-start" value="${localdt(new Date(b.start))}"><button style="margin-top:10px" onclick="saveBookingTime('${b.id}')">Új időpont mentése</button><label>Vendég módosítási hivatkozása</label><input readonly value="${location.origin}/modositas?provider=${providerId()}&token=${b.token}"><div class="buttons"><button onclick="$('#modal').close()">Bezárás</button><button onclick="setStatus('${id}','cancelled')">Lemondás</button>${b.status === "pending" ? `<button onclick="setStatus('${id}','rejected')">Elutasítás</button><button class="primary" onclick="setStatus('${id}','confirmed')">Jóváhagyás</button>` : ""}</div>`,
   );
 }
 async function setStatus(id, status) {
@@ -242,7 +244,7 @@ async function managePage() {
       balance,
     } = await api("/api/manage?token=" + encodeURIComponent(manageToken));
     $("#app").innerHTML =
-      `<div class="public"><div class="brand"><span>◷</span>ráérő.</div><div class="card"><h1>Az időpontod</h1><h3>${esc(b.name)}</h3><p>${b.services.map((id) => esc(services.find((s) => s.id === id)?.name)).join(" + ")}</p><div class="notice">${statusName[b.status]}</div><p>${new Date(b.start).toLocaleString("hu-HU")}</p>${!["cancelled", "rejected"].includes(b.status) ? `<form id="manage-form"><label>Új időpont</label><input name="start" type="datetime-local" value="${localdt(new Date(b.start))}" required><div class="buttons"><button type="button" onclick="cancelBooking()">Foglalás lemondása</button><button class="primary">Időpont módosítása</button></div><div id="form-error" class="error"></div></form>` : ""}${paymentReady && balance > 0 && !["cancelled", "rejected"].includes(b.status) ? `<button class="primary" style="margin-top:20px" onclick="payGuest()">Bankkártyás fizetés · ${money(balance)}</button>` : ""}<p style="margin-top:20px;font-size:12px">A változás megjelenik a szolgáltató naptárában. A beállításai szerint a szalon és a vendég is értesítést kap.</p></div></div>`;
+      `<div class="public"><div class="brand"><span>◷</span>ráérő.</div><div class="card"><h1>Az időpontod</h1><h3>${esc(b.name)}</h3><p>${b.services.map((id) => esc(services.find((s) => s.id === id)?.name)).join(" + ")}</p><div class="notice">${statusName[b.status]}</div><p>${new Date(b.start).toLocaleString("hu-HU")}</p>${!["cancelled", "rejected", "no_show"].includes(b.status) ? `<form id="manage-form"><label>Új időpont</label><input name="start" type="datetime-local" value="${localdt(new Date(b.start))}" required><div class="buttons"><button type="button" onclick="cancelBooking()">Foglalás lemondása</button><button class="primary">Időpont módosítása</button></div><div id="form-error" class="error"></div></form>` : ""}${paymentReady && balance > 0 && !["cancelled", "rejected", "no_show"].includes(b.status) ? `<button class="primary" style="margin-top:20px" onclick="payGuest()">Bankkártyás fizetés · ${money(balance)}</button>` : ""}<p style="margin-top:20px;font-size:12px">A változás megjelenik a szolgáltató naptárában. A beállításai szerint a szalon és a vendég is értesítést kap.</p></div></div>`;
     if ($("#manage-form"))
       $("#manage-form").onsubmit = async (e) => {
         e.preventDefault();
@@ -292,14 +294,7 @@ async function loadSlots() {
         }),
     );
     if (ticket !== slotRequest) return;
-    $("#available-slots").innerHTML =
-      slots
-        .map(
-          (s) =>
-            `<button type="button" data-start="${s.start}" onclick="selectSlot(this)">${s.time}</button>`,
-        )
-        .join("") ||
-      "<p>Erre a napra nincs szabad időpont. Válassz másik napot.</p>";
+    renderSlotPicker(slots);
   } catch (e) {
     if (ticket === slotRequest) $("#available-slots").textContent = e.message;
   }

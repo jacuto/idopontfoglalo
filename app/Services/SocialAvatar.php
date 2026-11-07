@@ -13,21 +13,8 @@ final class SocialAvatar
             if (!Schema::hasColumn('guest_accounts', 'avatar')) return;
             $account = DB::table('guest_accounts')->find($accountId);
             if (!$account || !empty($account->avatar)) return;
-            $response = Http::connectTimeout(3)->timeout(8)->withOptions([
-                'allow_redirects' => false,
-                'on_headers' => function ($response) {
-                    if ((int) $response->getHeaderLine('Content-Length') > 2097152) throw new \RuntimeException('Túl nagy kép.');
-                },
-                'progress' => function ($total, $downloaded) {
-                    if ($total > 2097152 || $downloaded > 2097152) throw new \RuntimeException('Túl nagy kép.');
-                },
-            ])->get($url);
-            if (!$response->successful()) return;
-            $bytes = $response->body();
-            if (strlen($bytes) > 2097152) return;
-            $image = @getimagesizefromstring($bytes);
-            $extension = [IMAGETYPE_JPEG => 'jpg', IMAGETYPE_PNG => 'png', IMAGETYPE_WEBP => 'webp'][$image[2] ?? 0] ?? null;
-            if (!$extension || $image[0] > 4096 || $image[1] > 4096) return;
+            $bytes=$this->fetch($provider,$url);if(!$bytes)return;
+            $image=getimagesizefromstring($bytes);$extension=[IMAGETYPE_JPEG=>'jpg',IMAGETYPE_PNG=>'png',IMAGETYPE_WEBP=>'webp'][$image[2]];
             $path = 'avatars/' . Str::uuid() . '.' . $extension;
             if (!Storage::disk('local')->put($path, $bytes)) return;
             try {
@@ -46,6 +33,25 @@ final class SocialAvatar
         }
     }
 
+    public function fetch(string $provider,mixed $url):?string {
+        if(!is_string($url)||!$this->allowed($url,$provider))return null;
+            $response = Http::connectTimeout(3)->timeout(8)->withOptions([
+                'allow_redirects' => false,
+                'on_headers' => function ($response) {
+                    if ((int) $response->getHeaderLine('Content-Length') > 2097152) throw new \RuntimeException('Túl nagy kép.');
+                },
+                'progress' => function ($total, $downloaded) {
+                    if ($total > 2097152 || $downloaded > 2097152) throw new \RuntimeException('Túl nagy kép.');
+                },
+            ])->get($url);
+            if (!$response->successful()) return null;
+            $bytes = $response->body();
+            if (strlen($bytes) > 2097152) return null;
+            $image = @getimagesizefromstring($bytes);
+            $extension = [IMAGETYPE_JPEG => 'jpg', IMAGETYPE_PNG => 'png', IMAGETYPE_WEBP => 'webp'][$image[2] ?? 0] ?? null;
+            if (!$extension || $image[0] > 4096 || $image[1] > 4096) return null;
+        return $bytes;
+    }
     private function allowed(string $url, string $provider): bool
     {
         $parts = parse_url($url);

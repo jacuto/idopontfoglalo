@@ -37,6 +37,7 @@ class BookingTest extends TestCase
                 "--force" => true,
             ]),
         );
+        foreach(['calendar_tasks','calendar_connections','media_assets','mail_templates'] as $table)DB::table($table)->delete();
         DB::table("salon_state")->delete();
         DB::table("salon_state")->insert([
             "id" => 1,
@@ -110,7 +111,7 @@ class BookingTest extends TestCase
             ->assertJsonPath("status", "confirmed");
         $this->getJson("/api/state")
             ->assertOk()
-            ->assertJsonPath("clients.0.phone", "+36301234567");
+            ->assertJsonPath("clients.0.phone", "06301234567");
     }
     public function test_slots_exclude_reserved_time_and_use_budapest_time(): void
     {
@@ -224,7 +225,7 @@ class BookingTest extends TestCase
                 [
                     "id" => "one",
                     "name" => "Import Vendég",
-                    "phone" => "123",
+                    "phone" => "06309998888",
                     "email" => "a@example.com",
                 ],
             ],

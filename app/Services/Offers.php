@@ -4,7 +4,7 @@ use Carbon\CarbonImmutable;
 use InvalidArgumentException;
 final class Offers
 {
-    public static function total(array $b): int { return (int) ($b['pricing']['payable'] ?? array_sum(array_column($b['serviceSnapshot'], 'price'))); }
+    public static function total(array $b): int { return (int) (($b['status']??'')==='no_show'?($b['noShowFee']??0):($b['pricing']['payable'] ?? array_sum(array_column($b['serviceSnapshot'], 'price')))); }
     public function quote(array $s, array $b, ?string $code): array
     {
         $original = (int) array_sum(array_column($b['serviceSnapshot'], 'price'));

@@ -26,12 +26,13 @@ class WorkspaceController
         $method = $request->method();
         if (preg_match('#^/api/subscription/invoices/([1-9][0-9]*)/pdf$#',$path,$m) && $method === 'GET') return app(\App\Services\PlatformInvoices::class)->download((int)$m[1],app(\App\Services\Tenant::class)->id);
         if ($path === "/api/subscription/info" && $method === "GET") {
-            return response()->json(["subscription"=>$this->store->read()["subscription"], "providerId" => app(\App\Services\Tenant::class)->id, "operator" => app(PlatformController::class)->operator(), "invoices" => DB::table("platform_invoices")->where("provider_id", app(\App\Services\Tenant::class)->id)->select("id", "payment_id", "status", "number", "reference")->get(), "payments" => DB::table("platform_payments")->where("provider_id", app(\App\Services\Tenant::class)->id)->latest("id")->get()]);
+            return response()->json(["subscription"=>$this->store->read()["subscription"], "providerId" => app(\App\Services\Tenant::class)->id, "operator" => array_intersect_key(app(PlatformController::class)->operator(),array_flip(["name","bank","account","iban","bic"])), "invoices" => DB::table("platform_invoices")->where("provider_id", app(\App\Services\Tenant::class)->id)->select("id", "payment_id", "status", "number", "reference")->get(), "payments" => DB::table("platform_payments")->where("provider_id", app(\App\Services\Tenant::class)->id)->latest("id")->get()]);
         }
         if ($path === "/api/connections" && $method === "GET") {
             return response()->json(app(Connections::class)->status());
         }
         if ($path === "/api/connections" && $method === "PUT") {
+            foreach(array_keys($request->all()) as $key)abort_if(\App\Services\SharedConnections::privateForProvider($key),403,"Ezt a központi kapcsolatot csak a főadmin módosíthatja.");
             $data = $request->validate([
                 "smtp_host" => "nullable|string|max:200",
                 "smtp_port" => "nullable|integer|between:1,65535",
@@ -111,6 +112,7 @@ class WorkspaceController
                         "name" => "required|string|max:150",
                         "phone" => "nullable|string|max:40",
                         "email" => "nullable|email|max:200",
+                        "description"=>"nullable|string|max:5000",
                         "role" =>
                             ($kind === "staff" ? "required" : "sometimes") .
                             "|string|max:80",
@@ -127,6 +129,7 @@ class WorkspaceController
                         if ($kind === 'clients' && !\App\Services\Clients::visible($row)) { if($method==='DELETE') return ['ok'=>true]; abort(404,'A vendég nincs a saját listádban.'); }
                         if ($method === "PATCH") {
                             if($kind==="clients") { \App\Services\Clients::editable($row,$data); if(($row['phone']??'')!==($data['phone']??'')||($row['email']??'')!==($data['email']??''))\App\Services\Clients::preventDuplicate($s['clients'],array_replace($row,$data)); }
+                            $data=\App\Services\Contact::apply($data,$row);if(isset($data['description']))$data['description']=\App\Services\SafeHtml::clean($data['description']);
                             $row = array_replace($row, $data);
                             $row["phone"] = $row["phone"] ?? "";
                             $row["email"] = $row["email"] ?? "";
@@ -307,6 +310,7 @@ class WorkspaceController
                             "email" => $record["email"] ?? "",
                         ]);
                     }
+                    $record=\App\Services\Contact::apply($record);
                     $match = null;
                     if ($kind === 'clients') {
                         foreach($s[$kind] as $i=>$old)if($old['id']===$id){$match=$i;break;}

@@ -45,7 +45,7 @@ final class Connections
             )
             : [];
         $env = app(Tenant::class)->id === 1 ? config("integrations.connections", []) : array_fill_keys(self::FIELDS, null);
-        return array_replace($env, $saved);
+        return array_replace($env, $saved, SharedConnections::all());
     }
     public function save(array $input): void
     {
@@ -67,6 +67,7 @@ final class Connections
         $temporary = null;
         try {
             $current = $this->all();
+            if(app(Tenant::class)->id!==1)$current=array_diff_key($current,array_flip(SharedConnections::KEYS));
             foreach (self::FIELDS as $key) {
                 if (isset($input[$key]) && $input[$key] !== "") {
                     $current[$key] = $input[$key];
@@ -127,7 +128,7 @@ final class Connections
         foreach (self::FIELDS as $key) {
             $safe[$key . "_configured"] = !empty($v[$key]);
         }
-        return $safe;
+        return array_filter($safe,fn($key)=>!SharedConnections::privateForProvider($key),ARRAY_FILTER_USE_KEY);
     }
     public function mailReady(): bool
     {

@@ -28,6 +28,7 @@ final class SampleData
     $c=collect($s['clients'])->firstWhere('id','sample-client-'.$i);$start=Time::now('Europe/Budapest')->addDays($i+1)->setTime(10,15);
     $s['bookings'][]=['id'=>$id,'clientId'=>$c['id'],'guestId'=>null,'name'=>$c['name'],'phone'=>$c['phone'],'email'=>$c['email'],'start'=>$start->utc()->toISOString(),'staff'=>$staff,'services'=>[$service['id']],'serviceSnapshot'=>[$service],'status'=>'pending','token'=>bin2hex(random_bytes(24)),'createdAt'=>now()->toISOString(),'updatedAt'=>now()->toISOString(),'sample'=>true];$added++;
    }
+   $s['profile']=array_replace($s['profile']??[],['description'=>'<h2>Egy kis idő, ami csak rólad szól</h2><p>Mesterséges bemutató szalon: személyre szabott szolgáltatások, nyugodt környezet és egyszerű online foglalás.</p>','address'=>'1051 Budapest, Minta utca 12. (bemutató cím)','email'=>'szalon@example.invalid','phone'=>'06301234567']);
    $s['sampleData']=true;
    return ['addedBookings'=>$added,'sampleClients'=>12];
   });

@@ -8,6 +8,7 @@ final class GuestFeaturesController
     public function profile(Request $r){
         $id=(int)$r->session()->get('guest_id',0);abort_unless($id&&DB::table('guest_accounts')->where('id',$id)->exists(),401);
         $v=$r->validate(['email'=>'present|nullable|email|max:200','phone'=>'present|nullable|string|max:40']);
+        $v=\App\Services\Contact::apply($v);
         DB::table('guest_accounts')->where('id',$id)->update(['contact_email'=>$v['email']??'','phone'=>$v['phone']??'','updated_at'=>now()]);
         return response()->json(['ok'=>true]);
     }

@@ -3,10 +3,10 @@ namespace App\Services;
 use Illuminate\Support\Facades\{DB, Mail, URL};
 class Newsletters {
  public function ready():bool {return (bool)(config('newsletter.host')&&config('newsletter.from'));}
- public function send(string $to,string $subject,string $content):void {
+ public function send(string $to,string $subject,string $content,bool $html=false):void {
   if(!$this->ready())throw new \InvalidArgumentException('A központi SMTP-kapcsolat még nincs beállítva.');
   config(['mail.mailers.platform'=>['transport'=>'smtp','host'=>config('newsletter.host'),'port'=>(int)config('newsletter.port'),'username'=>config('newsletter.username'),'password'=>config('newsletter.password'),'scheme'=>(int)config('newsletter.port')===465?'smtps':'smtp','timeout'=>20]]);
-  Mail::purge('platform');Mail::mailer('platform')->raw($content,fn($m)=>$m->from(config('newsletter.from'),config('newsletter.name'))->to($to)->subject($subject));
+  Mail::purge('platform');if($html){Mail::mailer('platform')->to($to)->send((new \App\Mail\NotificationMail($subject,$content))->from(config('newsletter.from'),config('newsletter.name')));}else Mail::mailer('platform')->raw($content,fn($m)=>$m->from(config('newsletter.from'),config('newsletter.name'))->to($to)->subject($subject));
  }
  public function run(int $limit=30):array {
   // An interrupted SMTP request may have been accepted: never retry it automatically.

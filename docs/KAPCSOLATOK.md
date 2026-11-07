@@ -2,7 +2,7 @@
 
 ## Két külön tulajdonos
 
-**Vendég → szolgáltató:** a szolgáltató Beállítások / Kapcsolatok részében saját SMTP-, SMS-, Stripe-, Billingo- és Számlázz.hu-adatokat adhat meg. Az eredeti vállalkozás korábbi `.env`-adatai és `storage/app/private/connections.enc` fájlja tovább működnek. Új vállalkozásoknak nincs hozzáférése ezekhez; saját fájljuk `connections.enc.provider-ID`.
+**Vendég → szolgáltató:** a szolgáltató Beállítások / Kapcsolatok részében saját Stripe-, Billingo- és Számlázz.hu-adatokat adhat meg. Az eredeti vállalkozás korábbi `.env`-adatai és `storage/app/private/connections.enc` fájlja tovább működnek. Az SMTP, Twilio és OAuth közös, csak főadmin által szerkeszthető. Az új vállalkozások saját fizetési kapcsolati fájlja `connections.enc.provider-ID`.
 
 **Szolgáltató → üzemeltető:** `/foadmin` → Saját Billingo, Stripe és SMTP. A központi kulcsok a `storage/app/private/platform-connections.enc` külön titkosított fájlba kerülnek. A titkos mezőket a böngésző nem kapja vissza; a „Beállítva” jelzés nem jelent sikeres fizetést vagy küldést. Üres mező mentéskor megőrzi a korábbi kulcsot. Az összes titkosított fájlhoz az eredeti APP_KEY szükséges.
 
@@ -68,7 +68,7 @@ Használj engedélyezett feladócímű SMTP-szolgáltatást; a szolgáltató el�
 
 A főadmin hírlevelet külön szolgáltatói vagy vendégcélcsoportnak készíthet. Van piszkozat, szöveges előnézet, tesztküldés és időzített küldés. Import vagy foglalás nem hoz létre feliratkozást. A hozzájárulást a bejelentkezett felhasználó külön jelöli. Vendégnél ellenőrzött email szükséges; a Facebooktól kapott, nem ellenőrzött email önmagában nem elég a feliratkozáshoz. A leiratkozási link aláírt, az adott email minden hírlevélcélcsoportjára hat. A munkafolyamat a tényleges küldés előtt újra ellenőrzi a hozzájárulást.
 
-Az `accepted` azt jelenti, hogy **az SMTP-szerver elfogadta**, nem azt, hogy a címzett postaládájába biztosan megérkezett. SMTP-n nincs automatikus bounce-/megnyitáskövetés. Bizonytalan küldés `unknown`, automatikus ismétlés nélkül. A központi SMTP-szolgáltató naplójában ellenőrizhető. HTML-sablonszerkesztő és szolgáltatóspecifikus bounce-webhook nincs ebben a kiadásban.
+Az `accepted` azt jelenti, hogy **az SMTP-szerver elfogadta**, nem azt, hogy a címzett postaládájába biztosan megérkezett. SMTP-n nincs automatikus bounce-/megnyitáskövetés. Bizonytalan küldés `unknown`, automatikus ismétlés nélkül. A központi SMTP-szolgáltató naplójában ellenőrizhető. Az automatikus levelek HTML-sablonját a főadmin szerkesztheti; szolgáltatóspecifikus bounce-webhook nincs.
 
 ## A szolgáltatók saját kapcsolatai
 
@@ -86,7 +86,7 @@ A fizetési visszaigazoló oldal és a vendégnek küldött foglaláskezelő lin
 
 A konzolokban követendő pontos lépések: [BELEPES.md](BELEPES.md).
 
-A szolgáltató saját Kapcsolatok felületén adhatja meg az OAuth-adatokat. Az eredeti vállalkozás korábbi `.env`-adatai is működnek. Callbackek:
+Az OAuth-adatokat kizárólag a főadmin központi kapcsolatai között lehet megadni. Az eredeti vállalkozás korábbi `.env`-adatai is működnek. Callbackek:
 
 ```text
 https://foglalo.digitmarketing.hu/auth/google/callback

@@ -24,7 +24,7 @@ const base=process.env.RAERO_TEST_URL||'http://127.0.0.1:8088';
  assert.equal(await page.locator('[name=name]').inputValue(),'Google Vendég');assert.equal(await page.locator('[name=email]').inputValue(),'social@example.com');
  assert.deepEqual(await page.locator('[name=services]:checked').evaluateAll(items=>items.map(x=>x.value)),services);
  await page.locator('[name=phone]').fill('+36 30 111 2222');await page.getByRole('button',{name:'Időpont lefoglalása →'}).click();await page.locator('.success').waitFor();assert.equal(profileWrites,1);assert.equal(submitted.phone,guest.phone);
- await page.goto(base+'/foglalas?provider=1');await page.locator('.guest-autofill').waitFor();assert.equal(await page.locator('[name=phone]').inputValue(),'+36 30 111 2222');
+ await page.goto(base+'/foglalas?provider=1');await page.locator('.guest-autofill').waitFor();assert.equal(await page.locator('[name=phone]').inputValue(),'06301112222');
  await page.locator('.guest-login-link a').click();await page.locator('#avatar-form').waitFor();assert.equal(await page.locator('.guest-booking').count(),2);
  assert.equal(await page.locator('.guest-booking a[href="/foglalas?provider=2"]').innerText(),'Másik szolgáltató');assert.equal(await page.locator('.guest-booking a[href="/modositas?provider=2&token=second"]').count(),1);
  assert.equal(await page.locator('#conversation,#message-form').count(),0);assert.equal(await page.getByRole('link',{name:'Új foglalás',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Üzenet az üzemeltetőnek',exact:true}).count(),0);

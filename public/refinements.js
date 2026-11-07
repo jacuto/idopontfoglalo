@@ -9,7 +9,7 @@ function serviceSelectionChanged(){if(isPublic&&$('#booking-date')){if(!$('#book
 function bookingDaySelected(){loadSlots();}
 const dialog=$('#modal');
 dialog.addEventListener('click',e=>{const r=dialog.getBoundingClientRect();if(e.target===dialog&&(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom))dialog.close();});
-const phoneLink=phone=>phone?`<a class="call-link" href="tel:${esc(String(phone).replace(/[^+0-9]/g,''))}" aria-label="Hívás: ${esc(phone)}">☎ ${esc(phone)}</a>`:'<span class="muted">Nincs telefonszám</span>';
+const phoneLink=phone=>phone?`<a class="call-link" href="tel:${esc(phoneHref(phone))}" aria-label="Hívás: ${esc(phoneFormatted(phone))}">☎ ${esc(phoneFormatted(phone))}</a>`:'<span class="muted">Nincs telefonszám</span>';
 function phoneAction(phone,label) {return phone?`<a class="call-action" href="tel:${esc(String(phone).replace(/[^+0-9]/g,''))}" aria-label="Hívás: ${esc(phone)}">☎ ${esc(label)}</a>`:'<span class="muted">—</span>';}
 function bookingContact(b){return state.clients.find(c=>c.id===b.clientId)||b;}
 function bookingGuestLink(b){const c=state.clients.find(c=>c.id===b.clientId);return c?`<a href="#vendeg-${c.id}" onclick="event.preventDefault();clientDetail('${c.id}')">${esc(c.name)}</a>`:`<a href="#foglalas-${b.id}" onclick="event.preventDefault();bookingDetails('${b.id}')">${esc(b.name)}</a>`;}
@@ -108,7 +108,7 @@ async function fillOwnBookingDetails(form, login) {
       if (draft.date && draft.date >= datekey(new Date())) $('#booking-date').value = draft.date;
       await loadSlots();
       const slot = [...form.querySelectorAll('[data-start]')].find(el => el.dataset.start === draft.start);
-      if (slot) selectSlot(slot);
+      if (slot) selectSlot(slot); else restoreSelectedSlot(draft.start);
     }
   } catch {}
 }
@@ -126,10 +126,3 @@ async function guestMessagesPage() {
   $('#app').innerHTML = `<div class="public"><h1>Üzenetek: ${operator ? 'Ráérő üzemeltetője' : esc(provider.name)}</h1><p><a href="/fiokom">Vissza a saját fiókhoz</a></p>${operator ? '<button onclick="operatorConversation(false)">Beszélgetés megnyitása</button>' : '<div id="conversation"></div>'}</div>`;
   if (operator) await operatorConversation(false); else await openConversation(guest.id, true);
 }
-
-// All extensions are registered before the first request renders a page.
-if(location.pathname==='/uzenetek') guestMessagesPage();
-else if(location.pathname==='/foadmin') platformPage();
-else if(manageToken) managePage();
-else if(location.pathname.replace(/\/+$/,'')==='/fiokom') guestPage();
-else refresh().catch(loginPage);

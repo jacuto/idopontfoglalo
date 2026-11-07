@@ -1,5 +1,7 @@
 # Fejlesztési átadás – 2026. november 1.
 
+> November 7-i bővítés: [naptár, képek, exportok és központi kapcsolatok](NOVEMBER7.md). A közös SMTP-, OAuth- és SMS-kezelésre az új útmutató érvényes.
+
 > Újabb működési szabályok: [FINOMITASOK.md](FINOMITASOK.md). Ez tartalmazza a később kért felületet, vendégadatvédelmet, méréskikapcsolást és a 21 napos előfizetési határidőt; ezekben az alábbi korábbi leltárt felülírja.
 
 ## Kiindulási állapot és vizsgálat

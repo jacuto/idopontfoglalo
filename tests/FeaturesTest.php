@@ -7,7 +7,7 @@ use Illuminate\Http\UploadedFile;
 class FeaturesTest extends TestCase {
  public function createApplication(){ $app=require __DIR__.'/../bootstrap/app.php';$app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();return $app; }
  protected function setUp():void {
-  parent::setUp();if(config('database.default')!=='sqlite'&&!str_ends_with((string)config('database.connections.mysql.database'),'_test'))throw new \RuntimeException('Csak külön tesztadatbázis használható.');config(['integrations.path'=>storage_path('framework/features-connections.enc')]);foreach(glob(storage_path('framework/features-connections.enc*')) as $file)unlink($file);Artisan::call('migrate',['--force'=>true]);foreach(['salon_state','providers','guest_accounts','deliveries','platform_payments','platform_settings','newsletter_consents','newsletters','newsletter_deliveries','platform_invoices','platform_messages'] as $table)DB::table($table)->delete();
+  parent::setUp();if(config('database.default')!=='sqlite'&&!str_ends_with((string)config('database.connections.mysql.database'),'_test'))throw new \RuntimeException('Csak külön tesztadatbázis használható.');config(['integrations.path'=>storage_path('framework/features-connections.enc')]);foreach(glob(storage_path('framework/features-connections.enc*')) as $file)unlink($file);Artisan::call('migrate',['--force'=>true]);foreach(['calendar_tasks','calendar_connections','media_assets','mail_templates','salon_state','providers','guest_accounts','deliveries','platform_payments','platform_settings','newsletter_consents','newsletters','newsletter_deliveries','platform_invoices','platform_messages'] as $table)DB::table($table)->delete();
   DB::table('salon_state')->insert(['id'=>1,'data'=>json_encode(SalonStore::initial())]);
   DB::table('salon_state')->insert(['id'=>2,'data'=>json_encode(SalonStore::initial())]);
   DB::table('providers')->insert(['id'=>2,'name'=>'Másik','password_hash'=>Hash::make('test-password-123'),'active'=>true,'trial_started_at'=>now(),'trial_ends_at'=>now()->addMonths(2),'created_at'=>now(),'updated_at'=>now()]);
@@ -145,7 +145,7 @@ class FeaturesTest extends TestCase {
  public function test_newsletter_queue_is_unique_and_records_smtp_acceptance():void {
   $this->guest();$this->putJson('/api/newsletter/consent',['subscribed'=>true])->assertOk();
   $n=DB::table('newsletters')->insertGetId(['audience'=>'guest','subject'=>'Hír','content'=>'Levél','status'=>'scheduled','scheduled_at'=>now()->subMinute(),'created_at'=>now(),'updated_at'=>now()]);
-  $service=new class extends \App\Services\Newsletters { public int $calls=0; public function ready():bool{return true;} public function send(string $to,string $subject,string $content):void{$this->calls++;} };
+  $service=new class extends \App\Services\Newsletters { public int $calls=0; public function ready():bool{return true;} public function send(string $to,string $subject,string $content,bool $html=false):void{$this->calls++;} };
   $this->app->instance(\App\Services\Newsletters::class,$service);
   $service->run();$service->run();$this->assertSame(1,$service->calls);$this->assertSame(1,DB::table('newsletter_deliveries')->count());
   $this->assertSame('accepted',DB::table('newsletter_deliveries')->value('status'));
@@ -214,9 +214,9 @@ class FeaturesTest extends TestCase {
  }
 
  public function test_provider_cannot_inject_account_link_when_saving_clients():void {
-  $this->provider();$this->putJson('/api/config',['clients'=>[['id'=>'unlinked','name'=>'Importált','phone'=>'123456','email'=>'guest@example.com','guestId'=>10]]])->assertOk();
+  $this->provider();$this->putJson('/api/config',['clients'=>[['id'=>'unlinked','name'=>'Importált','phone'=>'06309998888','email'=>'guest@example.com','guestId'=>10]]])->assertOk();
   $this->assertArrayNotHasKey('guestId',app(SalonStore::class)->read()['clients'][0]);
-  $this->putJson('/api/config',['clients'=>[['id'=>'second','name'=>'Második','phone'=>'999','email'=>'']]])->assertOk();
+  $this->putJson('/api/config',['clients'=>[['id'=>'second','name'=>'Második','phone'=>'06309997777','email'=>'']]])->assertOk();
   $this->assertCount(2,app(SalonStore::class)->read()['clients']);
  }
 
@@ -230,7 +230,7 @@ class FeaturesTest extends TestCase {
  public function test_registered_contacts_are_guest_owned_across_all_provider_write_routes():void {
   $this->guest();$a=$this->postJson('/api/bookings',$this->booking())->assertCreated()->json();$this->postJson('/api/bookings?provider=2',$this->booking())->assertCreated();
   $this->patchJson('/api/guest/profile',['email'=>'new@example.com','phone'=>'+36 20 222 3333'])->assertOk();
-  $this->provider();$this->getJson('/api/state')->assertJsonPath('clients.0.email','new@example.com')->assertJsonPath('clients.0.phone','+36 20 222 3333');
+  $this->provider();$this->getJson('/api/state')->assertJsonPath('clients.0.email','new@example.com')->assertJsonPath('clients.0.phone','06202223333');
   $change=['name'=>'Vendég','email'=>'attacker@example.com','phone'=>'999'];
   $this->patchJson('/api/clients/'.$a['clientId'],$change)->assertUnprocessable();
   $this->putJson('/api/config',['clients'=>[['id'=>$a['clientId']]+$change]])->assertUnprocessable();
@@ -331,7 +331,7 @@ class FeaturesTest extends TestCase {
  }
  public function test_social_login_returns_to_selected_provider_and_remembers_owned_contacts():void {
   \Illuminate\Support\Facades\Http::preventStrayRequests();
-  app(Tenant::class)->run(2,fn()=>app(\App\Services\Connections::class)->save(['google_client_id'=>'client','google_client_secret'=>'secret','facebook_client_id'=>'client','facebook_client_secret'=>'secret']));
+  app(Tenant::class)->run(1,fn()=>app(\App\Services\Connections::class)->save(['google_client_id'=>'client','google_client_secret'=>'secret','facebook_client_id'=>'client','facebook_client_secret'=>'secret']));
   \Illuminate\Support\Facades\Http::fake([
    'oauth2.googleapis.com/*'=>\Illuminate\Support\Facades\Http::response(['access_token'=>'token']),
    'openidconnect.googleapis.com/*'=>\Illuminate\Support\Facades\Http::response(['sub'=>'owned-google','name'=>'Közösségi Vendég','email'=>'social@example.com','email_verified'=>true]),
@@ -345,7 +345,7 @@ class FeaturesTest extends TestCase {
    $this->patchJson('/api/guest/profile?provider=2',['email'=>'contact@example.com','phone'=>'+36 30 111 2222'])->assertOk();
    $r=$this->get('/auth/'.$social.'?provider=2&returnTo=https://example.org');parse_str(parse_url($r->headers->get('Location'),PHP_URL_QUERY),$q);
    $this->get('/auth/'.$social.'/callback?state='.$q['state'].'&code=code')->assertRedirect('/fiokom?provider=2');
-   $this->getJson('/api/guest?provider=2')->assertJsonPath('phone','+36 30 111 2222')->assertJsonPath('email','contact@example.com');
+   $this->getJson('/api/guest?provider=2')->assertJsonPath('phone','06301112222')->assertJsonPath('email','contact@example.com');
    $this->getJson('/api/state?provider=2')->assertUnauthorized();
   }
  }
@@ -461,7 +461,7 @@ class FeaturesTest extends TestCase {
   $this->postJson('/api/bookings',$this->booking(['start'=>'2035-03-14T12:00:00+01:00']))->assertUnprocessable();
  }
  public function test_first_use_pass_dates_follow_reserved_visits_and_reset_after_cancellation():void {
-  $this->provider();$this->putJson('/api/config',['clients'=>[['id'=>'member','name'=>'Bérletes','phone'=>'1234567','email'=>'']]])->assertOk();
+  $this->provider();$this->putJson('/api/config',['clients'=>[['id'=>'member','name'=>'Bérletes','phone'=>'06309998888','email'=>'']]])->assertOk();
   $p=$this->postJson('/api/passes',['name'=>'Első alkalomtól','price'=>10000,'visits'=>3,'days'=>30,'services'=>[],'active'=>true,'validityMode'=>'first_use'])->assertCreated()->json();
   $pass=$this->postJson('/api/client-passes',['clientId'=>'member','passId'=>$p['id']])->assertCreated()->assertJsonPath('expiresAt',null)->json();
   $b=$this->postJson('/api/bookings',$this->booking(['clientId'=>'member','passId'=>$pass['id']]))->assertCreated()->json();
@@ -472,7 +472,7 @@ class FeaturesTest extends TestCase {
   $this->postJson('/api/bookings',$this->booking(['clientId'=>'member','passId'=>$pass['id'],'start'=>'2035-05-01T09:00:00Z']))->assertCreated();
  }
  public function test_fixed_pass_date_bounds_and_empty_service_scope_are_enforced():void {
-  $this->provider();$this->putJson('/api/config',['clients'=>[['id'=>'member','name'=>'Bérletes','phone'=>'1234567','email'=>'']]])->assertOk();
+  $this->provider();$this->putJson('/api/config',['clients'=>[['id'=>'member','name'=>'Bérletes','phone'=>'06309998888','email'=>'']]])->assertOk();
   $data=['name'=>'Dátumos','price'=>10000,'visits'=>3,'days'=>90,'services'=>[],'active'=>true,'validFrom'=>'2035-03-10','validUntil'=>'2035-04-10'];
   $this->postJson('/api/passes',array_replace($data,['validUntil'=>'2035-02-01']))->assertUnprocessable();
   $p=$this->postJson('/api/passes',$data)->assertCreated()->json();$pass=$this->postJson('/api/client-passes',['clientId'=>'member','passId'=>$p['id']])->assertCreated()->json();
@@ -494,7 +494,7 @@ class FeaturesTest extends TestCase {
   $this->get($relay)->assertRedirect('/foglalas?provider=1#public-form');$this->getJson('/api/guest')->assertOk()->assertJsonPath('name','Apple Vendég')->assertJsonPath('email','private@privaterelay.appleid.com');
   \Illuminate\Support\Facades\Http::assertSent(function($request)use($clientPublic){if(!str_ends_with($request->url(),'/token'))return false;$client=\Firebase\JWT\JWT::decode($request['client_secret'],new \Firebase\JWT\Key($clientPublic,'ES256'));return $client->iss==='TEAM123'&&$client->sub==='test.services'&&$client->aud==='https://appleid.apple.com';});
   $this->getJson('/api/state')->assertUnauthorized();$this->get($relay)->assertRedirect('/fiokom?authError=state');$this->assertSame(1,DB::table('guest_accounts')->count());
-  $this->provider();$this->getJson('/api/connections')->assertJsonMissingPath('apple_private_key')->assertJsonPath('apple_private_key_configured',true);
+  $this->provider();$this->getJson('/api/connections')->assertJsonMissingPath('apple_private_key')->assertJsonMissingPath('apple_private_key_configured');
  }
  public function test_apple_rejects_wrong_nonce_audience_and_expired_tokens():void {
   [$key,$jwks]=$this->appleTestKeys();\Illuminate\Support\Facades\Cache::flush();$jwt='';

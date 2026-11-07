@@ -119,7 +119,7 @@ class BookingRules
                 "Múltbeli időpontra nem lehet foglalni.",
             );
         }
-        if (!$historical) Availability::validate($booking, $state, $duration);
+        if (!$historical) { Availability::validate($booking, $state, $duration);app(GoogleCalendar::class)->validate($booking,$state,$duration,$ignore); }
         $ranges = $this->occupied($booking, $state);
         foreach ($state["bookings"] as $old) {
             if (

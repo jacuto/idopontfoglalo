@@ -153,3 +153,7 @@ Az új migrációk visszafelé szándékosan nem törlik a táblákat. Ne prób�
 ## Későbbi finomítások
 
 A felület és a 21 napos előfizetési határidő részletes szabályai: [FINOMITASOK.md](docs/FINOMITASOK.md). A teljes `public` mappával a `refinements.js` is kerüljön fel. A meglévő egyetlen `schedule:run` cron az óránkénti előfizetés-ellenőrzést is indítja; ne adj hozzá párhuzamos cron-sort. Mintaadatot kizárólag külön tesztpéldányra tölts a leírás szerint.
+
+## November 7-i újdonságok
+
+A képekhez, Excelhez, Google Naptárhoz és központi HTML levelekhez lásd: [beállítási és használati útmutató](docs/NOVEMBER7.md). A frissítés új additív táblákat készít, ezért a migrációt is futtasd. A privát üzemeltetői JSON külön fájl, nem a nyilvános ZIP része.

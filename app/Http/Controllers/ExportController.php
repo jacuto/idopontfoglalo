@@ -1,0 +1,23 @@
+<?php
+namespace App\Http\Controllers;
+use App\Services\{SalonStore,Tenant,Spreadsheet,Contact};
+use Illuminate\Http\Request;
+use Carbon\CarbonImmutable as Date;
+final class ExportController {
+ public function handle(Request $r,string $kind){
+  abort_unless($r->session()->get('admin')===true&&(int)$r->session()->get('provider_id',1)===app(Tenant::class)->id,403);
+  $v=$r->validate(['from'=>'required|date_format:Y-m-d','to'=>'required|date_format:Y-m-d|after_or_equal:from','format'=>'sometimes|in:xlsx,ics','staff'=>'nullable|string|max:80','staffs'=>'sometimes|array|max:100','staffs.*'=>'string|max:80']);$s=app(SalonStore::class)->read();$byId=collect($s['bookings'])->keyBy('id');
+  $bookings=array_values(array_filter($s['bookings'],fn($b)=>($d=Date::parse($b['start'])->setTimezone('Europe/Budapest')->format('Y-m-d'))>=$v['from']&&$d<=$v['to']&&(empty($v['staff'])||$b['staff']===$v['staff'])&&(empty($v['staffs'])||in_array($b['staff'],$v['staffs'],true))));
+  if(($v['format']??'xlsx')==='ics'){
+   $lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Raero//Booking Calendar//HU','CALSCALE:GREGORIAN'];$escape=fn($t)=>str_replace(["\\","\r","\n",',',';'],["\\\\",'',"\\n","\\,","\\;"],(string)$t);
+   foreach($bookings as $b){$start=Date::parse($b['start']);$lines=array_merge($lines,['BEGIN:VEVENT','UID:'.$escape($b['id'].'-'.app(Tenant::class)->id.'@raero'),'DTSTAMP:'.now()->utc()->format('Ymd\THis\Z'),'DTSTART:'.$start->utc()->format('Ymd\THis\Z'),'DTEND:'.$start->addMinutes(array_sum(array_column($b['serviceSnapshot'],'duration')))->utc()->format('Ymd\THis\Z'),'SUMMARY:'.$escape($b['name'].' · '.implode(' + ',array_column($b['serviceSnapshot'],'name'))),'DESCRIPTION:'.$escape($this->status($b['status'])),'STATUS:'.(in_array($b['status'],['cancelled','rejected'],true)?'CANCELLED':'CONFIRMED'),'END:VEVENT']);}
+   $lines[]='END:VCALENDAR';$fold=[];foreach($lines as $line){while(strlen($line)>73){$part=mb_strcut($line,0,73,'UTF-8');$fold[]=$part;$line=' '.substr($line,strlen($part));}$fold[]=$line;}return response(implode("\r\n",$fold)."\r\n")->header('Content-Type','text/calendar; charset=UTF-8')->header('Content-Disposition','attachment; filename="naptar.ics"')->header('Cache-Control','private,no-store');
+  }
+  if($kind==='calendar'){$rows=[['Időpont','Vendég','Telefonszám','Email','Szolgáltatások','Munkatárs','Állapot','Meg nem jelenési díj (Ft)']];foreach($bookings as $b)$rows[]=[Date::parse($b['start'])->setTimezone('Europe/Budapest')->format('Y.m.d. H:i'),$b['name'],Contact::display($b['phone']??''),$b['email']??'',implode(' + ',array_column($b['serviceSnapshot'],'name')),collect($s['staff'])->firstWhere('id',$b['staff'])['name']??'',$this->status($b['status']),$b['noShowFee']??0];return Spreadsheet::download([['name'=>'Naptár','rows'=>$rows]],'naptar.xlsx');}
+  $rows=[['Befizetés napja','Vendég','Szolgáltatások','Fizetési mód','Összeg (Ft)','Visszatérítés (Ft)','Nettó beérkezés (Ft)']];$daily=[];$services=[];$sum=0;
+  foreach($s['payments'] as $p){$date=Date::parse($p['paidAt'])->setTimezone('Europe/Budapest')->format('Y-m-d');if($date<$v['from']||$date>$v['to']||$p['status']!=='paid')continue;$b=$byId->get($p['bookingId']);if(!empty($v['staff'])&&($b['staff']??null)!==$v['staff'])continue;$net=$p['amount']-($p['refundedAmount']??0);$sum+=$net;$daily[$date]=($daily[$date]??0)+$net;$rows[]=[$date,$b['name']??'',implode(' + ',array_column($b['serviceSnapshot']??[],'name')),$p['method'],$p['amount'],$p['refundedAmount']??0,$net];$catalog=$b['serviceSnapshot']??[];$total=array_sum(array_column($catalog,'price'));foreach($catalog as $service)$services[$service['name']]=($services[$service['name']]??0)+($total?$net*$service['price']/$total:($catalog?$net/count($catalog):0));}
+  ksort($daily);$days=[['Nap','Bevétel (Ft)']];foreach($daily as $d=>$total)if($total!==0)$days[]=[$d,$total];$parts=[['Szolgáltatás','Bevétel (Ft)']];foreach($services as $name=>$amount)$parts[]=[$name,round($amount,2)];
+  return Spreadsheet::download([['name'=>'Összesítés','rows'=>[['Időszak kezdete',$v['from']],['Időszak vége',$v['to']],['Beérkezett bevétel (Ft)',$sum],['Időpontok száma',count($bookings)]]],['name'=>'Napi bevétel','rows'=>$days],['name'=>'Szolgáltatások','rows'=>$parts],['name'=>'Befizetések','rows'=>$rows]],'statisztika.xlsx');
+ }
+ private function status(string $status):string{return ['pending'=>'Jóváhagyásra vár','confirmed'=>'Megerősítve','cancelled'=>'Lemondva','rejected'=>'Elutasítva','no_show'=>'Nem jelent meg'][$status]??$status;}
+}
