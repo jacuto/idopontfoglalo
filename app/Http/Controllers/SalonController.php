@@ -64,7 +64,7 @@ class SalonController
                     [
                         "/api/public",
                         "/api/quote",
-                        "/api/slots",
+                        "/api/slots", "/api/slots/next",
                         "/api/manage",
                         "/api/manage/checkout",
                     ],
@@ -81,7 +81,7 @@ class SalonController
                 );
             }
             if ($admin && (int) $request->session()->get("provider_id", 1) !== app(\App\Services\Tenant::class)->id) { $admin = false; }
-            if (($path === '/api/bookings' && $method === 'POST') || preg_match('#^/api/bookings/[^/]+$#',$path) || $path === '/api/slots' || ($path === '/api/imports/bookings' && $method === 'POST')) {
+            if (($path === '/api/bookings' && $method === 'POST') || preg_match('#^/api/bookings/[^/]+$#',$path) || $path === '/api/slots' || $path === '/api/slots/next' || ($path === '/api/imports/bookings' && $method === 'POST')) {
                 \App\Services\Subscriptions::guard($this->store->read(),$admin);
             }
             if ($path === "/api/manage/checkout" && $method === "POST") {
@@ -117,7 +117,7 @@ class SalonController
                 return response()->json([
                     "hasCoupons" => collect($s['coupons'])->contains(fn($c)=>$c['active'] && now()->between(CarbonImmutable::parse($c['startsAt']),CarbonImmutable::parse($c['endsAt']))),
                     "hasPasses" => collect($s['passes'])->contains(fn($p)=>$p['active']) || collect($s['clientPasses'])->contains(fn($p)=>$p['remaining']>0 && (empty($p['expiresAt'])||CarbonImmutable::parse($p['expiresAt'])->isFuture())),
-                    "groupSessions"=>array_values(array_map(fn($g)=>["id"=>$g["id"],"serviceId"=>$g["serviceId"],"staff"=>$g["staff"],"start"=>$g["start"],"remaining"=>$g["serviceSnapshot"]["capacity"]-\App\Services\GroupSessions::booked($g,$s)],array_filter($s["groupSessions"],fn($g)=>empty($g["cancelled"])&&CarbonImmutable::parse($g["start"])->isFuture()))),
+                    "groupSessions"=>array_values(array_map(fn($g)=>["id"=>$g["id"],"serviceId"=>$g["serviceId"],"staff"=>$g["staff"],"start"=>$g["start"],"minimumParticipants"=>(int)($g["minimumParticipants"]??0),"minimumDeadline"=>\App\Services\GroupMinimum::deadline($g)->utc()->toISOString(),"remaining"=>$g["serviceSnapshot"]["capacity"]-\App\Services\GroupSessions::booked($g,$s)],array_filter($s["groupSessions"],fn($g)=>!\App\Services\GroupMinimum::unavailable($g,$s)&&CarbonImmutable::parse($g["start"])->isFuture()))),
                     "publicFooter"=>\App\Services\PublicFooter::get(),
                     "profile" => $s["profile"],
                     "offers" => array_values(array_filter($s["coupons"], fn($c) => $c["active"] && $c["public"] && now()->between(CarbonImmutable::parse($c["startsAt"]), CarbonImmutable::parse($c["endsAt"])))),
@@ -168,9 +168,10 @@ class SalonController
                 return app(WorkspaceController::class)->handle($request);
             }
             if ($path === "/api/state" && $method === "GET") {
-                $state=$this->store->read();$state['clients']=array_values(array_filter($state['clients'],fn($c)=>\App\Services\Clients::visible($c)));
+                $state=$this->store->read();$state['paymentDues']=\App\Services\PaymentDues::rows($state);$state['clients']=array_values(array_filter($state['clients'],fn($c)=>\App\Services\Clients::visible($c)));
                 return response()->json($state);
             }
+            if ($path === "/api/slots/next" && $method === "GET") return response()->json($this->nextSlots($request));
             if ($path === "/api/slots" && $method === "GET") {
                 return response()->json($this->slots($request));
             }
@@ -223,7 +224,7 @@ class SalonController
                         "public" => !$admin || $request->boolean("public"),
                     ]);
                     $b["guestId"] = $request->session()->get("guest_id");
-                    if(empty($b['services'])&& !$b['public']&&!empty($s['settings']['defaultServiceId']))$b['services']=[$s['settings']['defaultServiceId']];
+                    if(empty($b['services'])&&!$b['public']){$default=collect($s['services'])->first(fn($v)=>$v['id']===($s['settings']['defaultServiceId']??null)&&empty($v['archived'])&&($v['bookingMode']??'individual')!=='group'&&in_array($b['staff'],$v['staff'],true))??collect($s['services'])->first(fn($v)=>empty($v['archived'])&&($v['bookingMode']??'individual')!=='group'&&in_array($b['staff'],$v['staff'],true));if($default)$b['services']=[$default['id']];}
                     if(empty($b['services']))throw new InvalidArgumentException('Válassz szolgáltatást.');
                     if(empty(trim($b['name']??''))&&empty($data['clientId'])){
                         if($b['public'])throw new InvalidArgumentException('Add meg a vendég nevét.');
@@ -311,6 +312,7 @@ class SalonController
                                 \App\Services\GroupSessions::prepare($next,$s);
                                 $this->rules->validate($next, $s, $b["id"]);
                             }
+                            if(in_array($b['status'],['cancelled','rejected'],true)&&in_array($next['status'],['pending','confirmed'],true)&&!empty($b['pricing']['code']))app(\App\Services\Offers::class)->quote($s,$next,$b['pricing']['code']);
                             app(\App\Services\Offers::class)->transitionPass($s, $b, $next);
                             $b = $next;
                             app(\App\Services\Notifications::class)->enqueue(
@@ -401,7 +403,8 @@ class SalonController
                             }
                             if ($request->boolean("cancel")) {
                                 $next = array_replace($b, ["status" => "cancelled"]);
-                                app(\App\Services\Offers::class)->transitionPass($s, $b, $next);
+                                if(in_array($b['status'],['cancelled','rejected'],true)&&in_array($next['status'],['pending','confirmed'],true)&&!empty($b['pricing']['code']))app(\App\Services\Offers::class)->quote($s,$next,$b['pricing']['code']);
+                            app(\App\Services\Offers::class)->transitionPass($s, $b, $next);
                                 $b = $next;
                             } else {
                                 $next = array_merge($b, [
@@ -442,6 +445,7 @@ class SalonController
                     "settings" => "sometimes|array",
                     "settings.openingTime" => "sometimes|date_format:H:i",
                     "settings.closingTime" => "sometimes|date_format:H:i",
+                    "settings.paymentDefaults"=>"sometimes|array:enabled,method,note", "settings.paymentDefaults.enabled"=>"sometimes|boolean", "settings.paymentDefaults.method"=>"sometimes|in:cash,card,transfer", "settings.paymentDefaults.note"=>"nullable|string|max:300",
                     "settings.defaultServiceId"=>"nullable|string|max:80", "settings.skipUnnamedWarning"=>"sometimes|boolean",
                     "settings.slotStep"=>"sometimes|integer|in:5,10,15,20,30,60", "settings.noShowFee"=>"sometimes|integer|min:0|max:100000000",
                     "settings.businessMode" => "sometimes|in:solo,team",
@@ -615,7 +619,7 @@ class SalonController
                     if (isset($data["clients"])) {
                         $oldClients = collect($s["clients"])->keyBy("id");
                         foreach ($data["clients"] as &$client) {
-                            $previous=$oldClients->get($client['id'],[]);$client=\App\Services\Contact::apply($client,$previous);\App\Services\Clients::editable($previous,$client);
+                            $previous=$oldClients->get($client['id'],[]);if(!$previous&&empty(trim($client['phone']??''))&&empty(trim($client['email']??'')))throw new InvalidArgumentException('Legalább egy telefonszámot vagy emailcímet adj meg.');$client=\App\Services\Contact::apply($client,$previous);\App\Services\Clients::editable($previous,$client);
                             if(!$previous || ($previous['email']??'')!==($client['email']??'') || ($previous['phone']??'')!==($client['phone']??''))\App\Services\Clients::preventDuplicate(array_merge($s['clients'],$data['clients']),$client);
                             $client=array_replace($previous,array_intersect_key($client,array_flip(['id','name','phone','email'])));
                         }
@@ -726,7 +730,16 @@ class SalonController
         $request->session()->put("provider_id", $tenant);
         return response()->json(["ok" => true]);
     }
-    private function slots(Request $request): array
+    private function nextSlots(Request $request):array {
+        $s=$this->store->read();$ids=array_filter(explode(',',(string)$request->query('services','')));if(!$ids||count($ids)>20)return ['date'=>null,'slots'=>[]];
+        $active=array_filter($s['services'],fn($v)=>empty($v['archived']));if(array_diff($ids,array_column($active,'id')))return ['date'=>null,'slots'=>[]];$person=$request->query('staff');$eligible=array_filter(\App\Services\Settings::activeStaff($s),fn($p)=>(!$person||$person==='any'||$person===$p['id'])&&!array_filter($ids,fn($id)=>!in_array($p['id'],$this->rules->service($s['services'],$id)['staff'],true)));if(!$eligible)return ['date'=>null,'slots'=>[]];
+        $today=CarbonImmutable::now('Europe/Budapest')->startOfDay();$group=collect($s['services'])->contains(fn($v)=>in_array($v['id'],$ids,true)&&($v['bookingMode']??'individual')==='group');
+        $dates=$group?array_values(array_unique(array_map(fn($g)=>CarbonImmutable::parse($g['start'])->setTimezone('Europe/Budapest')->format('Y-m-d'),array_filter($s['groupSessions'],fn($g)=>!\App\Services\GroupMinimum::unavailable($g,$s)&&in_array($g['serviceId'],$ids,true)&&CarbonImmutable::parse($g['start'])->isFuture())))):array_map(fn($d)=>$today->addDays($d)->format('Y-m-d'),range(0,365));sort($dates);
+        $s['_googleBusy']=app(\App\Services\GoogleCalendar::class)->busy($s,(int)$request->session()->get('guest_id',0));
+        foreach($dates as $date){[$open,$close]=\App\Services\Availability::hours($s,$date);if($open===null)continue;if(!$group){$free=array_filter($eligible,fn($p)=>!array_filter(\App\Services\Availability::blocked($s,$date,$p['id']),fn($range)=>$range[0]<=$open&&$range[1]>=$close));if(!$free)continue;}$probe=$request->duplicate(array_replace($request->query->all(),['date'=>$date]));$slots=$this->slots($probe,$s);if($slots)return ['date'=>$date,'slots'=>$slots];}
+        return ['date'=>null,'slots'=>[],'searchedDays'=>$group?null:366];
+    }
+    private function slots(Request $request,?array $cached=null): array
     {
         $date = $request->query("date");
         $ids = array_filter(
@@ -753,7 +766,7 @@ class SalonController
         } catch (\Exception) {
             return [];
         }
-        $s = $this->store->read();
+        $s = $cached??$this->store->read();
         $dayStart=$day->getTimestamp();$dayEnd=$day->addDay()->getTimestamp();
         $s['bookings']=array_values(array_filter($s['bookings'],function($b)use($dayStart,$dayEnd,$s){$start=CarbonImmutable::parse($b['start'])->getTimestamp();$snapshot=$b['serviceSnapshot']??array_values(array_filter($s['services'],fn($service)=>in_array($service['id'],$b['services'],true)));$duration=array_sum(array_column($snapshot,'duration'))*60;return !in_array($b['status'],['cancelled','rejected'],true)&&$start<$dayEnd&&$start+$duration>$dayStart;}));
         $s['_googleBusy']=app(\App\Services\GoogleCalendar::class)->busy($s,(int)$request->session()->get('guest_id',0));
@@ -762,8 +775,8 @@ class SalonController
         if ($open === null) return [];
         if(collect($s['services'])->contains(fn($v)=>in_array($v['id'],$ids,true)&&($v['bookingMode']??'individual')==='group')){
             if(count($ids)!==1)return [];
-            foreach($s['groupSessions'] as $g){if(!empty($g['cancelled'])||$g['serviceId']!==array_values($ids)[0]||($person&&$person!=='any'&&$person!==$g['staff'])||CarbonImmutable::parse($g['start'])->setTimezone('Europe/Budapest')->format('Y-m-d')!==$date)continue;
-                try{$b=['name'=>'slot','phone'=>'slot','start'=>$g['start'],'staff'=>$g['staff'],'services'=>array_values($ids),'public'=>!$request->session()->get('admin'),'guestId'=>$request->session()->get('guest_id')];\App\Services\GroupSessions::prepare($b,$s);$this->rules->validate($b,$s);$slots[]=['start'=>$g['start'],'staff'=>$g['staff'],'time'=>CarbonImmutable::parse($g['start'])->setTimezone('Europe/Budapest')->format('H:i'),'remaining'=>$g['serviceSnapshot']['capacity']-\App\Services\GroupSessions::booked($g,$s)];}catch(InvalidArgumentException){}
+            foreach($s['groupSessions'] as $g){if(\App\Services\GroupMinimum::unavailable($g,$s)||$g['serviceId']!==array_values($ids)[0]||($person&&$person!=='any'&&$person!==$g['staff'])||CarbonImmutable::parse($g['start'])->setTimezone('Europe/Budapest')->format('Y-m-d')!==$date)continue;
+                try{$b=['name'=>'slot','phone'=>'slot','start'=>$g['start'],'staff'=>$g['staff'],'services'=>array_values($ids),'public'=>!$request->session()->get('admin'),'guestId'=>$request->session()->get('guest_id')];\App\Services\GroupSessions::prepare($b,$s);$this->rules->validate($b,$s);$slots[]=['start'=>$g['start'],'staff'=>$g['staff'],'time'=>CarbonImmutable::parse($g['start'])->setTimezone('Europe/Budapest')->format('H:i'),'groupSessionId'=>$g['id'],'remaining'=>$g['serviceSnapshot']['capacity']-\App\Services\GroupSessions::booked($g,$s)];}catch(InvalidArgumentException){}
             }return $slots;
         }
         $step=(int)($s['settings']['slotStep']??10);

@@ -25,6 +25,10 @@ class WorkspaceController
         $path = "/" . $request->path();
         $method = $request->method();
         if (preg_match('#^/api/subscription/invoices/([1-9][0-9]*)/pdf$#',$path,$m) && $method === 'GET') return app(\App\Services\PlatformInvoices::class)->download((int)$m[1],app(\App\Services\Tenant::class)->id);
+        if($path==='/api/clients'&&$method==='POST'){
+            $v=$request->validate(['name'=>'required|string|max:150','phone'=>'nullable|string|max:40','email'=>'nullable|email|max:200']);$v=\App\Services\Contact::apply($v);if(empty($v['phone'])&&empty($v['email']))throw new InvalidArgumentException('Legalább egy telefonszámot vagy emailcímet adj meg.');
+            return response()->json($this->store->mutate(function(&$s)use($v){$c=array_replace(['phone'=>'','email'=>''],$v,['id'=>(string)Str::uuid()]);\App\Services\Clients::preventDuplicate($s['clients'],$c);$s['clients'][]=$c;return $c;}),201);
+        }
         if ($path === "/api/subscription/info" && $method === "GET") {
             return response()->json(["subscription"=>$this->store->read()["subscription"], "providerId" => app(\App\Services\Tenant::class)->id, "operator" => array_intersect_key(app(PlatformController::class)->operator(),array_flip(["name","bank","account","iban","bic"])), "invoices" => DB::table("platform_invoices")->where("provider_id", app(\App\Services\Tenant::class)->id)->select("id", "payment_id", "status", "number", "reference")->get(), "payments" => DB::table("platform_payments")->where("provider_id", app(\App\Services\Tenant::class)->id)->latest("id")->get()]);
         }

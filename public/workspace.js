@@ -296,10 +296,7 @@ function clientForm(id) {
     const data = Object.fromEntries(new FormData(e.target));
     try {
       if (id) await api("/api/clients/" + id, "PATCH", data);
-      else
-        await api("/api/config", "PUT", {
-          clients: [...state.clients, { id: crypto.randomUUID(), ...data }],
-        });
+      else await api('/api/clients','POST',data);
       $("#modal").close();
       await refresh();
       toast("Vendég mentve");
@@ -527,7 +524,7 @@ function activityPage() {
         )
         .map(
           (b) =>
-            `<tr><td><a href="#foglalas-${esc(b.id)}" onclick="event.preventDefault();bookingDetails('${b.id}')"><strong>${esc(b.name)}</strong></a></td><td>${new Date(b.start).toLocaleString("hu-HU")}</td><td>${(b.serviceSnapshot || []).map(s => `<a class="text-link" href="#szolgaltatas-${esc(s.id)}" onclick="event.preventDefault();serviceDetail('${esc(s.id)}')">${esc(s.name)}</a>`).join(" + ")}</td><td><span class="status ${b.status}">${statusName[b.status]}</span></td><td><div class="table-actions"><button onclick="bookingMessage('${b.id}')">Üzenet</button>${phoneAction(bookingContact(b).phone, "Hívás")}</div></td></tr>`,
+            `<tr><td><a href="#foglalas-${esc(b.id)}" onclick="event.preventDefault();bookingDetails('${b.id}')"><strong>${esc(b.name)}</strong></a></td><td>${new Date(b.start).toLocaleString("hu-HU")}</td><td>${(b.serviceSnapshot || []).map(s => `<a class="text-link" href="#szolgaltatas-${esc(s.id)}" onclick="event.preventDefault();serviceDetail('${esc(s.id)}')">${esc(s.name)}</a>`).join(" + ")}</td><td><span class="status ${b.status}">${esc(bookingStatusLabel(b))}</span></td><td><div class="table-actions"><button onclick="bookingMessage('${b.id}')">Üzenet</button>${phoneAction(bookingContact(b).phone, "Hívás")}</div></td></tr>`,
         )
         .join("") || '<tr><td colspan="5">Még nincs foglalás.</td></tr>'
     }</tbody></table></div>`;
@@ -908,7 +905,7 @@ async function guestPage() {
     const previous = bookings.filter(b => !upcoming.includes(b)).reverse();
     const card = b => {
       const url = '/foglalas?provider=' + encodeURIComponent(b.provider.id);
-      return `<article class="card item guest-booking"><h3><a href="${url}">${esc(b.provider.name)}</a></h3><p>${(b.serviceSnapshot || []).map(s => `<a href="${url}#szolgaltatas-${encodeURIComponent(s.id)}">${esc(s.name)}</a>`).join(' + ')}</p><p>${new Date(b.start).toLocaleString('hu-HU')} · <strong>${statusName[b.status] || esc(b.status)}</strong></p><p>${attendanceName(b.attendance)}${b.pricing ? ' · Fizetendő: ' + money(b.pricing.payable) : ''}</p><a href="/modositas?provider=${encodeURIComponent(b.provider.id)}&token=${encodeURIComponent(b.token)}">Foglalás részletei / módosítása →</a>${b.status === 'confirmed' && b.attendance === 'attended' ? `<p><button class="guest-review" data-id="${esc(b.id)}" data-provider="${Number(b.provider.id)}">Szolgáltató értékelése</button></p>` : ''}</article>`;
+      return `<article class="card item guest-booking"><h3><a href="${url}">${esc(b.provider.name)}</a></h3><p>${(b.serviceSnapshot || []).map(s => `<a href="${url}#szolgaltatas-${encodeURIComponent(s.id)}">${esc(s.name)}</a>`).join(' + ')}</p><p>${new Date(b.start).toLocaleString('hu-HU')} · <strong>${esc(bookingStatusLabel(b))}</strong></p><p>${attendanceName(b.attendance)}${b.pricing ? ' · Fizetendő: ' + money(b.pricing.payable) : ''}</p><a href="/modositas?provider=${encodeURIComponent(b.provider.id)}&token=${encodeURIComponent(b.token)}">Foglalás részletei / módosítása →</a>${b.status === 'confirmed' && b.attendance === 'attended' ? `<p><button class="guest-review" data-id="${esc(b.id)}" data-provider="${Number(b.provider.id)}">Szolgáltató értékelése</button></p>` : ''}</article>`;
     };
     $("#app").innerHTML = `<div class="public"><div class="brand"><span>◷</span>ráérő.</div><h1>Szia, ${esc(g.name)}!</h1><p>Saját foglalásaid, minden szolgáltatónál.</p><button onclick="guestLogout()">Kilépés</button><h2>Közelgő foglalások</h2>${upcoming.map(card).join('') || '<div class="card item">Még nincs közelgő foglalásod. Új időpontot a választott szolgáltató foglalóoldalán foglalhatsz.</div>'}<h2>Korábbi és lezárt foglalások</h2>${previous.map(card).join('') || '<div class="card item">Még nincs korábbi foglalásod.</div>'}</div>`;
     document.querySelectorAll('.guest-review').forEach(button => button.onclick = () => reviewForm(button.dataset.id, true, button.dataset.provider));

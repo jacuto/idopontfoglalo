@@ -7,6 +7,7 @@ final class Settings
         return [
             "businessMode" => "team",
             "primaryStaffId" => "anna",
+            "paymentDefaults"=>["enabled"=>true,"method"=>"cash","note"=>""],
             "slotStep"=>10,"noShowFee"=>0,"defaultServiceId"=>null,"skipUnnamedWarning"=>false,
             "openingTime" => "08:00",
             "closingTime" => "20:00",

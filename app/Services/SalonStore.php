@@ -64,10 +64,10 @@ class SalonStore
             json_decode($row->data, true, 512, JSON_THROW_ON_ERROR),
         );
     }
-    public function mutate(callable $callback): mixed
+    public function mutate(callable $callback,bool $checkGroups=true): mixed
     {
         // Lock one salon row for the whole read/check/write operation: prevents double bookings.
-        return DB::transaction(function () use ($callback) {
+        return DB::transaction(function () use ($callback,$checkGroups) {
             $row = DB::table("salon_state")
                 ->where("id", app(Tenant::class)->id)
                 ->lockForUpdate()
@@ -79,6 +79,7 @@ class SalonStore
                 json_decode($row->data, true, 512, JSON_THROW_ON_ERROR),
             );
             $before=GoogleCalendar::versions($state);
+            if($checkGroups)GroupMinimum::evaluate($state);
             $result = $callback($state);
             app(GoogleCalendar::class)->enqueue($state,$before);
             DB::table("salon_state")

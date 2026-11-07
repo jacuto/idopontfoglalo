@@ -7,7 +7,7 @@ final class GroupSessions
         $services=array_values(array_filter($s['services'],fn($v)=>in_array($v['id'],$b['services'],true)));
         if(!collect($services)->contains(fn($v)=>($v['bookingMode']??'individual')==='group'))return;
         if(count($b['services'])!==1)throw new InvalidArgumentException('Csoportos órát külön foglalj, más szolgáltatás hozzáadása nélkül.');
-        $session=collect($s['groupSessions']??[])->first(fn($g)=>empty($g['cancelled'])&&$g['serviceId']===$b['services'][0]&&$g['staff']===$b['staff']&&strtotime($g['start'])===strtotime($b['start']));
+        $session=collect($s['groupSessions']??[])->first(fn($g)=>!GroupMinimum::unavailable($g,$s)&&$g['serviceId']===$b['services'][0]&&$g['staff']===$b['staff']&&strtotime($g['start'])===strtotime($b['start']));
         if(!$session)throw new InvalidArgumentException('Válassz a meghirdetett csoportos órák közül.');
         $b['groupSessionId']=$session['id'];$b['serviceSnapshot']=[$session['serviceSnapshot']];
         if(!empty($b['guestId'])&&collect($s['bookings'])->contains(fn($v)=>($v['groupSessionId']??null)===$session['id']&&($v['guestId']??null)===$b['guestId']&&!in_array($v['status'],['cancelled','rejected'],true)&&($v['id']??null)!==($b['id']??null)))throw new InvalidArgumentException('Erre a csoportos órára már van foglalásod.');

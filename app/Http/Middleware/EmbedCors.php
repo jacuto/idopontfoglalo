@@ -10,7 +10,7 @@ class EmbedCors
         $origin = $r->header("Origin");
         $public = in_array(
             "/" . $r->path(),
-            ["/api/public", "/api/slots", "/api/bookings"],
+            ["/api/public", "/api/slots", "/api/slots/next", "/api/bookings"],
             true,
         );
         $allowed = false;

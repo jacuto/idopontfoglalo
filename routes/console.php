@@ -169,3 +169,6 @@ Artisan::command('raero:footer-import {file : A közzétenni kívánt láblécad
  try{$data=json_decode(file_get_contents($this->argument('file')),true,32,JSON_THROW_ON_ERROR);$v=\Illuminate\Support\Facades\Validator::make($data,['name'=>'required|string|max:150','email'=>'nullable|email|max:200','phone'=>'nullable|string|max:40','address'=>'nullable|string|max:500','taxNumber'=>'nullable|string|max:40','website'=>'nullable|url:https|max:500','facebook'=>'nullable|url:https|max:500','contactUrl'=>'required|url:https|max:500'])->validate();$v=\App\Services\Contact::apply($v);DB::table('platform_settings')->updateOrInsert(['id'=>2],['data'=>json_encode($v,JSON_THROW_ON_ERROR)]);$this->info('Nyilvános láblécadatok elmentve. Ezek a vendégoldalon megjelennek.');}
  catch(\Throwable){$this->error('A láblécfájl hiányzik, vagy hibás/hiányos adatokat tartalmaz.');return 1;}
 })->purpose('Nyilvános láblécadatok importja külön helyi fájlból, titkok nélkül');
+
+Artisan::command('raero:group-check',function(){$this->info(json_encode(\App\Services\GroupMinimum::run(),JSON_UNESCAPED_UNICODE));})->purpose('Csoportos órák minimumlétszámának határidős ellenőrzése');
+\Illuminate\Support\Facades\Schedule::command('raero:group-check')->everyMinute()->withoutOverlapping();

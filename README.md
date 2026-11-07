@@ -50,3 +50,5 @@ A GitHubra feltöltés **nem frissíti** a foglalo.digitmarketing.hu weboldalt. 
 A november 7-i naptárkapcsolat, export, képek, meg nem jelenés és központi levelezés: [beállítás és használat](docs/NOVEMBER7.md).
 
 [Gyors szalonfoglalás, párhuzamos szolgáltatások és csoportos órák](docs/FOGLALASI_MODOK.md).
+
+[Gyorsabb használat, csoportos minimumlétszám és rögzítésre váró befizetések](docs/GYORS_HASZNALAT.md).

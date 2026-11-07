@@ -11,13 +11,13 @@ class Notifications
     public function __construct(private Connections $connections) {}
     public function enqueue(array $booking, array $state, string $event): void
     {
-        $settings = $state["settings"];
+        $settings = $state["settings"]; $critical=$event==='group_missed';
         $booking["notificationVersion"] = $settings["notificationVersion"] ?? 1;
         $staff = collect($state["staff"])->firstWhere("id", $booking["staff"]);
         if (
             $event !== "reminder" &&
-            !empty($settings["notifyGuest"]) &&
-            !empty($booking["email"]) && in_array($settings["channel"], ["email", "mindkettő"], true)
+            ($critical||!empty($settings["notifyGuest"])) &&
+            !empty($booking["email"]) && ($critical||in_array($settings["channel"], ["email", "mindkettő"], true))
         ) {
             $this->add(
                 $booking,
@@ -30,9 +30,9 @@ class Notifications
         }
         if (
             $event !== "reminder" &&
-            !empty($settings["notifyGuest"]) &&
+            ($critical||!empty($settings["notifyGuest"])) &&
             !empty($booking["phone"]) &&
-            in_array($settings["channel"], ["sms", "mindkettő"], true)
+            ($critical&&empty($booking["email"])||in_array($settings["channel"], ["sms", "mindkettő"], true))
         ) {
             $this->add(
                 $booking,
@@ -46,7 +46,7 @@ class Notifications
         $provider = $settings["providerEmail"] ?: $staff["email"] ?? "";
         if (
             $event !== "reminder" &&
-            !empty($settings["notifyProvider"]) &&
+            !$critical&&!empty($settings["notifyProvider"]) &&
             $provider
         ) {
             $this->add($booking, $event, "email", $provider, "provider", now());
@@ -95,6 +95,10 @@ class Notifications
                 }
             }
         }
+    }
+    public function groupNotice(array $g,array $s):void {
+        $staff=collect($s['staff'])->firstWhere('id',$g['staff']);$recipient=$s['settings']['providerEmail']?:($staff['email']??'');if(!$recipient)return;
+        $payload=['kind'=>'group_notice','groupId'=>$g['id'],'version'=>$g['minimumCheckedAt'],'recipient'=>$recipient];DB::table('deliveries')->insertOrIgnore(['provider_id'=>app(Tenant::class)->id,'dedup'=>hash('sha256',json_encode($payload)),'payload'=>Crypt::encryptString(json_encode($payload)),'available_at'=>now(),'status'=>'pending','attempts'=>0,'created_at'=>now(),'updated_at'=>now()]);
     }
     private function add(
         array $b,
@@ -169,6 +173,12 @@ class Notifications
                     $this->finish($job->id, 'sent', ['attempts' => $job->attempts + 1]); $counts['sent']++; continue;
                 }
                 $s = app(SalonStore::class)->read();
+                if(($p['kind']??'')==='group_notice'){
+                    $g=collect($s['groupSessions'])->firstWhere('id',$p['groupId']);if(!$g||empty($g['cancelled'])){$this->finish($job->id,'skipped');$counts['skipped']++;continue;}
+                    if(!$this->connections->mailReady()){$this->finish($job->id,'blocked',['error'=>'Hiányzó központi SMTP-kapcsolat.','available_at'=>now()->addMinutes(5)]);$counts['blocked']++;continue;}
+                    $text=$g['serviceSnapshot']['name'].' · '.CarbonImmutable::parse($g['start'])->setTimezone('Europe/Budapest')->format('Y.m.d. H:i').' – elmarad. '.(($g['cancellationReason']??'')==='minimum'?'A minimumlétszám nem teljesült.':'Szolgáltatói lemondás.');
+                    $sent=$this->sendMail($this->connections->all(),$p['recipient'],'Csoportos óra elmarad',$text,'group_missed',rtrim(config('app.url'),'/').'/?provider='.app(Tenant::class)->id);$this->finish($job->id,$sent?'sent':'skipped');$counts[$sent?'sent':'skipped']++;continue;
+                }
                 if (($p['kind'] ?? '') === 'message') {
                     $message = collect($s['messages'])->firstWhere('id', $p['messageId']);
                     if (!$message) { $this->finish($job->id, 'skipped'); $counts['skipped']++; continue; }
@@ -187,6 +197,7 @@ class Notifications
                                     ? "notifyGuest"
                                     : "notifyProvider"
                             ] ?? false;
+                if($p['event']==='group_missed')$enabled=true;
                 if (
                     !$b ||
                     ($p["event"] === "reminder" &&
@@ -219,7 +230,7 @@ class Notifications
                 $labels = [
                     "created" => "Új foglalás",
                     "updated" => "Foglalás módosítva",
-                    "cancelled" => "Foglalás lemondva",
+                    "cancelled" => "Foglalás lemondva", "group_missed"=>"Csoportos óra elmarad",
                     "reminder" => "Közelgő időpont",
                 ];
                 $statuses = [
@@ -248,6 +259,7 @@ class Notifications
                     ) .
                     "\n" .
                     ($statuses[$b["status"]] ?? $b["status"]);
+                if($p['event']==='group_missed')$text.=($b['cancellationReason']??'')==='group_minimum'?"\nA csoportos óra elmarad, mert a minimumlétszám a határidőig nem teljesült.":"\nA szolgáltató a csoportos órát elmaradtnak jelölte.";
                 if ($p["audience"] === "guest") {
                     $text .=
                         "\nFoglalás kezelése: " .
@@ -330,13 +342,13 @@ class Notifications
         }
         return $counts;
     }
-    private function sendMail(array $c, string $recipient, string $subject, string $text): bool
+    private function sendMail(array $c, string $recipient, string $subject, string $text,string $event='message',?string $manage=null): bool
     {
         config(['mail.default' => 'smtp', 'mail.mailers.smtp.host' => $c['smtp_host'], 'mail.mailers.smtp.port' => (int) ($c['smtp_port'] ?: 587),
             'mail.mailers.smtp.username' => $c['smtp_username'] ?: null, 'mail.mailers.smtp.password' => $c['smtp_password'] ?: null,
             'mail.mailers.smtp.scheme' => (int) $c['smtp_port'] === 465 ? 'smtps' : 'smtp', 'mail.from.address' => $c['mail_from'], 'mail.from.name' => $c['mail_name'] ?: 'Ráérő']);
         Mail::purge('smtp');
-        $state=app(SalonStore::class)->read();$template=app(MailTemplates::class)->render('message',['business'=>$state['settings']['name'],'name'=>'','details'=>$text,'manage_url'=>rtrim(config('app.url'),'/').'/uzenetek','account_url'=>rtrim(config('app.url'),'/').'/fiokom','provider_url'=>rtrim(config('app.url'),'/').'/foglalas?provider='.app(Tenant::class)->id]);
+        $state=app(SalonStore::class)->read();$template=app(MailTemplates::class)->render($event,['business'=>$state['settings']['name'],'name'=>'','details'=>$text,'manage_url'=>$manage??rtrim(config('app.url'),'/').'/uzenetek','account_url'=>rtrim(config('app.url'),'/').'/fiokom','provider_url'=>rtrim(config('app.url'),'/').'/foglalas?provider='.app(Tenant::class)->id]);
         if(!$template['enabled'])return false;Mail::to($recipient)->send(new \App\Mail\NotificationMail($template['subject'],$template['html'],$state['settings']['providerEmail']??null,$state['settings']['name']));return true;
     }
     private function finish(int $id, string $status, array $extra = []): void

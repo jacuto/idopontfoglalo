@@ -58,3 +58,11 @@ Ellenőrizve: alapértelmezett szolgáltatás csak a szalonnak; megerősített n
 Valós Google-hitelesítés és éles tárhelymódosítás továbbra sem történt.
 Végső teljes MariaDB-futás a privát lábléckonfigurációval: 118 teszt, 787 állítás, mind sikeres. A láblécimport külön, kifejezetten nyilvános mezőket enged; titkos mezőt a tesztben sem tett közzé.
 A végleges, konfigurációból töltött lábléccel a workflows.cjs és calendar-offer.cjs böngészőteszt is sikeres.
+
+Gyors használati finomítások és minimumlétszám
+MySQL/MariaDB teljes futás: 134 teszt, 881 állítás, mind sikeres.
+SQLite teljes futás az új funkciókkal: 131 teszt, 840 állítás, 4 MySQL-párhuzamossági teszt kihagyva; a három további célzott teszttel a végső MySQL-futás 134 tesztet tartalmaz.
+Célzott ComfortTest: 16 teszt, 94 állítás, sikeres. Minimumhatáridő, egyszeri lemondás/értesítések, létszám teljesülése utáni egyéni lemondás, késői jelentkezés tiltása, kézi elmaradás, valódi Mailable-feldolgozás Mail-fake-kel, új vendég adatellenőrzése, telefonnormalizálás, fizetendő összeg és részfizetés, állapot-visszaállítás, bérlet és kupon újraellenőrzése, legközelebbi nap, szabadság átugrása, beágyazási CORS-védelem.
+Playwright / Chromium: comfort.cjs, workflows.cjs, refinements.cjs, guest-flow.cjs, usability.cjs és calendar-offer.cjs sikeres. A comfort.cjs az SVG fogaskerék tényleges fehér stroke-színét is ellenőrzi.
+Ellenőrizve: szélen benyúló oldalsávfül; igazított Nézet gomb; platformfüggő billentyűsúgó; rövidebb szalonűrlap; feltételes szolgáltatásmagyarázat; inline infóikonok; vendégvalidáció; állapotjavítás; fizetendő tételek/alapértelmezések/elmúlt hét; automatikus szabadnap-váltás; mobil szélesség.
+Az éles tárhelyen nem történt módosítás, valódi SMTP-/SMS-küldés és éles fizetés nem történt.

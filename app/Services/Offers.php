@@ -56,12 +56,13 @@ final class Offers
             throw new InvalidArgumentException('A lezárt látogatás állapota nem írható át. Egyeztess az üzemeltetővel.');
         }
         if (empty($old['passId'])) return;
-        if (in_array($old['status'], ['cancelled', 'rejected'], true) && !in_array($next['status'], ['cancelled', 'rejected'], true)) throw new InvalidArgumentException('Lemondott bérletes foglalás helyett vegyél fel új időpontot.');
+        $restoring=in_array($old['status'],['cancelled','rejected'],true)&&in_array($next['status'],['pending','confirmed'],true);
         foreach ($s['clientPasses'] as &$pass) {
             if ($pass['id'] !== $old['passId']) continue;
             PassValidity::recalculate($pass,$s,$next);
             if($next['start']!==$old['start'] && !in_array($next['status'],['cancelled','rejected'],true))PassValidity::check($pass,$next);
             $current = $pass['reservations'][$old['id']] ?? 'reserved';
+            if($restoring&&$current==='released'){if($pass['remaining']<1)throw new InvalidArgumentException('A bérlet alkalmai időközben elfogytak.');PassValidity::check($pass,$next);$pass['remaining']--;$pass['reservations'][$old['id']]='reserved';}
             if (in_array($next['status'], ['cancelled', 'rejected'], true) && $current === 'reserved') {
                 $pass['remaining']++;
                 $pass['reservations'][$old['id']] = 'released';
