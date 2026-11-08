@@ -821,6 +821,32 @@ A Ráérő naptára · mintaadatok|The Ráérő calendar · sample data|Der Rá�
 MINDEN, AMI AZ INDULÁSHOZ KELL|EVERYTHING YOU NEED TO GET STARTED|ALLES FÜR DEINEN START
 Saját foglaláskezelés|Manage your bookings|Eigene Buchungen verwalten`;
  for(const line of showcase.split('\n')){const p=line.trim().split('|');if(p.length===3)dictionary.set(p[0],{en:p[1],de:p[2]});}
+ const referenceStyle=`Szolgáltatóknak|For providers|Für Anbieter
+A következő időpontod|Your next appointment|Dein nächster Termin
+itt kezdődik.|starts here.|beginnt hier.
+Keress szolgáltatót,|Find a provider,|Finde einen Anbieter,
+válassz időpontot.|choose an appointment.|wähle einen Termin.
+Keress név, szolgáltatás vagy település szerint, és foglalj közvetlenül a kiválasztott szakemberhez.|Search by name, service or town, and book directly with your chosen professional.|Suche nach Name, Leistung oder Ort und buche direkt bei der gewählten Fachkraft.
+Belépés nélkül is használható|No sign-in required|Ohne Anmeldung nutzbar
+✓ Keresés regisztráció nélkül|✓ Search without registering|✓ Ohne Registrierung suchen
+✓ Naprakész szabad időpontok|✓ Up-to-date availability|✓ Aktuelle freie Termine
+✓ Közvetlen foglalás a szolgáltatóhoz|✓ Book directly with the provider|✓ Direkt beim Anbieter buchen
+Szolgáltatóként csatlakoznál?|Want to join as a provider?|Möchtest du als Anbieter starten?
+Saját foglalóoldal, naptár és vendégkezelés. Próbáld ki két hónapig díjmentesen.|Your own booking page, calendar and client management. Try it free for two months.|Eigene Buchungsseite, Kalender und Kundenverwaltung. Zwei Monate kostenlos testen.
+Kevesebb egyeztetés.|Less back and forth.|Weniger Abstimmung.
+Átláthatóbb munkanap.|A clearer working day.|Ein übersichtlicher Arbeitstag.
+A vendégeid online foglalnak. Te egy helyen kezeled az időpontokat, az elérhetőségeket és a befizetéseket.|Your clients book online. Manage appointments, contact details and payments in one place.|Deine Kunden buchen online. Verwalte Termine, Kontaktdaten und Zahlungen an einem Ort.
+További funkciók megtekintése|Show more features|Weitere Funktionen anzeigen
+Kevesebb funkció megjelenítése|Show fewer features|Weniger Funktionen anzeigen
+Egyszerű csomagok.|Simple plans.|Einfache Pakete.
+Átlátható feltételek.|Clear terms.|Klare Konditionen.
+Egyedül dolgozol vagy csapatban? Válaszd a vállalkozásodhoz illő megoldást.|Working alone or with a team? Choose the right plan for your business.|Alleine oder im Team? Wähle die passende Lösung für dein Unternehmen.
+Összes funkció|All features|Alle Funktionen
+EGYSZERŰ INDULÁS|A SIMPLE START|EINFACH STARTEN
+Mi kerülhet külön pénzbe?|What may cost extra?|Was kann zusätzlich kosten?
+A foglaláshoz nem szükséges regisztráció.|No registration is needed to book.|Für die Buchung ist keine Registrierung nötig.
+Jelképes naptárillusztráció|Symbolic calendar illustration|Symbolische Kalenderillustration`;
+ for(const line of referenceStyle.split('\n')){const p=line.trim().split('|');if(p.length===3)dictionary.set(p[0],{en:p[1],de:p[2]});}
  const patterns=[
   [/^(\d+) szolgáltató(.*)$/,m=>language==='en'?`${m[1]} providers${m[2]}`:`${m[1]} Anbieter${m[2]}`],
   [/^(\d+) találat$/,m=>language==='en'?`${m[1]} results`:`${m[1]} Treffer`],

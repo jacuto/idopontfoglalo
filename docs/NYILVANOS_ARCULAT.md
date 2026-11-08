@@ -1,12 +1,22 @@
-# Fotós, kontrasztos nyilvános megjelenés
+# Áttekinthető nyilvános oldalak
 
-A főoldal/kereső, szolgáltatói csatlakozás, árak, kapcsolat és vendégfoglaló oldal egységes, sötétzöld–krém–réz arculatot kapott. A kereső fehér, árnyékos panelként emelkedik ki, a fő műveletek meleg színű gombokat kaptak. A kártyákhoz és képekhez finom rámutatási effekt tartozik; a csökkentett mozgást kérő böngészőbeállítást tiszteletben tartjuk.
+A vizuális irányhoz a felhasználó által megadott [Reservio főoldal](https://www.reservio.com/hu) és [árazás](https://www.reservio.com/hu/arkepzes) szolgált referenciaként: világos alap, kék kiemelések, egyszerű hierarchia és könnyen összevethető csomagok. A saját megjelenéshez saját szövegek és jelképes, helyben rajzolt SVG-naptár tartozik; más szolgáltató képei, logói, ügyfélszámai és értékelései nem kerültek át.
 
-A `salon-editorial.webp` és `training-editorial.webp` erre a bemutatóra generált marketing-hangulatképek. Nem valós szolgáltatói referenciafotók vagy ügyfélajánlások. A `product-calendar.webp` a rendszer tényleges naptárának képernyőképe kizárólag helyben létrehozott, nem mentett mintaadatokkal. A képek helyi WebP-fájlok, megjelenítésükhöz nem kell külső képoldalt felkeresni. A szolgáltató saját borítóképét nem írjuk felül: ha nincs saját kép, a foglalóoldal külön jelölt hangulatképet mutat.
+A korábbi generált szalon- és edzőfotók, illetve a tényleges alkalmazásról készített naptárkép kikerültek a csomagból. A szolgáltatók saját feltöltött fotóit továbbra is megjelenítjük. Saját borítókép hiányában jelképes naptár látható, mobilon ez háttérbe szorul, hogy a foglalás gyorsan elérhető legyen.
 
-A működő kereső, regisztrációs és foglalási űrlapok eseménykezelői megmaradnak. Nincs új adatbázismigráció, Composer-függőség vagy `.env`-változó. Nincsenek kitalált ügyfélszámok, értékelések vagy garanciák a bemutatóban.
+## Keresés belépés nélkül
 
-Frissítéshez a teljes csomagból a `resources/views/app.blade.php`, `public/showcase.js`, `public/showcase.css`, `public/i18n.js` és a három új `public/images/*.webp` fájl is kerüljön fel. A lap sablonja fájlmódosítási idővel verziózza a stílust és a JavaScriptet. Feltöltés után:
+A `/` és `/szolgaltatok` oldalon közvetlenül megnyílik a kereső. A főoldal megnyitásakor nem kell a privát `/api/state` végpontot lekérdezni, és a nyilvános oldal bejelentkezett szolgáltatóként is megnyitható. A szolgáltatói munkaterület továbbra is a `/?provider=AZONOSÍTÓ` címen érhető el.
+
+A keresőmezők fehérek, határozott kékesszürke kerettel, külön halványkék keresőpanelen. Fókuszban erősebb kék körvonal jelenik meg. A főoldal külön jelzi, hogy a kereséshez nem szükséges belépés. Név, kategória és település szerinti keresés, helymeghatározás és közvetlen foglalás megmarad.
+
+## Kevesebb részlet egyszerre
+
+A szolgáltatói oldalon először négy alapvető funkció jelenik meg; a továbbiak külön gombbal nyithatók meg. A három csomag fő előnyei rögtön látszanak, az összes funkció és a külön díjas tételek lenyithatók. A meglévő díjak változatlanok: Alap 4 000 Ft/hó, Csapat és Egyedi ajánlatkéréses. Előfizetési és számlázási működés nem módosul.
+
+## Feltöltés
+
+Nincs adatbázismigráció, új Composer-függőség vagy `.env`-változó. A csomagból a `public/showcase.js`, `public/showcase.css`, `public/i18n.js`, `public/boot.js` és a sablon is kerüljön fel. Az előző kiadás képfájljai esetleg megmaradhatnak a tárhelyen, de ez a változat már nem hivatkozik rájuk. Az `.env` és `storage` tartalmát őrizd meg.
 
 ```bash
 cd /home/digitmar/idopontfoglalo-php &&
@@ -14,4 +24,4 @@ php artisan optimize:clear &&
 php artisan view:cache
 ```
 
-Böngészőben Ctrl+F5. Az `.env` és `storage` tartalmát továbbra is őrizd meg.
+Böngészőben Ctrl+F5. A nézetek gyorsítótárazását feltöltés után kell elvégezni.

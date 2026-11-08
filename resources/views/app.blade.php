@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="/showcase.css?v={{ filemtime(public_path('showcase.css')) }}" />
   </head>
   <body>
-    <header class="visitor-header"><a class="visitor-brand" href="/" aria-label="Ráérő főoldal"><span>◷</span> ráérő.</a><details class="visitor-menu"><summary>Menü <span aria-hidden="true">☰</span></summary><nav aria-label="Felső menü"><a href="/szolgaltato">Csatlakozom</a><a href="/arak">Árak</a><a href="/kapcsolat">Kapcsolat</a><a class="booking-nav" href="/szolgaltatok">Időpontfoglalás</a><a class="visitor-account" href="/fiokom">Saját fiókom</a></nav></details></header>
+    <header class="visitor-header"><a class="visitor-brand" href="/" aria-label="Ráérő főoldal"><span>◷</span> ráérő.</a><details class="visitor-menu"><summary>Menü <span aria-hidden="true">☰</span></summary><nav aria-label="Felső menü"><a href="/szolgaltato">Szolgáltatóknak</a><a href="/arak">Árak</a><a href="/kapcsolat">Kapcsolat</a><a class="booking-nav" href="/szolgaltatok">Időpontfoglalás</a><a class="visitor-account" href="/fiokom">Saját fiókom</a></nav></details></header>
     <div id="app"></div>
     <footer class="site-footer">Copyright 2026 <a href="https://digitmarketing.hu/">digitmarketing.hu</a></footer>
     <dialog id="modal"></dialog>
