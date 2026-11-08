@@ -809,6 +809,18 @@ A jelenlegi jelszó hibás.|The current password is incorrect.|Das aktuelle Pass
 Túl sok kérés. Próbáld újra később.|Too many requests. Try again later.|Zu viele Anfragen. Versuche es später erneut.
 `;
  for(const line of followup.split('\n')){const p=line.trim().split('|');if(p.length===3)dictionary.set(p[0],{en:p[1],de:p[2]});}
+ const showcase=`A napod kézben.|Your day, under control.|Dein Tag im Griff.
+A vendégeid jó helyen.|Your clients, in good hands.|Deine Kunden in guten Händen.
+Hangulatkép|Illustrative scene|Stimmungsbild
+Felfedezem a szolgáltatókat|Explore providers|Anbieter entdecken
+Szakember a közeledben|Professionals nearby|Fachkräfte in deiner Nähe
+Valóban szabad időpontok|Available appointments|Verfügbare Termine
+Foglalás néhány kattintással|Book in a few clicks|Mit wenigen Klicks buchen
+Ráérő · Naptár|Ráérő · Calendar|Ráérő · Kalender
+A Ráérő naptára · mintaadatok|The Ráérő calendar · sample data|Der Ráérő-Kalender · Beispieldaten
+MINDEN, AMI AZ INDULÁSHOZ KELL|EVERYTHING YOU NEED TO GET STARTED|ALLES FÜR DEINEN START
+Saját foglaláskezelés|Manage your bookings|Eigene Buchungen verwalten`;
+ for(const line of showcase.split('\n')){const p=line.trim().split('|');if(p.length===3)dictionary.set(p[0],{en:p[1],de:p[2]});}
  const patterns=[
   [/^(\d+) szolgáltató(.*)$/,m=>language==='en'?`${m[1]} providers${m[2]}`:`${m[1]} Anbieter${m[2]}`],
   [/^(\d+) találat$/,m=>language==='en'?`${m[1]} results`:`${m[1]} Treffer`],

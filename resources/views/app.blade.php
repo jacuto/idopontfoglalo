@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Ráérő — időpontok egyszerűen</title>
     <link rel="stylesheet" href="/style.css?v={{ filemtime(public_path('style.css')) }}" />
+    <link rel="stylesheet" href="/showcase.css?v={{ filemtime(public_path('showcase.css')) }}" />
   </head>
   <body>
     <header class="visitor-header"><a class="visitor-brand" href="/" aria-label="Ráérő főoldal"><span>◷</span> ráérő.</a><details class="visitor-menu"><summary>Menü <span aria-hidden="true">☰</span></summary><nav aria-label="Felső menü"><a href="/szolgaltato">Csatlakozom</a><a href="/arak">Árak</a><a href="/kapcsolat">Kapcsolat</a><a class="booking-nav" href="/szolgaltatok">Időpontfoglalás</a><a class="visitor-account" href="/fiokom">Saját fiókom</a></nav></details></header>
@@ -29,6 +30,7 @@
     <script src="/discovery.js?v={{ filemtime(public_path('discovery.js')) }}" defer></script>
     <script src="/growth.js?v={{ filemtime(public_path('growth.js')) }}" defer></script>
     <script src="/followup.js?v={{ filemtime(public_path('followup.js')) }}" defer></script>
+    <script src="/showcase.js?v={{ filemtime(public_path('showcase.js')) }}" defer></script>
     <script src="/boot.js?v={{ filemtime(public_path('boot.js')) }}" defer></script>
   </body>
 </html>

@@ -63,3 +63,5 @@ A november 7-i naptárkapcsolat, export, képek, meg nem jelenés és központi 
 A november 8-i vendégfiók-, ismétlődés-, feketelista-, értékelés- és nyelvi bővítés: [útmutató](docs/NOVEMBER8_PLUS.md).
 
 Az ismétlődés és szolgáltatói belépés folytatása: [útmutató](docs/ISMETLODES_ES_BELEPES.md).
+
+Fotós nyilvános arculat: [részletek és feltöltés](docs/NYILVANOS_ARCULAT.md).
