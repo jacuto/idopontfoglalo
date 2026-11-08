@@ -2,6 +2,7 @@
 use App\Http\Controllers\SalonController;
 use App\Http\Middleware\ApiHeaders;
 use Illuminate\Support\Facades\Route;
+Route::get('/api/providers',[\App\Http\Controllers\ProviderDirectoryController::class,'index'])->middleware('throttle:60,1');
 Route::get('/meghivo/{token}',[\App\Http\Controllers\InvitationController::class,'open'])->where('token','[a-f0-9]{64}');
 Route::post('/api/guest/invitations/claim',[\App\Http\Controllers\InvitationController::class,'claim']);
 Route::match(['GET','PUT'],'/api/guest/billing',[\App\Http\Controllers\GuestFeaturesController::class,'billing']);
@@ -79,3 +80,5 @@ Route::any("/api/{path}", [SalonController::class, "handle"])
 Route::view("/", "app");
 Route::view("/foglalas", "app");
 Route::view("/modositas", "app");
+
+foreach(['/szolgaltatok','/szolgaltato','/arak','/kapcsolat'] as $page)Route::view($page,'app');

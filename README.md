@@ -2,6 +2,7 @@
 
 A **jacuto/idopontfoglalo meglévő PHP/Laravel alkalmazásának továbbfejlesztése**, nem külön demó. PHP 8.2+, Laravel 12, MySQL/MariaDB. Nincs Node.js-build vagy Passenger-követelmény.
 
+- [Főadmin oldalsáv, szolgáltatókeresők és vendégoldali felső menü](docs/NAVIGACIO.md)
 - [Egyszerűbb űrlapok, szakmai kapcsolók, QR és vendégfiók – november 8.](docs/NOVEMBER8.md)
 - [Napi használati finomítások, 21 napos határidő és mintaadatok](docs/FINOMITASOK.md)
 - [Google-/Facebook-alkalmazásadatok megkeresése](docs/BELEPES.md)
@@ -14,7 +15,9 @@ A **jacuto/idopontfoglalo meglévő PHP/Laravel alkalmazásának továbbfejleszt
 
 | Felület | Cím |
 |---|---|
-| Eredeti vállalkozás | `/` |
+| Közös kezdőoldal / belépett szolgáltató munkatere | `/` |
+| Szolgáltatókereső | `/szolgaltatok` |
+| Eredeti vállalkozás belépése | `/szolgaltato?provider=1` |
 | Másik vállalkozás | `/?provider=2` |
 | Nyilvános adatlap és foglalás | `/foglalas?provider=2` |
 | Vendégfiók és szolgáltatóválasztás | `/fiokom?provider=2` |
