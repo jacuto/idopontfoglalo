@@ -774,6 +774,41 @@ Megadom a nevet|Enter a name|Namen eingeben
 Mentés név nélkül|Save without a name|Ohne Namen speichern
 `;
  for(const line of operational.split('\n')){const p=line.trim().split('|');if(p.length===3)dictionary.set(p[0],{en:p[1],de:p[2]});}
+ const followup=`Találj szakembert.|Find a professional.|Finde die passende Fachkraft.
+Foglalj időpontot.|Book an appointment.|Buche einen Termin.
+Fodrász, masszőr, edző vagy más szakember — keress a közeledben, nézd meg a szolgáltatásokat, és válassz szabad időpontot.|Hairdresser, massage therapist, trainer or another professional — search nearby, browse services and choose an available appointment.|Friseur, Masseur, Trainer oder eine andere Fachkraft — suche in deiner Nähe, vergleiche Leistungen und wähle einen freien Termin.
+Szolgáltatások kategóriánként|Services by category|Leistungen nach Kategorie
+Foglalható szolgáltatók|Providers accepting bookings|Anbieter mit Onlinebuchung
+Saját vállalkozásod van?|Running your own business?|Du hast ein eigenes Unternehmen?
+Legyen saját foglalóoldalad.|Get your own booking page.|Erstelle deine eigene Buchungsseite.
+Időpontok, vendégek,|Appointments, clients,|Termine, Kunden,
+egy munkaterületen.|one workspace.|ein Arbeitsbereich.
+Csomagok és árak|Plans and pricing|Pakete und Preise
+Külön díjas tételek|Additional charges|Zusätzliche Kosten
+Kezdőnap|Start date|Startdatum
+Végdátum (nem kötelező)|End date (optional)|Enddatum (optional)
+Korlátlan|Unlimited|Unbegrenzt
+0 vagy üres darabszám és üres végdátum: folyamatos ismétlés. A rendszer egy évre előre készíti el az alkalmakat, majd naponta bővíti a sorozatot.|Zero or an empty count with no end date means ongoing repetition. Appointments are created one year ahead and the series is extended daily.|Null oder eine leere Anzahl ohne Enddatum bedeutet eine fortlaufende Wiederholung. Termine werden ein Jahr im Voraus erstellt und täglich ergänzt.
+Felhívom|Call|Anrufen
+Elfelejtett jelszó|Forgot password|Passwort vergessen
+Új jelszó|New password|Neues Passwort
+Jelszó megváltoztatása|Change password|Passwort ändern
+Jelenlegi jelszó|Current password|Aktuelles Passwort
+Új jelszó még egyszer|Repeat new password|Neues Passwort wiederholen
+Visszaállító levél kérése|Send reset email|E-Mail zum Zurücksetzen senden
+Jelszó mentése|Save password|Passwort speichern
+Jelszó mentve.|Password saved.|Passwort gespeichert.
+Belépés és biztonság|Login and security|Anmeldung und Sicherheit
+Jelszó beállítása e-mailben|Set a password by email|Passwort per E-Mail festlegen
+A közösségi fiók összekapcsolása után azzal is beléphetsz ebbe a vállalkozásba.|Link a social account to use it to sign in to this business.|Verknüpfe ein Social-Media-Konto, um dich damit bei diesem Unternehmen anzumelden.
+A közösségi belépés központi beállítása még nem készült el.|Social sign-in has not been configured by the platform yet.|Die Plattform hat die Anmeldung über soziale Netzwerke noch nicht eingerichtet.
+Közösségi fiók ellenőrizve. Add meg a vállalkozás adatait a csatlakozáshoz.|Social account verified. Enter your business details to join.|Social-Media-Konto bestätigt. Gib deine Unternehmensdaten ein, um dich zu registrieren.
+Ha van ilyen szolgáltatói fiók, a visszaállító levél küldési sorba került.|If a matching provider account exists, a reset email has been queued.|Falls ein passendes Anbieterkonto existiert, wurde eine E-Mail zum Zurücksetzen eingeplant.
+Sorozat leállítása|Stop series|Serie beenden
+A jelenlegi jelszó hibás.|The current password is incorrect.|Das aktuelle Passwort ist falsch.
+Túl sok kérés. Próbáld újra később.|Too many requests. Try again later.|Zu viele Anfragen. Versuche es später erneut.
+`;
+ for(const line of followup.split('\n')){const p=line.trim().split('|');if(p.length===3)dictionary.set(p[0],{en:p[1],de:p[2]});}
  const patterns=[
   [/^(\d+) szolgáltató(.*)$/,m=>language==='en'?`${m[1]} providers${m[2]}`:`${m[1]} Anbieter${m[2]}`],
   [/^(\d+) találat$/,m=>language==='en'?`${m[1]} results`:`${m[1]} Treffer`],
@@ -816,5 +851,6 @@ Mentés név nélkül|Save without a name|Ohne Namen speichern
  window.raeroApplyLanguage=apply;
  observer=new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(apply,30);});apply();
  document.addEventListener('invalid',event=>{const field=event.target;if(!field.setCustomValidity)return;if(field.validity.customError)field.setCustomValidity(translate(field.validationMessage));else if(field.validity.valueMissing)field.setCustomValidity(translate('Töltsd ki ezt a mezőt.'));},true);
+ document.addEventListener('change',event=>{if(event.target.setCustomValidity)event.target.setCustomValidity('');},true);
  document.addEventListener('input',event=>{if(event.target.setCustomValidity)event.target.setCustomValidity('');},true);
 })();

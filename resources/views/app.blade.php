@@ -28,6 +28,7 @@
     <script src="/navigation.js?v={{ filemtime(public_path('navigation.js')) }}" defer></script>
     <script src="/discovery.js?v={{ filemtime(public_path('discovery.js')) }}" defer></script>
     <script src="/growth.js?v={{ filemtime(public_path('growth.js')) }}" defer></script>
+    <script src="/followup.js?v={{ filemtime(public_path('followup.js')) }}" defer></script>
     <script src="/boot.js?v={{ filemtime(public_path('boot.js')) }}" defer></script>
   </body>
 </html>

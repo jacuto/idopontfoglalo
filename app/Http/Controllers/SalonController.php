@@ -200,7 +200,7 @@ class SalonController
                 }
                 RateLimiter::hit($key, 60);
                 $data = $request->validate([
-                    "recurrence"=>"nullable|array:frequency,count","recurrence.frequency"=>"required_with:recurrence|in:daily,weekly,fortnightly,monthly","recurrence.count"=>"required_with:recurrence|integer|between:2,52",
+                    "recurrence"=>"nullable|array:frequency,count,startDate,endDate","recurrence.frequency"=>"required_with:recurrence|in:daily,weekly,fortnightly,monthly","recurrence.count"=>"nullable|integer|between:0,5200","recurrence.startDate"=>"nullable|date_format:Y-m-d","recurrence.endDate"=>"nullable|date_format:Y-m-d",
                     "clientId" => "nullable|string|max:80",
                     "coupon" => "nullable|string|max:80",
                     "passId" => "nullable|string|max:80",
@@ -218,8 +218,11 @@ class SalonController
                     if(!$rule)return $this->createBooking($s,$data,$admin,$request);
                     abort_unless($admin&&!$request->boolean('public'),403,'Ismétlődő időpontot a szolgáltató vehet fel.');
                     foreach($data['services']??[] as $id)if(($this->rules->service($s['services'],$id)['bookingMode']??'individual')==='group')throw new InvalidArgumentException('Csoportos órára külön meghirdetett alkalmat válassz.');
+                    if(!empty($rule['startDate'])){$clock=CarbonImmutable::parse($data['start'])->setTimezone('Europe/Budapest')->format('H:i');$first=CarbonImmutable::parse($rule['startDate'].' '.$clock,'Europe/Budapest');if($first->format('H:i')!==$clock)throw new InvalidArgumentException('Az óraátállítás miatt nem létezik a kezdési idő.');$data['start']=$first->utc()->toISOString();}
+                    if(!empty($rule['endDate'])&&$rule['endDate']<CarbonImmutable::parse($data['start'])->setTimezone('Europe/Budapest')->format('Y-m-d'))throw new InvalidArgumentException('A végdátum nem lehet a kezdőnap előtt.');
                     $series=(string)Str::uuid();$created=[];
                     foreach(\App\Services\RecurringBookings::starts($data['start'],$rule) as $i=>$at){try{$next=$this->createBooking($s,array_replace($data,['start'=>$at]),$admin,$request);}catch(InvalidArgumentException $e){throw new InvalidArgumentException('A sorozat '.CarbonImmutable::parse($at)->setTimezone('Europe/Budapest')->format('Y.m.d. H:i').' alkalmát nem lehet menteni: '.$e->getMessage());}$n=count($s['bookings'])-1;$s['bookings'][$n]['seriesId']=$series;$s['bookings'][$n]['seriesIndex']=$i+1;$created[]=$s['bookings'][$n];}
+                    $s['recurringSeries'][$series]=array_replace($rule,['start'=>$data['start'],'template'=>array_replace($data,['services'=>$created[0]['services'],'clientId'=>$created[0]['clientId']??null]),'nextIndex'=>count($created),'active'=>true,'error'=>null]);
                     return array_replace($created[0],['seriesCount'=>count($created),'createdIds'=>array_column($created,'id')]);
                 });
                 return response()->json($b, 201);
@@ -674,7 +677,7 @@ class SalonController
             );
         }
         $tenant = app(\App\Services\Tenant::class)->id;
-        $hash = $tenant === 1 ? config("raero.admin_password_hash") : \Illuminate\Support\Facades\DB::table("providers")->where("id", $tenant)->value("password_hash");
+        $hash = \App\Services\ProviderPasswords::hash($tenant);
         if (!$hash) {
             return response()->json(
                 [
@@ -689,12 +692,10 @@ class SalonController
             return response()->json(["error" => "Hibás jelszó."], 401);
         }
         RateLimiter::clear($key);
-        $request->session()->regenerate();
-        $request->session()->put("admin", true);
-        $request->session()->put("provider_id", $tenant);
+        \App\Services\ProviderIdentity::signIn($request,$tenant,'password');
         return response()->json(["ok" => true]);
     }
-    private function createBooking(array &$s,array $data,bool $admin,Request $request):array
+    public function createBooking(array &$s,array $data,bool $admin,Request $request):array
     {
                     $b = array_merge($data, [
                         "phone" => $data["phone"] ?? "",

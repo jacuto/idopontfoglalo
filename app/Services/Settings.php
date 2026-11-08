@@ -52,7 +52,7 @@ final class Settings
         $defaults["primaryStaffId"] = $state["staff"][0]["id"] ?? "";
         $state["settings"] = array_replace($defaults, $old);
         $state += [
-            "availability" => Availability::defaults(), "groupSessions"=>[],
+            "availability" => Availability::defaults(), "groupSessions"=>[], "recurringSeries"=>[],
             "payments" => [],
             "checkouts" => [],
             "invoiceRequests" => [],

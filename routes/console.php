@@ -175,3 +175,6 @@ Artisan::command('raero:group-check',function(){$this->info(json_encode(\App\Ser
 
 Artisan::command('raero:review-requests',function(){$this->info((string)\App\Services\ReviewRequests::run());})->purpose('Értékeléskérések sorba állítása igazolt látogatások után');
 \Illuminate\Support\Facades\Schedule::command('raero:review-requests')->hourly()->withoutOverlapping();
+
+Artisan::command('raero:recurring',function(){$this->info((string)\App\Services\RecurringBookings::run());})->purpose('Ismétlődő sorozatok következő alkalmai');
+\Illuminate\Support\Facades\Schedule::command('raero:recurring')->dailyAt('00:10')->withoutOverlapping();

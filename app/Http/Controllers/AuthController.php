@@ -33,7 +33,8 @@ class AuthController
             strtr(base64_encode(random_bytes(48)), "+/", "-_"),
             "=",
         );
-        $mode = $r->query("mode") === "admin" ? "admin" : "guest";
+        $mode = in_array($r->query("mode"),["admin","provider","provider-link"],true)?$r->query("mode"):"guest";
+        if($mode==='provider-link')abort_unless($r->session()->get('admin')===true&&(int)$r->session()->get('provider_id',1)===app(\App\Services\Tenant::class)->id,403);
         $photo=null;if($r->query('mode')==='photo'){
             abort_unless($r->session()->get('admin')===true&&(int)$r->session()->get('provider_id',1)===app(\App\Services\Tenant::class)->id,403);
             $target=$r->query('target');$entity=$r->query('entityId');abort_unless(in_array($target,['logo','staff'],true),422);if($target==='staff')abort_unless(is_string($entity)&&collect(app(\App\Services\SalonStore::class)->read()['staff'])->contains(fn($p)=>$p['id']===$entity&&empty($p['archived'])),404);$photo=['target'=>$target,'entity'=>$entity];$mode='photo';
@@ -98,7 +99,7 @@ class AuthController
             return redirect("/fiokom?authError=state");
         }
         app(\App\Services\Tenant::class)->id = (int) ($saved["tenant"] ?? 1);
-        $target = $saved["mode"] === "admin" ? "/" : "/fiokom";
+        $target = in_array($saved["mode"],["provider","provider-link"],true)?"/belepes":($saved["mode"] === "admin" ? "/" : "/fiokom");
         $c = app(Connections::class)->all();
         $uri =
             rtrim(config("app.url"), "/") . "/auth/" . $provider . "/callback";
@@ -161,6 +162,7 @@ class AuthController
                 $ok=app(\App\Services\BusinessAvatar::class)->import(app(\App\Services\Tenant::class)->id,$photo['target'],$photo['entity'],$provider,$picture,true);
                 return redirect('/?provider='.app(\App\Services\Tenant::class)->id.'&'.($photo['target']==='staff'?'staffPhotos':'profilePhotos').'=1&'.($ok?'photoUpdated=1':'photoError=unavailable'));
             }
+            if(in_array($saved['mode'],['provider','provider-link'],true))return \App\Services\ProviderIdentity::complete($r,$provider,$id,filter_var($user['email']??'',FILTER_VALIDATE_EMAIL)?$user['email']:null,$user['name']??'',$saved['mode'],app(\App\Services\Tenant::class)->id);
             if ($saved["mode"] === "admin") {
                 $allowed =
                     $provider === "google"
@@ -186,12 +188,11 @@ class AuthController
                             ),
                             true,
                         );
+                $allowed=$allowed&&app(\App\Services\Tenant::class)->id===1;
                 if (!$allowed) {
                     return redirect("/?authError=denied");
                 }
-                $r->session()->regenerate();
-                $r->session()->put("admin", true);
-                $r->session()->put("provider_id", app(\App\Services\Tenant::class)->id);
+                \App\Services\ProviderIdentity::signIn($r,app(\App\Services\Tenant::class)->id);
                 $picture=$provider==='google'?($user['picture']??null):(empty($user['picture']['data']['is_silhouette'])?($user['picture']['data']['url']??null):null);
                 app(\App\Services\BusinessAvatar::class)->import(app(\App\Services\Tenant::class)->id,'logo',null,$provider,$picture);
                 return redirect(app(\App\Services\Tenant::class)->id === 1 ? "/" : "/?provider=" . app(\App\Services\Tenant::class)->id);
@@ -272,6 +273,7 @@ class AuthController
         }
         usort($allBookings, fn($a, $b) => strcmp($a['start'], $b['start']));
         return response()->json([
+            "passwordAccount"=>DB::table("guest_credentials")->where("guest_id",$account->id)->exists(),
             "providers" => $providers,
             "allBookings" => $allBookings,
             "id" => $account->id,

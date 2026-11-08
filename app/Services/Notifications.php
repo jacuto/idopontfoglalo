@@ -172,6 +172,7 @@ class Notifications
                     app(Newsletters::class)->send($p['recipient'],$template['subject'],$template['html'],true);
                     $this->finish($job->id, 'sent', ['attempts' => $job->attempts + 1]); $counts['sent']++; continue;
                 }
+                if(($p['kind']??'')==='provider_reset'){$status=ProviderPasswords::deliver($p['tokenId']);$this->finish($job->id,$status,$status==='blocked'?['error'=>'Hiányzó központi SMTP-kapcsolat.','available_at'=>now()->addMinutes(5)]:[]);$counts[$status]++;continue;}
                 if(($p['kind']??'')==='guest_auth'){$status=GuestPasswords::deliver($p['tokenId']);$this->finish($job->id,$status,$status==='blocked'?['error'=>'Hiányzó központi SMTP-kapcsolat.','available_at'=>now()->addMinutes(5)]:[]);$counts[$status]++;continue;}
                 $s = app(SalonStore::class)->read();
                 if(($p['kind']??'')==='review_request'){$status=ReviewRequests::deliver($p['bookingId'],$s,!empty($p['automatic']));$this->finish($job->id,$status,$status==='blocked'?['error'=>'Hiányzó központi SMTP-kapcsolat.','available_at'=>now()->addMinutes(5)]:[]);$counts[$status]++;continue;}
