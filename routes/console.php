@@ -172,3 +172,6 @@ Artisan::command('raero:footer-import {file : A közzétenni kívánt láblécad
 
 Artisan::command('raero:group-check',function(){$this->info(json_encode(\App\Services\GroupMinimum::run(),JSON_UNESCAPED_UNICODE));})->purpose('Csoportos órák minimumlétszámának határidős ellenőrzése');
 \Illuminate\Support\Facades\Schedule::command('raero:group-check')->everyMinute()->withoutOverlapping();
+
+Artisan::command('raero:review-requests',function(){$this->info((string)\App\Services\ReviewRequests::run());})->purpose('Értékeléskérések sorba állítása igazolt látogatások után');
+\Illuminate\Support\Facades\Schedule::command('raero:review-requests')->hourly()->withoutOverlapping();

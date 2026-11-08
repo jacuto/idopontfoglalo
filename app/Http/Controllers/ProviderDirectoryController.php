@@ -6,9 +6,9 @@ use Illuminate\Support\Facades\{DB,Cache};
 use Illuminate\Validation\Rule;
 final class ProviderDirectoryController
 {
- public const CACHE_KEY='public-directory-catalog-v4';
+ public const CACHE_KEY='public-directory-catalog-v5';
  public function index(Request $r){
-  $v=$r->validate(['q'=>'nullable|string|max:100','city'=>'nullable|string|max:100','category'=>['nullable',Rule::in(array_keys(Discovery::CATEGORIES))],'page'=>'nullable|integer|min:1|max:10000']);$q=Discovery::fold($v['q']??'');$city=Discovery::fold($v['city']??'');$category=$v['category']??'';$page=(int)($v['page']??1);$limit=24;
+  $v=$r->validate(['q'=>'nullable|string|max:100','city'=>'nullable|string|max:100','category'=>['nullable',Rule::in(array_keys(Discovery::CATEGORIES))],'page'=>'nullable|integer|min:1|max:10000','sort'=>'nullable|in:name,price_asc,price_desc']);$q=Discovery::fold($v['q']??'');$city=Discovery::fold($v['city']??'');$category=$v['category']??'';$page=(int)($v['page']??1);$limit=24;$sort=$v['sort']??'name';
   // Cache only an explicit public projection, shared by all filter combinations.
   $catalog=Cache::remember(self::CACHE_KEY,60,function(){
    $items=[];$active=DB::table('providers')->where('active',true)->pluck('id')->all();
@@ -18,6 +18,7 @@ final class ProviderDirectoryController
   $towns=[];$counts=array_fill_keys(array_keys(Discovery::CATEGORIES),0);foreach($catalog as $item){if($item['city']!=='')$towns[$item['city']]=true;foreach($item['categories'] as $c)$counts[$c]++;}
   $cities=array_keys($towns);usort($cities,fn($a,$b)=>Discovery::fold($a)<=>Discovery::fold($b));
   $filtered=array_values(array_filter($catalog,fn($item)=>($city===''||Discovery::fold($item['city'])===$city)&&($category===''||in_array($category,$item['categories'],true))&&($q===''||str_contains(Discovery::fold($item['name'].' '.$item['profession'].' '.$item['city'].' '.$item['address'].' '.implode(' ',$item['services'])),$q))));
-  return response()->json(['items'=>array_slice($filtered,($page-1)*$limit,$limit),'total'=>count($filtered),'page'=>$page,'pages'=>(int)ceil(count($filtered)/$limit),'cities'=>$cities,'categories'=>array_map(fn($id,$name)=>['id'=>$id,'name'=>$name,'count'=>$counts[$id]],array_keys(Discovery::CATEGORIES),array_values(Discovery::CATEGORIES))])->header('Cache-Control','public, max-age=60');
+  usort($filtered,fn($a,$b)=>($sort==='price_asc'?($a['minPrice']<=>$b['minPrice']):($sort==='price_desc'?($b['minPrice']<=>$a['minPrice']):0))?:((Discovery::fold($a['name'])<=>Discovery::fold($b['name']))?:($a['id']<=>$b['id'])));
+  return response()->json(['items'=>array_slice($filtered,($page-1)*$limit,$limit),'total'=>count($filtered),'catalogTotal'=>count($catalog),'page'=>$page,'pages'=>(int)ceil(count($filtered)/$limit),'cities'=>$cities,'categories'=>array_map(fn($id,$name)=>['id'=>$id,'name'=>$name,'count'=>$counts[$id]],array_keys(Discovery::CATEGORIES),array_values(Discovery::CATEGORIES))])->header('Cache-Control','public, max-age=60');
  }
 }

@@ -59,3 +59,5 @@ A november 7-i naptárkapcsolat, export, képek, meg nem jelenés és központi 
 [Gyors szalonfoglalás, párhuzamos szolgáltatások és csoportos órák](docs/FOGLALASI_MODOK.md).
 
 [Gyorsabb használat, csoportos minimumlétszám és rögzítésre váró befizetések](docs/GYORS_HASZNALAT.md).
+
+A november 8-i vendégfiók-, ismétlődés-, feketelista-, értékelés- és nyelvi bővítés: [útmutató](docs/NOVEMBER8_PLUS.md).

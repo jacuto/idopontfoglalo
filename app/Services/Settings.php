@@ -7,6 +7,7 @@ final class Settings
         return [
             "businessMode" => "team",
             "primaryStaffId" => "anna",
+            "reviewRequestsEnabled"=>false,"reviewRequestDelayHours"=>24,
             "advancedBookingEnabled"=>false,"servicePhasesEnabled"=>false,"couponsEnabled"=>true,"passesEnabled"=>true,"guestInvitationPolicy"=>"none",
             "paymentDefaults"=>["enabled"=>true,"method"=>"cash","note"=>""],
             "slotStep"=>10,"noShowFee"=>0,"defaultServiceId"=>null,"skipUnnamedWarning"=>false,

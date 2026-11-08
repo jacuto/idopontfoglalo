@@ -1,0 +1,23 @@
+<?php
+namespace App\Http\Controllers;
+use App\Services\{GuestPasswords,Tenant,Contact};
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\{DB,Hash,RateLimiter};
+use Illuminate\Validation\ValidationException;
+final class GuestPasswordController{
+ public function handle(Request $r,string $action){
+  if($action==='register'){
+   $v=$r->validate(['name'=>'sometimes|string|max:150','email'=>'required|email|max:200','phone'=>'nullable|string|max:40','locale'=>'sometimes|in:hu,en,de']);$v=Contact::apply($v);
+   try{DB::transaction(function()use($v,$r){if(DB::table('guest_credentials')->where('email',$v['email'])->exists())throw ValidationException::withMessages(['email'=>'Ezzel az e-mail-címmel már van jelszavas vendégfiók. Lépj be, vagy kérj új jelszót.']);$subject=hash('sha256',$v['email']);$guest=DB::table('guest_accounts')->insertGetId(['provider'=>'email','subject'=>$subject,'name'=>$v['name']??'Vendég','email'=>$v['email'],'contact_email'=>$v['email'],'phone'=>$v['phone']??'','email_verified'=>false,'created_at'=>now(),'updated_at'=>now()]);$id=DB::table('guest_credentials')->insertGetId(['guest_id'=>$guest,'email'=>$v['email'],'password_hash'=>Hash::make(bin2hex(random_bytes(32))),'locale'=>$v['locale']??'hu','created_at'=>now(),'updated_at'=>now()]);GuestPasswords::queue(DB::table('guest_credentials')->find($id),'verify',app(Tenant::class)->id,$this->destination($r));});}catch(\Illuminate\Database\QueryException $e){if(DB::table('guest_credentials')->where('email',$v['email'])->exists())throw ValidationException::withMessages(['email'=>'Ezzel az e-mail-címmel már van jelszavas vendégfiók. Lépj be, vagy kérj új jelszót.']);throw $e;}return response()->json(['verificationRequired'=>true],201);
+  }
+  if($action==='login'){
+   $v=$r->validate(['email'=>'required|email|max:200','password'=>'required|string|max:200']);$key='guest-password-login:'.$r->ip().':'.hash('sha256',Contact::email($v['email']));abort_if(RateLimiter::tooManyAttempts($key,5),429,'Túl sok belépési kísérlet. Próbáld később.');$c=DB::table('guest_credentials')->where('email',Contact::email($v['email']))->first();$valid=Hash::check($v['password'],$c->password_hash??'$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi');if(!$c||!$valid){RateLimiter::hit($key,60);abort(401,'Hibás e-mail-cím vagy jelszó.');}RateLimiter::clear($key);abort_unless($c->verified_at,403,'Előbb erősítsd meg az e-mail-címedet a kapott levélben.');return $this->signIn($r,$c);
+  }
+  if(in_array($action,['forgot','resend'],true)){
+   $v=$r->validate(['email'=>'required|email|max:200']);$c=DB::table('guest_credentials')->where('email',Contact::email($v['email']))->first();if($c&&($action==='forgot'?(bool)$c->verified_at:!$c->verified_at))DB::transaction(fn()=>GuestPasswords::queue($c,$action==='forgot'?'reset':'verify',app(Tenant::class)->id,$this->destination($r)));return response()->json(['ok'=>true]);
+  }
+  $v=$r->validate(['token'=>'required|string|regex:/^[a-f0-9]{64}$/','password'=>'required|string|min:12|max:200|confirmed','name'=>($action==='verify'?'required':'sometimes').'|string|max:150','phone'=>'nullable|string|max:40']);$v=Contact::apply($v);$c=DB::transaction(function()use($v,$action){$c=GuestPasswords::consume($v['token'],$action,$v['password']);if($action==='verify')DB::table('guest_accounts')->where('id',$c->guest_id)->update(['name'=>$v['name'],'profile_name'=>$v['name'],'phone'=>$v['phone']??'','updated_at'=>now()]);return $c;});return $this->signIn($r,$c);
+ }
+ private function destination(Request $r):string{return in_array($r->input('returnTo'),['booking','messages','operatorMessages'],true)?$r->input('returnTo'):'';}
+ private function signIn(Request $r,object $c){$r->session()->regenerate();$r->session()->forget(['admin','platform_admin']);$r->session()->put(['guest_id'=>$c->guest_id,'guest_password_account'=>$c->guest_id,'guest_password_version'=>$c->version]);$id=app(Tenant::class)->id;$target=$this->destination($r);$url=$target==='booking'?'/foglalas?provider='.$id.'#public-form':(in_array($target,['messages','operatorMessages'],true)?'/uzenetek?provider='.$id.($target==='operatorMessages'?'&platformMessages=1':''):'/fiokom?provider='.$id);return response()->json(['ok'=>true,'url'=>$url]);}
+}

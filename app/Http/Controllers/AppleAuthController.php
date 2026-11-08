@@ -45,7 +45,7 @@ final class AppleAuthController
             $user=json_decode($input['user']??'{}',true);$name=trim(($user['name']['firstName']??'').' '.($user['name']['lastName']??''));
             $values=['name'=>mb_substr($name?:($account->name??'Vendég'),0,150),'email'=>filter_var($claims->email??'',FILTER_VALIDATE_EMAIL)?$claims->email:($account->email??null),'email_verified'=>isset($claims->email_verified)?in_array($claims->email_verified,[true,'true'],true):(bool)($account->email_verified??false),'updated_at'=>now()];
             if(!$account){DB::table('guest_accounts')->insertOrIgnore(array_merge($values,['provider'=>'apple','subject'=>$claims->sub,'created_at'=>now()]));$account=DB::table('guest_accounts')->where('provider','apple')->where('subject',$claims->sub)->first();}else DB::table('guest_accounts')->where('id',$account->id)->update($values);
-            $r->session()->regenerate();$r->session()->put('guest_id',$account->id);
+            $r->session()->regenerate();$r->session()->forget(['admin','platform_admin','guest_password_account','guest_password_version']);$r->session()->put('guest_id',$account->id);
             $path=match($saved['returnTo']){'booking'=>'/foglalas?provider='.$saved['tenant'].'#public-form','messages'=>'/uzenetek?provider='.$saved['tenant'],'operatorMessages'=>'/uzenetek?provider='.$saved['tenant'].'&platformMessages=1',default=>'/fiokom?provider='.$saved['tenant']};
             return redirect($path);
         }catch(\Throwable){$target=$saved['mode']==='admin'?'/':'/fiokom';return redirect($target.'?authError=provider'.($saved['tenant']!==1?'&provider='.$saved['tenant']:'').($saved['returnTo']?'&returnTo='.$saved['returnTo']:''));}

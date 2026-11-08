@@ -2,6 +2,11 @@
 use App\Http\Controllers\SalonController;
 use App\Http\Middleware\ApiHeaders;
 use Illuminate\Support\Facades\Route;
+Route::post('/api/bookings/{id}/review-request',[\App\Http\Controllers\ReviewRequestController::class,'request']);
+Route::post('/api/manage/review',[\App\Http\Controllers\ReviewRequestController::class,'review'])->middleware('throttle:10,1');
+Route::patch('/api/clients/{id}/blacklist',[\App\Http\Controllers\BookingToolsController::class,'blacklist']);
+Route::post('/api/booking-series/{id}/cancel',[\App\Http\Controllers\BookingToolsController::class,'cancelSeries']);
+Route::post('/api/guest/auth/{action}',[\App\Http\Controllers\GuestPasswordController::class,'handle'])->whereIn('action',['register','login','forgot','resend','verify','reset'])->middleware('throttle:12,1');
 Route::post('/api/provider-login',[\App\Http\Controllers\ProviderRegistrationController::class,'login'])->middleware('throttle:5,1');
 Route::post('/api/provider-register',[\App\Http\Controllers\ProviderRegistrationController::class,'store'])->middleware('throttle:3,60');
 Route::get('/api/providers',[\App\Http\Controllers\ProviderDirectoryController::class,'index'])->middleware('throttle:60,1');

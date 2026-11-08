@@ -200,6 +200,7 @@ class SalonController
                 }
                 RateLimiter::hit($key, 60);
                 $data = $request->validate([
+                    "recurrence"=>"nullable|array:frequency,count","recurrence.frequency"=>"required_with:recurrence|in:daily,weekly,fortnightly,monthly","recurrence.count"=>"required_with:recurrence|integer|between:2,52",
                     "clientId" => "nullable|string|max:80",
                     "coupon" => "nullable|string|max:80",
                     "passId" => "nullable|string|max:80",
@@ -212,56 +213,14 @@ class SalonController
                     "services.*" => "required|string",
                 ]);
                 $data=\App\Services\Contact::apply($data);
-                $b = $this->store->mutate(function (&$s) use (
-                    $data,
-                    $admin,
-                    $request,
-                ) {
-                    $b = array_merge($data, [
-                        "phone" => $data["phone"] ?? "",
-                        "email" => $data["email"] ?? "",
-                        "public" => !$admin || $request->boolean("public"),
-                    ]);
-                    $b["guestId"] = $request->session()->get("guest_id");
-                    if(empty($b['services'])&&!$b['public']){$default=collect($s['services'])->first(fn($v)=>$v['id']===($s['settings']['defaultServiceId']??null)&&empty($v['archived'])&&($v['bookingMode']??'individual')!=='group'&&in_array($b['staff'],\App\Services\Settings::serviceStaff($s,$v),true))??collect($s['services'])->first(fn($v)=>empty($v['archived'])&&($v['bookingMode']??'individual')!=='group'&&in_array($b['staff'],\App\Services\Settings::serviceStaff($s,$v),true));if($default)$b['services']=[$default['id']];}
-                    if(empty($b['services']))throw new InvalidArgumentException('Válassz szolgáltatást.');
-                    if(empty(trim($b['name']??''))&&empty($data['clientId'])){
-                        if($b['public'])throw new InvalidArgumentException('Add meg a vendég nevét.');
-                        if(empty($data['allowUnnamed'])&&empty($s['settings']['skipUnnamedWarning']))throw new InvalidArgumentException('Nem adtad meg a vendég nevét. Erősítsd meg a név nélküli mentést.');
-                        $b['name']='Név nélküli vendég';$b['anonymous']=true;
-                        if(!empty($data['rememberUnnamed']))$s['settings']['skipUnnamedWarning']=true;
-                    }
-                    unset($b['allowUnnamed'],$b['rememberUnnamed']);
-                    \App\Services\GroupSessions::prepare($b,$s);
-                    $previousClientIds=array_column($s['clients'],'id');
-                    \App\Services\Clients::attach($s, $b, $data["clientId"] ?? null, !$b["public"]);
-                    \App\Services\Subscriptions::guard($s,!$b["public"]);
-                    $this->rules->validate($b, $s);
-                    $b["id"] = (string) Str::uuid();
-                    $b["token"] = bin2hex(random_bytes(24));
-                    $b["start"] = CarbonImmutable::parse($b["start"])
-                        ->utc()
-                        ->toISOString();
-                    $b["createdAt"] = $b["updatedAt"] = CarbonImmutable::now()
-                        ->utc()
-                        ->toISOString();
-                    $b["serviceSnapshot"] = $b["serviceSnapshot"]??array_map(
-                        fn($id) => array_replace($this->rules->service($s["services"], $id),["staff"=>\App\Services\Settings::serviceStaff($s,$this->rules->service($s["services"],$id))]),
-                        $b["services"],
-                    );
-                    $b["status"] = $b["public"]
-                        ? $this->rules->status($b["services"], $s)
-                        : "confirmed";
-                    $b["pricing"] = app(\App\Services\Offers::class)->quote($s, $b, $data["coupon"] ?? null);
-                    app(\App\Services\Offers::class)->reservePass($s, $b, $data["passId"] ?? null, !$b["public"]);
-                    $s["bookings"][] = $b;
-                    if(!$b['public']&&!empty($b['clientId'])&&!in_array($b['clientId'],$previousClientIds,true)){ $client=collect($s['clients'])->firstWhere('id',$b['clientId']);if($client)\App\Services\ClientInvitations::queue($s,$client);}
-                    app(\App\Services\Notifications::class)->enqueue(
-                        $b,
-                        $s,
-                        "created",
-                    );
-                    return $b;
+                $b = $this->store->mutate(function (&$s) use ($data,$admin,$request) {
+                    $rule=$data['recurrence']??null;unset($data['recurrence']);
+                    if(!$rule)return $this->createBooking($s,$data,$admin,$request);
+                    abort_unless($admin&&!$request->boolean('public'),403,'Ismétlődő időpontot a szolgáltató vehet fel.');
+                    foreach($data['services']??[] as $id)if(($this->rules->service($s['services'],$id)['bookingMode']??'individual')==='group')throw new InvalidArgumentException('Csoportos órára külön meghirdetett alkalmat válassz.');
+                    $series=(string)Str::uuid();$created=[];
+                    foreach(\App\Services\RecurringBookings::starts($data['start'],$rule) as $i=>$at){try{$next=$this->createBooking($s,array_replace($data,['start'=>$at]),$admin,$request);}catch(InvalidArgumentException $e){throw new InvalidArgumentException('A sorozat '.CarbonImmutable::parse($at)->setTimezone('Europe/Budapest')->format('Y.m.d. H:i').' alkalmát nem lehet menteni: '.$e->getMessage());}$n=count($s['bookings'])-1;$s['bookings'][$n]['seriesId']=$series;$s['bookings'][$n]['seriesIndex']=$i+1;$created[]=$s['bookings'][$n];}
+                    return array_replace($created[0],['seriesCount'=>count($created),'createdIds'=>array_column($created,'id')]);
                 });
                 return response()->json($b, 201);
             }
@@ -446,6 +405,7 @@ class SalonController
                     "settings" => "sometimes|array",
                     "settings.openingTime" => "sometimes|date_format:H:i",
                     "settings.closingTime" => "sometimes|date_format:H:i",
+                    "settings.reviewRequestsEnabled"=>"sometimes|boolean","settings.reviewRequestDelayHours"=>"sometimes|integer|between:0,720",
                     "settings.advancedBookingEnabled"=>"sometimes|boolean","settings.servicePhasesEnabled"=>"sometimes|boolean","settings.couponsEnabled"=>"sometimes|boolean","settings.passesEnabled"=>"sometimes|boolean","settings.guestInvitationPolicy"=>"sometimes|in:none,email,sms,email_first,sms_first",
                     "settings.paymentDefaults"=>"sometimes|array:enabled,method,note", "settings.paymentDefaults.enabled"=>"sometimes|boolean", "settings.paymentDefaults.method"=>"sometimes|in:cash,card,transfer", "settings.paymentDefaults.note"=>"nullable|string|max:300",
                     "settings.defaultServiceId"=>"nullable|string|max:80", "settings.skipUnnamedWarning"=>"sometimes|boolean",
@@ -634,6 +594,7 @@ class SalonController
                             }
                         }
                     }
+                    if(isset($data['settings'])){$data['settings']['reviewRequestsEnabledAt']=$s['settings']['reviewRequestsEnabledAt']??null;if(!empty($data['settings']['reviewRequestsEnabled'])&&empty($s['settings']['reviewRequestsEnabled']))$data['settings']['reviewRequestsEnabledAt']=now()->toISOString();}
                     foreach (
                         ["settings", "staff", "services", "clients"]
                         as $key
@@ -732,6 +693,55 @@ class SalonController
         $request->session()->put("admin", true);
         $request->session()->put("provider_id", $tenant);
         return response()->json(["ok" => true]);
+    }
+    private function createBooking(array &$s,array $data,bool $admin,Request $request):array
+    {
+                    $b = array_merge($data, [
+                        "phone" => $data["phone"] ?? "",
+                        "email" => $data["email"] ?? "",
+                        "public" => !$admin || $request->boolean("public"),
+                    ]);
+                    $b["guestId"] = $request->session()->get("guest_id");$b["locale"]=in_array($request->header("X-App-Language"),["hu","en","de"],true)?$request->header("X-App-Language"):"hu";
+                    \App\Services\Blacklist::guard($s,$b);
+                    if(empty($b['services'])&&!$b['public']){$default=collect($s['services'])->first(fn($v)=>$v['id']===($s['settings']['defaultServiceId']??null)&&empty($v['archived'])&&($v['bookingMode']??'individual')!=='group'&&in_array($b['staff'],\App\Services\Settings::serviceStaff($s,$v),true))??collect($s['services'])->first(fn($v)=>empty($v['archived'])&&($v['bookingMode']??'individual')!=='group'&&in_array($b['staff'],\App\Services\Settings::serviceStaff($s,$v),true));if($default)$b['services']=[$default['id']];}
+                    if(empty($b['services']))throw new InvalidArgumentException('Válassz szolgáltatást.');
+                    if(empty(trim($b['name']??''))&&empty($data['clientId'])){
+                        if($b['public'])throw new InvalidArgumentException('Add meg a vendég nevét.');
+                        if(empty($data['allowUnnamed'])&&empty($s['settings']['skipUnnamedWarning']))throw new InvalidArgumentException('Nem adtad meg a vendég nevét. Erősítsd meg a név nélküli mentést.');
+                        $b['name']='Név nélküli vendég';$b['anonymous']=true;
+                        if(!empty($data['rememberUnnamed']))$s['settings']['skipUnnamedWarning']=true;
+                    }
+                    unset($b['allowUnnamed'],$b['rememberUnnamed']);
+                    \App\Services\GroupSessions::prepare($b,$s);
+                    $previousClientIds=array_column($s['clients'],'id');
+                    \App\Services\Clients::attach($s, $b, $data["clientId"] ?? null, !$b["public"]);
+                    \App\Services\Subscriptions::guard($s,!$b["public"]);
+                    $this->rules->validate($b, $s);
+                    $b["id"] = (string) Str::uuid();
+                    $b["token"] = bin2hex(random_bytes(24));
+                    $b["start"] = CarbonImmutable::parse($b["start"])
+                        ->utc()
+                        ->toISOString();
+                    $b["createdAt"] = $b["updatedAt"] = CarbonImmutable::now()
+                        ->utc()
+                        ->toISOString();
+                    $b["serviceSnapshot"] = $b["serviceSnapshot"]??array_map(
+                        fn($id) => array_replace($this->rules->service($s["services"], $id),["staff"=>\App\Services\Settings::serviceStaff($s,$this->rules->service($s["services"],$id))]),
+                        $b["services"],
+                    );
+                    $b["status"] = $b["public"]
+                        ? $this->rules->status($b["services"], $s)
+                        : "confirmed";
+                    $b["pricing"] = app(\App\Services\Offers::class)->quote($s, $b, $data["coupon"] ?? null);
+                    app(\App\Services\Offers::class)->reservePass($s, $b, $data["passId"] ?? null, !$b["public"]);
+                    $s["bookings"][] = $b;
+                    if(!$b['public']&&!empty($b['clientId'])&&!in_array($b['clientId'],$previousClientIds,true)){ $client=collect($s['clients'])->firstWhere('id',$b['clientId']);if($client)\App\Services\ClientInvitations::queue($s,$client);}
+                    app(\App\Services\Notifications::class)->enqueue(
+                        $b,
+                        $s,
+                        "created",
+                    );
+                    return $b;
     }
     private function nextSlots(Request $request):array {
         $s=$this->store->read();$ids=array_filter(explode(',',(string)$request->query('services','')));if(!$ids||count($ids)>20)return ['date'=>null,'slots'=>[]];

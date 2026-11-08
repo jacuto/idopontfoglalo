@@ -229,7 +229,7 @@ class AuthController
                     ->update($values);
             }
             $r->session()->regenerate();
-            $r->session()->put("guest_id", $account->id);
+            $r->session()->forget(["admin","platform_admin","guest_password_account","guest_password_version"]);$r->session()->put("guest_id", $account->id);
             $picture = $provider === 'google' ? ($user['picture'] ?? null) : (empty($user['picture']['data']['is_silhouette']) ? ($user['picture']['data']['url'] ?? null) : null);
             app(\App\Services\SocialAvatar::class)->import((int) $account->id, $provider, $picture);
             $tenant = app(\App\Services\Tenant::class)->id;

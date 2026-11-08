@@ -82,6 +82,7 @@ class BookingRules
         ) {
             throw new InvalidArgumentException("Válassz munkatársat.");
         }
+        if(!$historical)Blacklist::guard($state,$booking);
         $duration = 0;
         foreach ($booking["services"] as $id) {
             $service = $this->service($state["services"], $id);

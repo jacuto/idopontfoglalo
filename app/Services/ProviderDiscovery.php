@@ -23,6 +23,7 @@ final class ProviderDiscovery
  public static function publicRow(int $id,array $s):?array{
   $people=array_column(Settings::activeStaff($s),'id');$services=array_values(array_filter($s['services']??[],fn($v)=>empty($v['archived'])&&array_intersect(Settings::serviceStaff($s,$v),$people)));if(!$services)return null;
   $p=$s['profile']??[];$categories=self::categories($s,$services);$cover=self::image($p['cover']??null);if(!$cover)foreach($services as $v)if($cover=self::image($v['image']??null))break;
-  return ['id'=>$id,'name'=>$s['settings']['name']??'Szolgáltató','profession'=>$s['settings']['profession']??'','city'=>self::city($p),'address'=>$p['address']??'','logo'=>self::image($p['logo']??null),'cover'=>$cover,'categories'=>$categories,'services'=>array_slice(array_column($services,'name'),0,4),'minPrice'=>min(array_column($services,'price')),'url'=>'/foglalas?provider='.$id];
+  $reviews=array_values(array_filter($s['reviews']??[],fn($v)=>($v['direction']??'')==='guest'));
+  return ['id'=>$id,'name'=>$s['settings']['name']??'Szolgáltató','profession'=>$s['settings']['profession']??'','city'=>self::city($p),'address'=>$p['address']??'','logo'=>self::image($p['logo']??null),'cover'=>$cover,'categories'=>$categories,'services'=>array_slice(array_column($services,'name'),0,4),'minPrice'=>min(array_column($services,'price')),'reviewCount'=>count($reviews),'rating'=>$reviews?round(array_sum(array_column($reviews,'score'))/count($reviews),1):null,'url'=>'/foglalas?provider='.$id];
  }
 }
