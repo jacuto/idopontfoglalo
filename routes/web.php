@@ -2,6 +2,10 @@
 use App\Http\Controllers\SalonController;
 use App\Http\Middleware\ApiHeaders;
 use Illuminate\Support\Facades\Route;
+Route::get('/meghivo/{token}',[\App\Http\Controllers\InvitationController::class,'open'])->where('token','[a-f0-9]{64}');
+Route::post('/api/guest/invitations/claim',[\App\Http\Controllers\InvitationController::class,'claim']);
+Route::match(['GET','PUT'],'/api/guest/billing',[\App\Http\Controllers\GuestFeaturesController::class,'billing']);
+Route::get('/api/clients/{id}/billing',[\App\Http\Controllers\GuestFeaturesController::class,'clientBilling']);
 Route::match(['GET','POST'],'/api/group-sessions',[\App\Http\Controllers\GroupSessionController::class,'handle']);
 Route::match(['GET','POST'],'/api/guest/calendar-prompt',[\App\Http\Controllers\GuestFeaturesController::class,'calendarPrompt']);
 Route::match(['GET','PATCH','DELETE'],'/api/calendar/connection',[\App\Http\Controllers\CalendarConnectionController::class,'handle']);

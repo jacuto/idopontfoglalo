@@ -45,6 +45,7 @@ final class FeaturesController
             if ($data['type'] === 'percent' && $data['value'] > 100) throw new InvalidArgumentException('A százalék legfeljebb 100 lehet.');
             $data['id'] = $data['id'] ?? (string) Str::uuid(); $data['code'] = strtoupper($data['code']);
             $this->store->mutate(function (&$s) use ($data) {
+                if(empty($s['settings']['couponsEnabled'])&&!collect($s['coupons'])->contains('id',$data['id']))throw new InvalidArgumentException('Az új kuponok létrehozása ki van kapcsolva.');
                 if (array_diff($data['services'], array_column($s['services'], 'id'))) throw new InvalidArgumentException('Ismeretlen szolgáltatás.');
                 foreach ($s['coupons'] as $c) if ($c['code'] === $data['code'] && $c['id'] !== $data['id']) throw new InvalidArgumentException('Ez a kuponkód már létezik.');
                 $s['coupons'] = array_values(array_filter($s['coupons'], fn($c) => $c['id'] !== $data['id'])); $s['coupons'][] = $data;
@@ -58,6 +59,7 @@ final class FeaturesController
             $data['validityMode']=$data['validityMode']??'assigned';
             $data['id'] = $data['id'] ?? (string) Str::uuid();
             $this->store->mutate(function (&$s) use ($data) {
+                if(empty($s['settings']['passesEnabled'])&&!collect($s['passes'])->contains('id',$data['id']))throw new InvalidArgumentException('Az új bérletek létrehozása ki van kapcsolva.');
                 if (array_diff($data['services'], array_column($s['services'], 'id'))) throw new InvalidArgumentException('Ismeretlen szolgáltatás.');
                 $s['passes'] = array_values(array_filter($s['passes'], fn($p) => $p['id'] !== $data['id'])); $s['passes'][] = $data;
             });

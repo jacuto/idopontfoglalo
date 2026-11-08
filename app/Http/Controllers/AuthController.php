@@ -267,7 +267,7 @@ class AuthController
             $provider = ['id' => $row->id, 'name' => $salon['settings']['name'] ?? 'Szolgáltató'];
             $providers[] = $provider;
             foreach ($own as $booking) {
-                $allBookings[] = array_merge(array_intersect_key($booking, array_flip(['id','start','status','attendance','token','serviceSnapshot','pricing'])), ['provider' => $provider]);
+                $allBookings[] = array_merge(array_intersect_key($booking, array_flip(['id','start','status','attendance','token','serviceSnapshot','pricing','cancellationReason'])), ['provider' => $provider]);
             }
         }
         usort($allBookings, fn($a, $b) => strcmp($a['start'], $b['start']));
@@ -276,7 +276,7 @@ class AuthController
             "allBookings" => $allBookings,
             "id" => $account->id,
             "avatar" => !empty($account->avatar) ? "/api/guest/avatar/" . $account->id : null,
-            "name" => $account->name,
+            "name" => $account->profile_name??$account->name,
             "email" => $account->contact_email ?? $account->email,
             "phone" => $account->phone ?? "",
             "bookings" => $bookings,

@@ -173,6 +173,7 @@ class Notifications
                     $this->finish($job->id, 'sent', ['attempts' => $job->attempts + 1]); $counts['sent']++; continue;
                 }
                 $s = app(SalonStore::class)->read();
+                if(($p['kind']??'')==='guest_invite'){$status=ClientInvitations::deliver($p['invitationId'],$s);$this->finish($job->id,$status,$status==='blocked'?['error'=>'Hiányzó központi küldőkapcsolat.','available_at'=>now()->addMinutes(5)]:[]);$counts[$status]++;continue;}
                 if(($p['kind']??'')==='group_notice'){
                     $g=collect($s['groupSessions'])->firstWhere('id',$p['groupId']);if(!$g||empty($g['cancelled'])){$this->finish($job->id,'skipped');$counts['skipped']++;continue;}
                     if(!$this->connections->mailReady()){$this->finish($job->id,'blocked',['error'=>'Hiányzó központi SMTP-kapcsolat.','available_at'=>now()->addMinutes(5)]);$counts['blocked']++;continue;}

@@ -12,10 +12,21 @@ final class GuestFeaturesController
     }
     public function profile(Request $r){
         $id=(int)$r->session()->get('guest_id',0);abort_unless($id&&DB::table('guest_accounts')->where('id',$id)->exists(),401);
-        $v=$r->validate(['email'=>'present|nullable|email|max:200','phone'=>'present|nullable|string|max:40']);
+        $v=$r->validate(['email'=>'present|nullable|email|max:200','phone'=>'present|nullable|string|max:40','name'=>'sometimes|required|string|max:150']);
         $v=\App\Services\Contact::apply($v);
+        if(isset($v['name']))DB::table('guest_accounts')->where('id',$id)->update(['profile_name'=>$v['name']]);
         DB::table('guest_accounts')->where('id',$id)->update(['contact_email'=>$v['email']??'','phone'=>$v['phone']??'','updated_at'=>now()]);
         return response()->json(['ok'=>true]);
+    }
+    public function billing(Request $r){
+        $id=(int)$r->session()->get('guest_id',0);abort_unless($id&&!$r->session()->get('admin')&&DB::table('guest_accounts')->where('id',$id)->exists(),401);
+        if($r->isMethod('GET'))return response()->json(\App\Services\GuestBilling::get($id));
+        $v=$r->validate(['name'=>'nullable|string|max:200','email'=>'nullable|email|max:200','country'=>'nullable|string|regex:/^[A-Z]{2}$/','zip'=>'nullable|string|max:20','city'=>'nullable|string|max:100','address'=>'nullable|string|max:250','taxNumber'=>'nullable|string|max:30']);
+        $any=collect($v)->except('country')->contains(fn($v)=>$v!==null&&trim((string)$v)!=='');if($any)$v=validator($v,['name'=>'required|string|max:200','email'=>'nullable|email|max:200','country'=>'required|string|regex:/^[A-Z]{2}$/','zip'=>'required|string|max:20','city'=>'required|string|max:100','address'=>'required|string|max:250','taxNumber'=>'nullable|string|max:30'])->validate();
+        DB::table('guest_accounts')->where('id',$id)->update(['billing_data'=>$any?\Illuminate\Support\Facades\Crypt::encryptString(json_encode($v,JSON_THROW_ON_ERROR)):null,'updated_at'=>now()]);return response()->json(['ok'=>true]);
+    }
+    public function clientBilling(Request $r,string $id){
+        abort_unless($r->session()->get('admin')===true&&(int)$r->session()->get('provider_id',1)===app(Tenant::class)->id,403);$c=collect(app(SalonStore::class)->read()['clients'])->first(fn($c)=>$c['id']===$id&&\App\Services\Clients::visible($c));abort_unless($c&&!empty($c['guestId']),404);return response()->json(\App\Services\GuestBilling::get((int)$c['guestId']));
     }
     public function passes(Request $r)
     {

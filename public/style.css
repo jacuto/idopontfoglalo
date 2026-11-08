@@ -1562,3 +1562,24 @@ fieldset{border:1px solid #d9e4df;border-radius:12px;padding:14px;margin:18px 0}
 .intro-actions .clear-calendar-toggle{width:auto;min-width:78px;padding:8px;gap:5px}.intro-actions .clear-calendar-toggle:after{content:'Nézet';font-size:11px;line-height:1;font-weight:600}.intro-actions .clear-calendar-toggle:before{content:'';display:block;width:18px;height:18px;flex:0 0 18px;background:currentColor;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;transform:rotate(180deg)}.calendar-controls-collapsed .intro-actions .clear-calendar-toggle:before{content:'';transform:none}
 @media(max-width:400px){.intro-actions .clear-calendar-toggle{width:40px;min-width:40px}.intro-actions .clear-calendar-toggle:after{display:none}}
 .calendar-gear{display:block;width:16px;height:16px;flex:none}.day-hours{display:inline-flex;align-items:center;justify-content:center}
+/* Compact appointment entry and personal account */
+.site-footer{padding:18px 20px;text-align:center;font-size:13px;color:var(--muted,#577480)}
+.site-footer a{color:inherit;text-decoration:none}.site-footer a:hover{text-decoration:underline}
+body:has(.sidebar)>.site-footer{margin-left:var(--sidebar-width,280px)}
+body.sidebar-collapsed>.site-footer{margin-left:0}
+#booking-form .compact-field{display:grid;grid-template-columns:105px minmax(0,1fr);align-items:center;gap:10px;margin:10px 0}
+#booking-form .compact-field>label{margin:0}#booking-form .compact-field>input,#booking-form .compact-field>select{margin:0;min-width:0;width:100%}
+#booking-form .appointment-time-fields{grid-template-columns:1fr!important;gap:0}
+#booking-form .appointment-time-fields>div{min-width:0}#booking-form .compact-field:has([name=name]){margin-bottom:0}
+.profession-options{margin:20px 0;padding:18px;border:1px solid var(--line,#d2e1e0);border-radius:14px}.profession-options legend{font-weight:700;padding:0 8px}
+.primary-professional{display:flex;align-items:center;gap:12px}.booking-qr{max-width:300px;margin:auto}.booking-qr svg{width:100%;height:auto}.qr-url{overflow-wrap:anywhere;text-align:center}
+.guest-account{max-width:1000px}.guest-topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:24px}.guest-topbar .brand{margin:0}
+.guest-profile{background:linear-gradient(125deg,#f0f9f6,#fff 60%);margin-bottom:18px}.guest-profile-heading{display:flex;align-items:center;gap:20px;margin-bottom:20px}.guest-profile-heading h1{margin:4px 0;font-size:28px}
+.avatar-change{position:relative;flex:none;padding:0;border:0;border-radius:50%;background:transparent;overflow:hidden;width:88px;height:88px}.avatar-change .avatar{width:88px;height:88px;margin:0;border-radius:50%;object-fit:cover;display:flex;align-items:center;justify-content:center}.avatar-change-overlay{position:absolute;inset:auto 0 0;background:#103943d9;color:white;font-size:11px;padding:8px 0;opacity:0;transition:opacity .15s}.avatar-change:hover .avatar-change-overlay,.avatar-change:focus-visible .avatar-change-overlay{opacity:1}
+.guest-profile #guest-contact-form{display:grid;grid-template-columns:150px minmax(0,1fr);align-items:center;gap:10px}.guest-profile #guest-contact-form label,.guest-profile #guest-contact-form input{margin:0}.guest-profile #guest-contact-form p,.guest-profile #guest-contact-form button{grid-column:1/-1}.guest-profile #guest-contact-form button{justify-self:end}
+.linked-providers,.guest-billing{margin:18px 0}.linked-providers h2{margin-top:0}.linked-provider{display:flex;justify-content:space-between;align-items:center;gap:16px;border:1px solid #cee5df;border-radius:12px;padding:16px;background:#f5faf8;text-decoration:none;margin:8px 0}.linked-provider span{font-size:13px}.guest-billing summary{font-weight:700;cursor:pointer}
+.sidebar .sidebar-toggle{width:23px;min-width:23px;padding:0;right:-23px}
+@media(hover:none){.avatar-change-overlay{opacity:1}}
+@media(max-width:650px){body:has(.sidebar)>.site-footer{margin-left:0}#booking-form .compact-field{grid-template-columns:94px minmax(0,1fr);gap:8px}.guest-profile #guest-contact-form{grid-template-columns:1fr;gap:7px}.guest-profile #guest-contact-form input{margin-bottom:9px}.guest-profile-heading{gap:14px}.guest-profile-heading h1{font-size:24px}.linked-provider{align-items:start;flex-direction:column;gap:5px}}
+
+.sidebar-collapsed .sidebar .sidebar-toggle{right:-23px}@media(max-width:650px){.sidebar:not(:has([inert])) .sidebar-toggle{right:5px}}

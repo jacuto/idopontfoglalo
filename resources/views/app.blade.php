@@ -8,6 +8,7 @@
   </head>
   <body>
     <div id="app"></div>
+    <footer class="site-footer">Copyright 2026 <a href="https://digitmarketing.hu/">digitmarketing.hu</a></footer>
     <dialog id="modal"></dialog>
     <div id="toast" role="status"></div>
     <script src="/app.js?v={{ filemtime(public_path('app.js')) }}" defer></script>
@@ -19,6 +20,8 @@
     <script src="/operations.js?v={{ filemtime(public_path('operations.js')) }}" defer></script>
     <script src="/workflows.js?v={{ filemtime(public_path('workflows.js')) }}" defer></script>
     <script src="/comfort.js?v={{ filemtime(public_path('comfort.js')) }}" defer></script>
+    <script src="/vendor/qrcode.js?v={{ filemtime(public_path('vendor/qrcode.js')) }}" defer></script>
+    <script src="/personalization.js?v={{ filemtime(public_path('personalization.js')) }}" defer></script>
     <script src="/boot.js?v={{ filemtime(public_path('boot.js')) }}" defer></script>
   </body>
 </html>

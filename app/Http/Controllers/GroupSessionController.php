@@ -29,6 +29,7 @@ final class GroupSessionController
                     }unset($b);return $g;
                 }unset($g);abort(404);
             }
+            if(empty($s['settings']['advancedBookingEnabled']))throw new InvalidArgumentException('A csoportos foglalást előbb kapcsold be a beállításoknál.');
             if(count($s['groupSessions'])>=2000)throw new InvalidArgumentException('Legfeljebb 2000 meghirdetett alkalom kezelhető.');
             $service=app(BookingRules::class)->service($s['services'],$v['serviceId']);if(($service['bookingMode']??'individual')!=='group'||!empty($service['archived']))throw new InvalidArgumentException('Aktív csoportos szolgáltatást válassz.');
             $service['capacity']=$v['capacity'];$g=['id'=>(string)Str::uuid(),'serviceId'=>$service['id'],'staff'=>$v['staff'],'start'=>Time::parse($v['start'])->utc()->toISOString(),'serviceSnapshot'=>$service,'cancelled'=>false,'status'=>'active','minimumParticipants'=>(int)($v['minimumParticipants']??0),'minimumLeadMinutes'=>(int)($v['minimumLeadMinutes']??120)];

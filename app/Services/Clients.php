@@ -6,6 +6,7 @@ final class Clients
 {
     public static function editable(array $client,array $input):void {
         if(empty($client['guestId']))return;
+        if(!empty($client['nameManaged'])&&isset($input['name'])&&$input['name']!==$client['name'])throw new InvalidArgumentException('A regisztrált vendég saját nevét a vendég módosíthatja a fiókjában.');
         foreach(['email','phone'] as $field)if(array_key_exists($field,$input)&&($field==='phone'?self::phone((string)($input[$field]??''))!==self::phone((string)($client[$field]??'')):mb_strtolower(trim((string)($input[$field]??'')))!==mb_strtolower(trim((string)($client[$field]??''))))) throw new InvalidArgumentException('A regisztrált vendég emailjét és telefonszámát csak a vendég módosíthatja a saját fiókjában.');
     }
     public static function visible(array $client):bool {return empty($client['deletedAt']);}

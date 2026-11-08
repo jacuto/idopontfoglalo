@@ -7,6 +7,7 @@ final class Settings
         return [
             "businessMode" => "team",
             "primaryStaffId" => "anna",
+            "advancedBookingEnabled"=>false,"servicePhasesEnabled"=>false,"couponsEnabled"=>true,"passesEnabled"=>true,"guestInvitationPolicy"=>"none",
             "paymentDefaults"=>["enabled"=>true,"method"=>"cash","note"=>""],
             "slotStep"=>10,"noShowFee"=>0,"defaultServiceId"=>null,"skipUnnamedWarning"=>false,
             "openingTime" => "08:00",
@@ -68,6 +69,7 @@ final class Settings
         if($guestIds){
             $accounts=\Illuminate\Support\Facades\DB::table('guest_accounts')->whereIn('id',$guestIds)->get()->keyBy('id');
             foreach($state['clients'] as &$client)if(Clients::visible($client)&&!empty($client['guestId'])&&($account=$accounts->get($client['guestId']))){
+                if(!empty($account->profile_name)){$client['name']=$account->profile_name;$client['nameManaged']=true;}
                 if($account->phone!==null)$client['phone']=$account->phone;
                 if($account->contact_email!==null||$account->email!==null)$client['email']=$account->contact_email??$account->email;
             }

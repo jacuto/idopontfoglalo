@@ -383,9 +383,10 @@ function serviceForm(id) {
       duration: Number(f.get("duration")),
       price: Number(f.get("price")),
       staff: f.getAll("staff"),
-      automatic: f.has("automatic"), bookingMode:f.get("bookingMode")||"individual",capacity:Number(f.get("capacity")||1),
+      automatic: f.has("automatic"), bookingMode:state.settings.advancedBookingEnabled?(f.get("bookingMode")||"individual"):(old.bookingMode||"individual"),capacity:state.settings.advancedBookingEnabled?Number(f.get("capacity")||1):(old.capacity||1),
     };
-    if (f.get("phases").trim())
+    if (!state.settings.servicePhasesEnabled) { if(old.phases)v.phases=old.phases; else delete v.phases; }
+    else if (f.get("phases").trim())
       v.phases = f.get("phases").split(",").map(Number);
     else delete v.phases;
     try {
@@ -587,7 +588,7 @@ function settingsPage() {
       "confirmation",
       "notifyGuest",
       "notifyProvider",
-      "reminderGuest", "skipUnnamedWarning",
+      "reminderGuest", "skipUnnamedWarning", "advancedBookingEnabled", "servicePhasesEnabled", "couponsEnabled", "passesEnabled",
     ])
       v[k] = f.has(k);
     v.reminder = Number(v.reminder);
