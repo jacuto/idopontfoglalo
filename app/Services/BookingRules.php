@@ -90,7 +90,7 @@ class BookingRules
                     "Archivált szolgáltatás nem foglalható.",
                 );
             }
-            if (!in_array($booking["staff"], $service["staff"], true)) {
+            if (!in_array($booking["staff"], $historical ? $service["staff"] : Settings::serviceStaff($state,$service), true)) {
                 throw new InvalidArgumentException(
                     "A munkatárs nem végzi az összes kiválasztott szolgáltatást.",
                 );

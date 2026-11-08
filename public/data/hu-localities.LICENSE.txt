@@ -1,0 +1,18 @@
+Hungarian locality coordinates — GeoNames data (Creative Commons Attribution).
+
+Data source: https://www.geonames.org/export/zip/
+GeoNames terms: https://www.geonames.org/export/
+Mirror used: https://github.com/tarsolya/hu-localities
+Source file: hu.geonames.org.txt (retrieved 2026-11-08).
+
+Derived file: hu-localities.json
+Changes: retain locality name, latitude, longitude; remove exact duplicates;
+filter invalid/out-of-region coordinates; sort by name; encode as compact JSON.
+No location of any user is included in this dataset.
+
+Attribution: GeoNames (https://www.geonames.org/).
+The data is supplied as-is. Locality names and points are approximate and may
+not reflect recent boundary or administrative changes. This is not a boundary map.
+
+The application loads this file only on explicit location lookup. Matching is
+performed in the user's browser, and the user can change the suggested town.

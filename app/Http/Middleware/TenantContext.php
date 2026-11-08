@@ -12,7 +12,7 @@ final class TenantContext
         $selector = $r->query('provider', $r->input('provider', 1));
         abort_unless(is_scalar($selector) && preg_match('/^[1-9][0-9]{0,8}$/', (string) $selector), 404);
         $id = (int) $selector;
-        $public = in_array($r->path(), ['api/providers', 'api/public', 'api/slots', 'api/slots/next', 'api/bookings', 'api/manage', 'api/manage/checkout', 'api/login', 'api/stripe/webhook'], true)
+        $public = in_array($r->path(), ['api/provider-login', 'api/provider-register', 'api/providers', 'api/public', 'api/slots', 'api/slots/next', 'api/bookings', 'api/manage', 'api/manage/checkout', 'api/login', 'api/stripe/webhook'], true)
             || $r->is('api/platform/*') || $r->is('api/platform-messages*') || !$r->is('api/*') || $r->is('api/guest*') || $r->is('api/auth/*');
         // Old admin sessions remain scoped exclusively to the original salon.
         $owner = (int) $r->session()->get('provider_id', 1);

@@ -7,7 +7,7 @@ if(operationQuery.has('photoUpdated'))setTimeout(()=>toast('Profilkép átvéve.
 if(operationQuery.has('photoError'))setTimeout(()=>toast('A profilkép nem volt átvehető. Tölts fel saját képet.'),500);
 if(operationQuery.has('calendarError'))setTimeout(()=>toast('A Google Naptár összekapcsolása nem sikerült. Próbáld újra.'),500);
 if(operationQuery.has('calendarConnected'))setTimeout(()=>toast('Google Naptár kapcsolva. A foglalások szinkronizálása sorba állítva.'),500);
-if(['/szolgaltatok','/szolgaltato','/arak','/kapcsolat'].includes(location.pathname)) portalPage();
+if(['/szolgaltatok','/szolgaltato','/belepes','/arak','/kapcsolat'].includes(location.pathname)) portalPage();
 else if(location.pathname==='/uzenetek') guestMessagesPage();
 else if(location.pathname==='/foadmin') platformPage();
 else if(manageToken) managePage();

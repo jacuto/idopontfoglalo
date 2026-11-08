@@ -15,7 +15,7 @@ final class GroupSessions
     public static function checkCatalog(array $s,array $services,array $staff):void {
         foreach($s['groupSessions']??[] as $g){if(!empty($g['cancelled'])||strtotime($g['start'])<=time())continue;
             $service=collect($services)->firstWhere('id',$g['serviceId']);$person=collect($staff)->firstWhere('id',$g['staff']);
-            if(!$service||!empty($service['archived'])||($service['bookingMode']??'individual')!=='group'||!$person||!empty($person['archived'])||!in_array($g['staff'],$service['staff'],true))throw new InvalidArgumentException('Előbb mondd le a kapcsolódó meghirdetett csoportos órákat.');
+            if(!$service||!empty($service['archived'])||($service['bookingMode']??'individual')!=='group'||!$person||!empty($person['archived'])||!in_array($g['staff'],array_unique(array_merge($service['staff'],Settings::serviceStaff($s,$service))),true))throw new InvalidArgumentException('Előbb mondd le a kapcsolódó meghirdetett csoportos órákat.');
             if((int)$service['price']!==(int)$g['serviceSnapshot']['price']||(int)$service['duration']!==(int)$g['serviceSnapshot']['duration'])throw new InvalidArgumentException('Meghirdetett csoportos óránál az ár és időtartam rögzített. Módosításhoz előbb mondd le az alkalmakat.');
         }
     }

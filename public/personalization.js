@@ -15,7 +15,7 @@ serviceForm=function(id){
  const update=()=>{const hidden=!s.servicePhasesEnabled||mode.value==='group';phases.hidden=hidden;phases.previousElementSibling.hidden=hidden;};mode.addEventListener('change',update);update();
  if(s.businessMode==='solo'){
   const checks=[...form.querySelectorAll('input[name=staff]')],label=checks[0]?.closest('label')?.previousElementSibling;
-  if(label?.tagName==='LABEL')label.hidden=true;checks.forEach(input=>{input.disabled=true;input.closest('label').hidden=true;});
+  if(label?.tagName==='LABEL')label.remove();checks.forEach(input=>input.closest('label').remove());
   const field=document.createElement('div');field.className='notice primary-professional';field.innerHTML=`<small>Elsődleges szakember</small><strong>${esc(state.staff.find(p=>p.id===s.primaryStaffId)?.name||'')}</strong><input type="hidden" name="staff" value="${esc(s.primaryStaffId)}">`;form.querySelector('#form-error').before(field);
  }
 };

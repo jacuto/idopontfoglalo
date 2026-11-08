@@ -24,15 +24,17 @@ final class FeaturesController
         if ($path === 'api/profile' && $method === 'PUT') {
             $data = $r->validate([
                 'intro' => 'nullable|string|max:500', 'description' => 'nullable|string|max:12000',
+                'city'=>'nullable|string|max:100','zip'=>'nullable|string|max:20','categories'=>'sometimes|array|max:7','categories.*'=>\Illuminate\Validation\Rule::in(array_keys(\App\Services\ProviderDiscovery::CATEGORIES)),
                 'address' => 'nullable|string|max:500', 'directions' => 'nullable|string|max:1500', 'phone' => 'nullable|string|max:40',
                 'email' => 'nullable|email|max:200', 'website' => 'nullable|url:http,https|max:1000',
                 'mapUrl' => 'nullable|url:http,https|max:1000', 'facebook' => 'nullable|url:http,https|max:1000', 'instagram' => 'nullable|url:http,https|max:1000',
-                'logo' => 'nullable|url:http,https|max:1000', 'cover' => 'nullable|url:http,https|max:1000', 'photos' => 'sometimes|array|max:12', 'photos.*' => 'url:http,https|max:1000',
+                'logo' => ['nullable','string','max:1000',self::publicImageRule()], 'cover' => ['nullable','string','max:1000',self::publicImageRule()], 'photos' => 'sometimes|array|max:12', 'photos.*' => ['string','max:1000',self::publicImageRule()],
                 'hours' => 'nullable|string|max:1500', 'terms' => 'nullable|string|max:5000',
             ]);
             $data=\App\Services\Contact::apply($data);
             foreach(['description','terms'] as $key)if(isset($data[$key]))$data[$key]=\App\Services\SafeHtml::clean($data[$key]);
             $this->store->mutate(function (&$s) use ($data) { $s['profile'] = array_replace($s['profile']??[], $data); });
+            \Illuminate\Support\Facades\Cache::forget(ProviderDirectoryController::CACHE_KEY);
             return response()->json(['ok' => true]);
         }
         if ($path === 'api/coupons' && $method === 'POST') {
@@ -105,4 +107,5 @@ final class FeaturesController
         app(Offers::class)->reservePass($s,$b,$data['passId']??null,!$b['public']);
         return response()->json($b['pricing']);
     }
+    private static function publicImageRule():\Closure{return static function($attribute,$value,$fail){if(!\App\Services\ProviderDiscovery::image($value)&&!(filter_var($value,FILTER_VALIDATE_URL)&&parse_url($value,PHP_URL_SCHEME)==='http'))$fail('Érvényes képcímet adj meg.');};}
 }

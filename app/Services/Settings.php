@@ -104,6 +104,13 @@ final class Settings
         [$h, $m] = array_map("intval", explode(":", $time));
         return $h * 60 + $m;
     }
+    /** Effective assignment for new bookings; original team assignments and historical snapshots stay intact. */
+    public static function serviceStaff(array $state,array $service):array
+    {
+        return ($state['settings']['businessMode']??'team')==='solo'
+            ? [($state['settings']['primaryStaffId']??'')]
+            : ($service['staff']??[]);
+    }
     public static function activeStaff(array $state): array
     {
         $people = array_values(

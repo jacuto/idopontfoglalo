@@ -102,7 +102,7 @@ function updateStaff() {
       (state.settings.businessMode !== "solo" ||
         p.id === state.settings.primaryStaffId) &&
       selected.every((id) =>
-        state.services.find((s) => s.id === id).staff.includes(p.id),
+        (state.settings.businessMode === "solo" || state.services.find((s) => s.id === id).staff.includes(p.id)),
       ),
   );
   const el = $("[name=staff]");
@@ -169,7 +169,7 @@ async function submitBooking(e) {
       let last;
       for (const st of state.staff.filter((p) =>
         body.services.every((id) =>
-          state.services.find((s) => s.id === id).staff.includes(p.id),
+          (state.settings.businessMode === "solo" || state.services.find((s) => s.id === id).staff.includes(p.id)),
         ),
       )) {
         try {

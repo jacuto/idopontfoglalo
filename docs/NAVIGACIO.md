@@ -24,7 +24,7 @@ A vendégeknek szóló teljes oldalakon felső navigáció található: **Szolg�
 | `/arak` | Szolgáltatói alapcsomag és a vendégoldal díjmentessége |
 | `/kapcsolat` | Hivatkozás az üzemeltető valódi elérhetőségeire |
 
-Az eddigi `/?provider=…` és `/foglalas?provider=…` címek tovább működnek. A nyilvános önkiszolgáló szolgáltatói regisztráció nem része ennek a navigációs frissítésnek: új vállalkozást továbbra is a főadmin hoz létre; a csatlakozási oldal kapcsolatfelvételt kínál.
+Az eddigi `/?provider=…` és `/foglalas?provider=…` címek tovább működnek. A későbbi [kereső- és csatlakozási frissítés](KERESO.md) már önálló szolgáltatói regisztrációt és e-mailes belépést is tartalmaz. A főadmin továbbra is létrehozhat szolgáltatót.
 
 A nyilvános szolgáltatólista név, szakma, cím és szolgáltatás szerint kereshető, 24-es oldalakra bontott. Csak aktív, foglalható szolgáltatáskatalógussal rendelkező vállalkozásokat mutat. Vendégek, belépési adatok, értesítési címek, előfizetési vagy bankadatok nem kerülnek ebbe az API-ba. A megjelenített cím kizárólag a szolgáltató nyilvános adatlapjából származik. A találatok legfeljebb egy percig gyorsítótárazódnak.
 

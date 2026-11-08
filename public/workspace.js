@@ -356,7 +356,7 @@ function servicesPage() {
     .filter((s) => !s.archived)
     .map(
       (s) =>
-        `<article class="card item">${serviceVisual(s)}<span class="badge">${s.duration} PERC</span><h3>${esc(s.name)}</h3><p>${s.staff.map((id) => esc(state.staff.find((p) => p.id === id)?.name)).join(", ")}</p><div class="price">${money(s.price)}</div>${s.phases ? `<p>${s.phases[0]} p munka · ${s.phases[1]} p hatóidő · ${s.phases[2]} p munka</p>` : ""}<button onclick="serviceForm('${s.id}')">Szerkesztés</button></article>`,
+        `<article class="card item">${serviceVisual(s)}<span class="badge">${s.duration} PERC</span><h3>${esc(s.name)}</h3><p>${(state.settings.businessMode==="solo"?[state.settings.primaryStaffId]:s.staff).map((id) => esc(state.staff.find((p) => p.id === id)?.name)).join(", ")}</p><div class="price">${money(s.price)}</div>${s.phases ? `<p>${s.phases[0]} p munka · ${s.phases[1]} p hatóidő · ${s.phases[2]} p munka</p>` : ""}<button onclick="serviceForm('${s.id}')">Szerkesztés</button></article>`,
     )
     .join("")}</div>`;
 }
@@ -533,7 +533,7 @@ function activityPage() {
 function settingsPage() {
   const s = state.settings;
   $("#content").innerHTML =
-    `<div class="settings-layout"><div class="card item"><form id="settings-form"><h2>Vállalkozás és foglalás</h2><div class="form-grid"><div><label>Vállalkozás neve</label><input name="name" value="${esc(s.name)}" required></div><div><label>Szakterület</label><select name="profession">${["Szépségszalon", "Masszázs", "Fodrászat", "Műköröm", "Pedikűr", "Szempilla"].map((v) => `<option ${v === s.profession ? "selected" : ""}>${v}</option>`).join("")}</select></div><div><label>Működés</label><select name="businessMode"><option value="solo" ${s.businessMode === "solo" ? "selected" : ""}>Egyéni vállalkozás</option><option value="team" ${s.businessMode !== "solo" ? "selected" : ""}>Több munkatársas vállalkozás</option></select></div><div><label>Elsődleges szakember (egyéni működésnél)</label><select name="primaryStaffId">${activePeople()
+    `<div class="settings-layout"><div class="card item"><form id="settings-form"><h2>Vállalkozás és foglalás</h2><div class="form-grid"><div><label>Vállalkozás neve</label><input name="name" value="${esc(s.name)}" required></div><div><label>Szakterület</label><select name="profession">${[...new Set([s.profession,"Szépségszalon", "Masszázs", "Fodrászat", "Műköröm", "Pedikűr", "Szempilla", "Személyi edzés", "Jóga és pilates", "Egészség és terápia", "Tanácsadás", "Egyéb"])].filter(Boolean).map((v) => `<option ${v === s.profession ? "selected" : ""}>${esc(v)}</option>`).join("")}</select></div><div><label>Működés</label><select name="businessMode"><option value="solo" ${s.businessMode === "solo" ? "selected" : ""}>Egyéni vállalkozás</option><option value="team" ${s.businessMode !== "solo" ? "selected" : ""}>Több munkatársas vállalkozás</option></select></div><div><label>Elsődleges szakember (egyéni működésnél)</label><select name="primaryStaffId">${activePeople()
       .map(
         (p) =>
           `<option value="${p.id}" ${p.id === s.primaryStaffId ? "selected" : ""}>${esc(p.name)}</option>`,

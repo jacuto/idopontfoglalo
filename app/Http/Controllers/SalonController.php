@@ -136,7 +136,7 @@ class SalonController
                             fn($v) => empty($v["archived"]) &&
                                 count(
                                     array_intersect(
-                                        $v["staff"],
+                                        \App\Services\Settings::serviceStaff($s,$v),
                                         array_column(
                                             \App\Services\Settings::activeStaff(
                                                 $s,
@@ -223,7 +223,7 @@ class SalonController
                         "public" => !$admin || $request->boolean("public"),
                     ]);
                     $b["guestId"] = $request->session()->get("guest_id");
-                    if(empty($b['services'])&&!$b['public']){$default=collect($s['services'])->first(fn($v)=>$v['id']===($s['settings']['defaultServiceId']??null)&&empty($v['archived'])&&($v['bookingMode']??'individual')!=='group'&&in_array($b['staff'],$v['staff'],true))??collect($s['services'])->first(fn($v)=>empty($v['archived'])&&($v['bookingMode']??'individual')!=='group'&&in_array($b['staff'],$v['staff'],true));if($default)$b['services']=[$default['id']];}
+                    if(empty($b['services'])&&!$b['public']){$default=collect($s['services'])->first(fn($v)=>$v['id']===($s['settings']['defaultServiceId']??null)&&empty($v['archived'])&&($v['bookingMode']??'individual')!=='group'&&in_array($b['staff'],\App\Services\Settings::serviceStaff($s,$v),true))??collect($s['services'])->first(fn($v)=>empty($v['archived'])&&($v['bookingMode']??'individual')!=='group'&&in_array($b['staff'],\App\Services\Settings::serviceStaff($s,$v),true));if($default)$b['services']=[$default['id']];}
                     if(empty($b['services']))throw new InvalidArgumentException('Válassz szolgáltatást.');
                     if(empty(trim($b['name']??''))&&empty($data['clientId'])){
                         if($b['public'])throw new InvalidArgumentException('Add meg a vendég nevét.');
@@ -246,7 +246,7 @@ class SalonController
                         ->utc()
                         ->toISOString();
                     $b["serviceSnapshot"] = $b["serviceSnapshot"]??array_map(
-                        fn($id) => $this->rules->service($s["services"], $id),
+                        fn($id) => array_replace($this->rules->service($s["services"], $id),["staff"=>\App\Services\Settings::serviceStaff($s,$this->rules->service($s["services"],$id))]),
                         $b["services"],
                     );
                     $b["status"] = $b["public"]
@@ -571,7 +571,7 @@ class SalonController
                     if(isset($data['services']))\App\Services\ProfessionOptions::validateCatalog($s,$data['services'],array_replace($s['settings'],$data['settings']??[]));
                     if(isset($data['services']))foreach($data['services'] as $service){if(($service['bookingMode']??'individual')!=='group'&&collect($s['groupSessions'])->contains(fn($g)=>$g['serviceId']===$service['id']&&empty($g['cancelled'])&&CarbonImmutable::parse($g['start'])->isFuture()))throw new InvalidArgumentException('Előbb mondd le a szolgáltatás meghirdetett csoportos óráit.');if(($service['bookingMode']??'individual')==='group'&&!empty($service['phases']))throw new InvalidArgumentException('Csoportos órához ne adj meg hatóidős szakaszokat.');}
                     if(!empty($data['settings']['defaultServiceId'])){ $catalog=$data['services']??$s['services'];if(!collect($catalog)->contains(fn($v)=>$v['id']===$data['settings']['defaultServiceId']&&empty($v['archived'])&&($v['bookingMode']??'individual')!=='group'))throw new InvalidArgumentException('Alapértelmezettnek aktív, nem csoportos szolgáltatást válassz.');}
-                    \App\Services\GroupSessions::checkCatalog($s,$data['services']??$s['services'],$data['staff']??$s['staff']);
+                    \App\Services\GroupSessions::checkCatalog(array_replace($s,['settings'=>array_replace($s['settings'],$data['settings']??[])]),$data['services']??$s['services'],$data['staff']??$s['staff']);
                     foreach(['staff','services'] as $kind)if(isset($data[$kind])){foreach($data[$kind] as &$entity){$old=collect($s[$kind])->firstWhere('id',$entity['id'])??[];if($kind==='staff')$entity=\App\Services\Contact::apply($entity,$old);if(isset($entity['description']))$entity['description']=\App\Services\SafeHtml::clean($entity['description']);if(!empty($old['image']))$entity['image']=$old['image'];}unset($entity);}
                     if (isset($data['staff'])) \App\Services\Settings::checkCalendars($s,$data['staff']);
                     // Keep catalog records referenced by bookings; use a separate archive feature to remove them later.
@@ -735,7 +735,7 @@ class SalonController
     }
     private function nextSlots(Request $request):array {
         $s=$this->store->read();$ids=array_filter(explode(',',(string)$request->query('services','')));if(!$ids||count($ids)>20)return ['date'=>null,'slots'=>[]];
-        $active=array_filter($s['services'],fn($v)=>empty($v['archived']));if(array_diff($ids,array_column($active,'id')))return ['date'=>null,'slots'=>[]];$person=$request->query('staff');$eligible=array_filter(\App\Services\Settings::activeStaff($s),fn($p)=>(!$person||$person==='any'||$person===$p['id'])&&!array_filter($ids,fn($id)=>!in_array($p['id'],$this->rules->service($s['services'],$id)['staff'],true)));if(!$eligible)return ['date'=>null,'slots'=>[]];
+        $active=array_filter($s['services'],fn($v)=>empty($v['archived']));if(array_diff($ids,array_column($active,'id')))return ['date'=>null,'slots'=>[]];$person=$request->query('staff');$eligible=array_filter(\App\Services\Settings::activeStaff($s),fn($p)=>(!$person||$person==='any'||$person===$p['id'])&&!array_filter($ids,fn($id)=>!in_array($p['id'],\App\Services\Settings::serviceStaff($s,$this->rules->service($s['services'],$id)),true)));if(!$eligible)return ['date'=>null,'slots'=>[]];
         $today=CarbonImmutable::now('Europe/Budapest')->startOfDay();$group=collect($s['services'])->contains(fn($v)=>in_array($v['id'],$ids,true)&&($v['bookingMode']??'individual')==='group');
         $dates=$group?array_values(array_unique(array_map(fn($g)=>CarbonImmutable::parse($g['start'])->setTimezone('Europe/Budapest')->format('Y-m-d'),array_filter($s['groupSessions'],fn($g)=>!\App\Services\GroupMinimum::unavailable($g,$s)&&in_array($g['serviceId'],$ids,true)&&CarbonImmutable::parse($g['start'])->isFuture())))):array_map(fn($d)=>$today->addDays($d)->format('Y-m-d'),range(0,365));sort($dates);
         $s['_googleBusy']=app(\App\Services\GoogleCalendar::class)->busy($s,(int)$request->session()->get('guest_id',0));
