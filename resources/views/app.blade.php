@@ -30,7 +30,9 @@
     <script src="/discovery.js?v={{ filemtime(public_path('discovery.js')) }}" defer></script>
     <script src="/growth.js?v={{ filemtime(public_path('growth.js')) }}" defer></script>
     <script src="/followup.js?v={{ filemtime(public_path('followup.js')) }}" defer></script>
+    <script src="/pricing-features.js?v={{ filemtime(public_path('pricing-features.js')) }}" defer></script>
     <script src="/showcase.js?v={{ filemtime(public_path('showcase.js')) }}" defer></script>
+    <script src="/team.js?v={{ filemtime(public_path('team.js')) }}" defer></script>
     <script src="/boot.js?v={{ filemtime(public_path('boot.js')) }}" defer></script>
   </body>
 </html>

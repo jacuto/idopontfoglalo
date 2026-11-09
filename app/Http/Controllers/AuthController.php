@@ -230,7 +230,7 @@ class AuthController
                     ->update($values);
             }
             $r->session()->regenerate();
-            $r->session()->forget(["admin","platform_admin","guest_password_account","guest_password_version"]);$r->session()->put("guest_id", $account->id);
+            $r->session()->forget(["admin","platform_admin","guest_password_account","guest_password_version","provider_member_id","provider_member_version","provider_auth_method"]);$r->session()->put("guest_id", $account->id);
             $picture = $provider === 'google' ? ($user['picture'] ?? null) : (empty($user['picture']['data']['is_silhouette']) ? ($user['picture']['data']['url'] ?? null) : null);
             app(\App\Services\SocialAvatar::class)->import((int) $account->id, $provider, $picture);
             $tenant = app(\App\Services\Tenant::class)->id;
@@ -243,6 +243,7 @@ class AuthController
     }
     public function guest(Request $r)
     {
+        if($r->session()->get("admin")===true&&!$r->session()->get("guest_id"))\App\Services\ProviderGuest::ensure($r,(int)$r->session()->get("provider_id",1),$r->attributes->get("provider_member"));
         $account = DB::table("guest_accounts")->find(
             $r->session()->get("guest_id"),
         );
@@ -273,6 +274,7 @@ class AuthController
         }
         usort($allBookings, fn($a, $b) => strcmp($a['start'], $b['start']));
         return response()->json([
+            "providerWorkspace"=>$r->session()->get("admin")?"/?provider=".$r->session()->get("provider_id",1):null,
             "passwordAccount"=>DB::table("guest_credentials")->where("guest_id",$account->id)->exists(),
             "providers" => $providers,
             "allBookings" => $allBookings,
@@ -286,7 +288,7 @@ class AuthController
     }
     public function logout(Request $r)
     {
-        $r->session()->forget("guest_id");
+        if($r->session()->get("admin")&&\App\Services\ProviderGuest::allowed($r))\App\Services\StaffAccess::clear($r);$r->session()->forget(["guest_id","guest_password_account","guest_password_version"]);
         return response()->json(["ok" => true]);
     }
 }

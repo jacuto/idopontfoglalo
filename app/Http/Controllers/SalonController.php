@@ -73,7 +73,7 @@ class SalonController
                 ($path === "/api/bookings" && $method === "POST");
             $admin =
                 !$request->attributes->get("embedAllowed", false) &&
-                $request->session()->get("admin", false) === true;
+                $request->session()->get("admin", false) === true&&!(in_array($path,["/api/bookings","/api/slots","/api/slots/next","/api/quote"],true)&&$request->boolean("public"));
             if (!$public && !$admin) {
                 return response()->json(
                     ["error" => "Bejelentkezés szükséges."],
@@ -99,14 +99,7 @@ class SalonController
                 if (!$b) {
                     abort(404);
                 }
-                if (
-                    RateLimiter::tooManyAttempts(
-                        "checkout:" . $request->ip(),
-                        10,
-                    )
-                ) {
-                    abort(429);
-                }
+                \App\Services\AttemptLimit::check("checkout:".$request->ip(),10);
                 RateLimiter::hit("checkout:" . $request->ip(), 60);
                 return response()->json(
                     app(\App\Services\Payments::class)->checkout($b["id"]),
@@ -168,7 +161,7 @@ class SalonController
             }
             if ($path === "/api/state" && $method === "GET") {
                 $state=$this->store->read();$state['paymentDues']=\App\Services\PaymentDues::rows($state);$state['clients']=array_values(array_filter($state['clients'],fn($c)=>\App\Services\Clients::visible($c)));
-                return response()->json($state);
+                return response()->json(\App\Services\StaffAccess::projection($state,$request));
             }
             if ($path === "/api/slots/next" && $method === "GET") return response()->json($this->nextSlots($request));
             if ($path === "/api/slots" && $method === "GET") {
@@ -192,12 +185,7 @@ class SalonController
                     );
                 }
                 $key = "booking:" . $request->ip();
-                if (RateLimiter::tooManyAttempts($key, 30)) {
-                    return response()->json(
-                        ["error" => "Túl sok foglalási kérés. Próbáld később."],
-                        429,
-                    );
-                }
+                \App\Services\AttemptLimit::check($key,30);
                 RateLimiter::hit($key, 60);
                 $data = $request->validate([
                     "recurrence"=>"nullable|array:frequency,count,startDate,endDate","recurrence.frequency"=>"required_with:recurrence|in:daily,weekly,fortnightly,monthly","recurrence.count"=>"nullable|integer|between:0,5200","recurrence.startDate"=>"nullable|date_format:Y-m-d","recurrence.endDate"=>"nullable|date_format:Y-m-d",
@@ -240,10 +228,11 @@ class SalonController
                 ]);
                 $result = $this->store->mutate(function (&$s) use (
                     $match,
-                    $data,
+                    $data,$request,
                 ) {
                     foreach ($s["bookings"] as &$b) {
                         if ($b["id"] === $match[1]) {
+                            \App\Services\StaffAccess::guard($b,$request);
                             $next = array_merge($b, $data, [
                                 "updatedAt" => CarbonImmutable::now()
                                     ->utc()
@@ -667,15 +656,7 @@ class SalonController
     private function login(Request $request)
     {
         $key = "login:" . $request->ip();
-        if (RateLimiter::tooManyAttempts($key, 5)) {
-            return response()->json(
-                [
-                    "error" =>
-                        "Túl sok próbálkozás. Egy perc múlva próbáld újra.",
-                ],
-                429,
-            );
-        }
+        \App\Services\AttemptLimit::check($key,5);
         $tenant = app(\App\Services\Tenant::class)->id;
         $hash = \App\Services\ProviderPasswords::hash($tenant);
         if (!$hash) {
@@ -703,6 +684,7 @@ class SalonController
                         "public" => !$admin || $request->boolean("public"),
                     ]);
                     $b["guestId"] = $request->session()->get("guest_id");$b["locale"]=in_array($request->header("X-App-Language"),["hu","en","de"],true)?$request->header("X-App-Language"):"hu";
+                    if(!$b['public']){\App\Services\StaffAccess::guard($b,$request);\App\Services\StaffAccess::ownClient($s,$data['clientId']??null,$request);}
                     \App\Services\Blacklist::guard($s,$b);
                     if(empty($b['services'])&&!$b['public']){$default=collect($s['services'])->first(fn($v)=>$v['id']===($s['settings']['defaultServiceId']??null)&&empty($v['archived'])&&($v['bookingMode']??'individual')!=='group'&&in_array($b['staff'],\App\Services\Settings::serviceStaff($s,$v),true))??collect($s['services'])->first(fn($v)=>empty($v['archived'])&&($v['bookingMode']??'individual')!=='group'&&in_array($b['staff'],\App\Services\Settings::serviceStaff($s,$v),true));if($default)$b['services']=[$default['id']];}
                     if(empty($b['services']))throw new InvalidArgumentException('Válassz szolgáltatást.');
@@ -716,6 +698,7 @@ class SalonController
                     \App\Services\GroupSessions::prepare($b,$s);
                     $previousClientIds=array_column($s['clients'],'id');
                     \App\Services\Clients::attach($s, $b, $data["clientId"] ?? null, !$b["public"]);
+                    $b=\App\Services\Contact::apply($b);
                     \App\Services\Subscriptions::guard($s,!$b["public"]);
                     $this->rules->validate($b, $s);
                     $b["id"] = (string) Str::uuid();
@@ -790,7 +773,7 @@ class SalonController
         if(collect($s['services'])->contains(fn($v)=>in_array($v['id'],$ids,true)&&($v['bookingMode']??'individual')==='group')){
             if(count($ids)!==1)return [];
             foreach($s['groupSessions'] as $g){if(\App\Services\GroupMinimum::unavailable($g,$s)||$g['serviceId']!==array_values($ids)[0]||($person&&$person!=='any'&&$person!==$g['staff'])||CarbonImmutable::parse($g['start'])->setTimezone('Europe/Budapest')->format('Y-m-d')!==$date)continue;
-                try{$b=['name'=>'slot','phone'=>'slot','start'=>$g['start'],'staff'=>$g['staff'],'services'=>array_values($ids),'public'=>!$request->session()->get('admin'),'guestId'=>$request->session()->get('guest_id')];\App\Services\GroupSessions::prepare($b,$s);$this->rules->validate($b,$s);$slots[]=['start'=>$g['start'],'staff'=>$g['staff'],'time'=>CarbonImmutable::parse($g['start'])->setTimezone('Europe/Budapest')->format('H:i'),'groupSessionId'=>$g['id'],'remaining'=>$g['serviceSnapshot']['capacity']-\App\Services\GroupSessions::booked($g,$s)];}catch(InvalidArgumentException){}
+                try{$b=['name'=>'slot','phone'=>'slot','start'=>$g['start'],'staff'=>$g['staff'],'services'=>array_values($ids),'public'=>!$request->session()->get('admin')||$request->boolean('public'),'guestId'=>$request->session()->get('guest_id')];\App\Services\GroupSessions::prepare($b,$s);$this->rules->validate($b,$s);$slots[]=['start'=>$g['start'],'staff'=>$g['staff'],'time'=>CarbonImmutable::parse($g['start'])->setTimezone('Europe/Budapest')->format('H:i'),'groupSessionId'=>$g['id'],'remaining'=>$g['serviceSnapshot']['capacity']-\App\Services\GroupSessions::booked($g,$s)];}catch(InvalidArgumentException){}
             }return $slots;
         }
         $step=(int)($s['settings']['slotStep']??10);

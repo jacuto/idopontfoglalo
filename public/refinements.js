@@ -6,7 +6,7 @@ function offerFields() {
  return `<details id="booking-offers"><summary>Kedvezmény vagy bérlet</summary>${coupons?'<label>Kuponkód</label><input name="coupon"><button type="button" onclick="previewPrice()">Ár ellenőrzése</button>':''}${passes?'<label>Bérlet</label><select name="passId" onchange="previewPrice()"><option value="">Nem használok bérletet</option></select><p class="hint">Saját bérlethez lépj be, vagy szolgáltatóként válassz vendéget. Lemondáskor a lefoglalt alkalom visszajár.</p>':''}<p id="price-preview" aria-live="polite"></p></details>`;
 }
 function serviceSelectionChanged(){if(isPublic&&$('#booking-date')){if(!$('#booking-date').value)$('#booking-date').value=datekey(new Date());++slotRequest;}updateStaff();}
-function bookingDaySelected(){loadSlots();}
+function bookingDaySelected(){const date=$('#booking-date');if(date)date.dataset.userChosen='true';loadSlots();}
 const dialog=$('#modal');
 dialog.addEventListener('click',e=>{const r=dialog.getBoundingClientRect();if(e.target===dialog&&(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom))dialog.close();});
 const phoneLink=phone=>phone?`<a class="call-link" href="tel:${esc(phoneHref(phone))}" aria-label="Hívás: ${esc(phoneFormatted(phone))}">☎ ${esc(phoneFormatted(phone))}</a>`:'<span class="muted">Nincs telefonszám</span>';

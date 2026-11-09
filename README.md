@@ -65,3 +65,5 @@ A november 8-i vendégfiók-, ismétlődés-, feketelista-, értékelés- és ny
 Az ismétlődés és szolgáltatói belépés folytatása: [útmutató](docs/ISMETLODES_ES_BELEPES.md).
 
 Áttekinthető nyilvános arculat: [részletek és feltöltés](docs/NYILVANOS_ARCULAT.md).
+
+Munkatársi belépés és jogosultságok: [útmutató](docs/MUNKATARSI_BELEPESEK.md).

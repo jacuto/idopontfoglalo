@@ -19,7 +19,7 @@ final class AppleAuthController
     public function callback(Request $r){
         // Apple posts cross-site. A one-use relay restores the Lax session cookie on the same-site GET.
         if($r->isMethod('POST')){
-            abort_if(strlen($r->getContent())>20000,413);abort_if(RateLimiter::tooManyAttempts('apple-relay:'.$r->ip(),30),429);RateLimiter::hit('apple-relay:'.$r->ip(),60);
+            abort_if(strlen($r->getContent())>20000,413);\App\Services\AttemptLimit::check('apple-relay:'.$r->ip(),30);RateLimiter::hit('apple-relay:'.$r->ip(),60);
             $validator=validator($r->all(),['state'=>'required|string|max:256','code'=>'nullable|string|max:4096','user'=>'nullable|string|max:12000','error'=>'nullable|string|max:200']);abort_unless($validator->passes(),422,'Érvénytelen Apple-válasz.');$v=$validator->validated();
             $relay=Str::random(64);Cache::put('apple-relay:'.$relay,$v,120);
             return redirect('/auth/apple/callback?relay='.$relay,303)->header('Cache-Control','no-store')->header('Referrer-Policy','no-referrer');
@@ -47,7 +47,7 @@ final class AppleAuthController
             $user=json_decode($input['user']??'{}',true);$name=trim(($user['name']['firstName']??'').' '.($user['name']['lastName']??''));
             $values=['name'=>mb_substr($name?:($account->name??'Vendég'),0,150),'email'=>filter_var($claims->email??'',FILTER_VALIDATE_EMAIL)?$claims->email:($account->email??null),'email_verified'=>isset($claims->email_verified)?in_array($claims->email_verified,[true,'true'],true):(bool)($account->email_verified??false),'updated_at'=>now()];
             if(!$account){DB::table('guest_accounts')->insertOrIgnore(array_merge($values,['provider'=>'apple','subject'=>$claims->sub,'created_at'=>now()]));$account=DB::table('guest_accounts')->where('provider','apple')->where('subject',$claims->sub)->first();}else DB::table('guest_accounts')->where('id',$account->id)->update($values);
-            $r->session()->regenerate();$r->session()->forget(['admin','platform_admin','guest_password_account','guest_password_version']);$r->session()->put('guest_id',$account->id);
+            $r->session()->regenerate();$r->session()->forget(['admin','platform_admin','guest_password_account','guest_password_version','provider_member_id','provider_member_version','provider_auth_method']);$r->session()->put('guest_id',$account->id);
             $path=match($saved['returnTo']){'booking'=>'/foglalas?provider='.$saved['tenant'].'#public-form','messages'=>'/uzenetek?provider='.$saved['tenant'],'operatorMessages'=>'/uzenetek?provider='.$saved['tenant'].'&platformMessages=1',default=>'/fiokom?provider='.$saved['tenant']};
             return redirect($path);
         }catch(\Throwable){$target=in_array($saved['mode'],['provider','provider-link'],true)?'/belepes':($saved['mode']==='admin'?'/':'/fiokom');return redirect($target.'?authError=provider'.($saved['tenant']!==1?'&provider='.$saved['tenant']:'').($saved['returnTo']?'&returnTo='.$saved['returnTo']:''));}

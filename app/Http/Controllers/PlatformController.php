@@ -7,7 +7,7 @@ final class PlatformController {
  public function handle(Request $r) {
   $path=$r->path();$method=$r->method();
   if($path==='api/platform/login'&&$method==='POST'){
-   $key='platform-login:'.$r->ip();abort_if(RateLimiter::tooManyAttempts($key,5),429);
+   $key='platform-login:'.$r->ip();\App\Services\AttemptLimit::check($key,5);
    $hash=config('operator.password_hash');abort_unless($hash,503,'Előbb futtasd a szerveren: php artisan raero:platform-password');
    if(!Hash::check((string)$r->input('password'),$hash)){RateLimiter::hit($key,60);abort(401,'Hibás jelszó.');}
    RateLimiter::clear($key);$r->session()->regenerate();$r->session()->put('platform_admin',true);return response()->json(['ok'=>true]);

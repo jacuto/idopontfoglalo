@@ -847,7 +847,13 @@ Mi kerülhet külön pénzbe?|What may cost extra?|Was kann zusätzlich kosten?
 A foglaláshoz nem szükséges regisztráció.|No registration is needed to book.|Für die Buchung ist keine Registrierung nötig.
 Jelképes naptárillusztráció|Symbolic calendar illustration|Symbolische Kalenderillustration`;
  for(const line of referenceStyle.split('\n')){const p=line.trim().split('|');if(p.length===3)dictionary.set(p[0],{en:p[1],de:p[2]});}
+ const accountPolish=`Vállalkozás keresése név alapján|Find a business by name|Unternehmen nach Namen suchen
+A választott napon nincs szabad időpont.|There are no available appointments on the selected day.|Am ausgewählten Tag sind keine Termine verfügbar.`;
+ for(const line of accountPolish.split('\n')){const p=line.trim().split('|');if(p.length===3)dictionary.set(p[0],{en:p[1],de:p[2]});}
  const patterns=[
+  [/^Túl sok próbálkozás\. Próbáld újra (\d+) másodperc múlva\.$/,m=>language==='en'?`Too many attempts. Try again in ${m[1]} seconds.`:`Zu viele Versuche. Bitte in ${m[1]} Sekunden erneut versuchen.`],
+  [/^A választott napon nincs szabad időpont\. A mai naphoz legközelebbi szabad napot mutatjuk: (.+)$/,m=>language==='en'?'There are no available appointments on the selected day. Showing the nearest available day from today: '+m[1]:'Am ausgewählten Tag sind keine Termine verfügbar. Der nächstmögliche freie Tag ab heute wird angezeigt: '+m[1]],
+  [/^(\d+) funkció$/,m=>m[1]+(language==='en'?' features':' Funktionen')],
   [/^(\d+) szolgáltató(.*)$/,m=>language==='en'?`${m[1]} providers${m[2]}`:`${m[1]} Anbieter${m[2]}`],
   [/^(\d+) találat$/,m=>language==='en'?`${m[1]} results`:`${m[1]} Treffer`],
   [/^([＋+↓↑☎↗⌃⌄]\s+)(.+)$/,m=>m[1]+translate(m[2])],
@@ -872,7 +878,7 @@ Jelképes naptárillusztráció|Symbolic calendar illustration|Symbolische Kalen
   [/^Ctrl \+ kattintás vagy húzás: több nap kijelölése\.$/,()=>language==='en'?'Ctrl + click or drag to select multiple days.':'Strg + klicken oder ziehen, um mehrere Tage auszuwählen.'],
   [/^⌘ \+ kattintás vagy húzás: több nap kijelölése\.$/,()=>language==='en'?'⌘ + click or drag to select multiple days.':'⌘ + klicken oder ziehen, um mehrere Tage auszuwählen.']
  ];
- function translate(text){if(language==='hu')return text;const found=dictionary.get(text);if(found)return found[language];for(const [regex,format]of patterns){const m=text.match(regex);if(m)return format(m);}return text;}
+ function translate(text){if(language==='hu')return text;const found=dictionary.get(text)||window.raeroFeatureTranslations?.[text];if(found)return found[language];for(const [regex,format]of patterns){const m=text.match(regex);if(m)return format(m);}return text;}
  window.raeroTranslate=translate;
  const originals=new WeakMap(),attributes=new WeakMap();let timer,observer;
  const skip='script,style,textarea,input,svg,[contenteditable],[data-no-i18n],.brand,.visitor-brand,.rich-text,.rich-content,.editor-body,.discovery-provider-name h3,.guest-profile-heading h1,.guest-booking h3,.entity-grid h3,.booking-hero h1,.directory-identity h3,.directory-card h3,.mail-preview';

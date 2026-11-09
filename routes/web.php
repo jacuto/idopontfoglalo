@@ -9,6 +9,8 @@ Route::post('/api/booking-series/{id}/cancel',[\App\Http\Controllers\BookingTool
 Route::post('/api/guest/auth/{action}',[\App\Http\Controllers\GuestPasswordController::class,'handle'])->whereIn('action',['register','login','forgot','resend','verify','reset','change'])->middleware('throttle:12,1');
 Route::get('/api/provider-social',[\App\Http\Controllers\ProviderSecurityController::class,'pending']);
 Route::post('/api/provider-password/{action}',[\App\Http\Controllers\ProviderSecurityController::class,'handle'])->whereIn('action',['forgot','reset','change'])->middleware('throttle:12,1');
+Route::match(['GET','POST','PATCH'],'/api/provider-members/{id?}',[\App\Http\Controllers\MemberController::class,'handle'])->whereNumber('id');
+Route::post('/api/provider-workspace',[\App\Http\Controllers\MemberController::class,'activate'])->middleware('throttle:12,1');
 Route::post('/api/provider-login',[\App\Http\Controllers\ProviderRegistrationController::class,'login'])->middleware('throttle:5,1');
 Route::post('/api/provider-register',[\App\Http\Controllers\ProviderRegistrationController::class,'store'])->middleware('throttle:3,60');
 Route::get('/api/providers',[\App\Http\Controllers\ProviderDirectoryController::class,'index'])->middleware('throttle:60,1');

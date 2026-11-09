@@ -9,7 +9,8 @@ final class ProviderRegistrationController
  public function login(Request $r){
   $v=$r->validate(['email'=>'required|email|max:200','password'=>'required|string|max:200']);$email=mb_strtolower(trim($v['email']));$candidate=DB::table('providers')->where('active',true)->whereRaw('LOWER(email) = ?',[$email])->first();$id=$candidate?(int)$candidate->id:0;$hash=\App\Services\ProviderPasswords::hash($id?:1);
   if(!$candidate){$root=DB::table('salon_state')->where('id',1)->value('data');$settings=$root?json_decode($root,true)['settings']:[];if($email===mb_strtolower(trim($settings['providerEmail']??'')))$id=1;}
-  $valid=$hash&&Hash::check($v['password'],$hash);abort_unless($valid&&$id,401,'Hibás e-mail-cím vagy jelszó.');\App\Services\ProviderIdentity::signIn($r,$id,'password');return response()->json(['id'=>$id,'url'=>'/?provider='.$id]);
+  $valid=$hash&&Hash::check($v['password'],$hash);if(!($valid&&$id)){if($member=MemberController::login($r,$email,$v['password']))return response()->json($member);}
+  abort_unless($valid&&$id,401,'Hibás e-mail-cím vagy jelszó.');\App\Services\ProviderIdentity::signIn($r,$id,'password');return response()->json(['id'=>$id,'url'=>'/?provider='.$id]);
  }
  public function store(Request $r){
   abort_if($r->session()->get('admin')||$r->session()->get('platform_admin'),409,'Már be vagy jelentkezve. Új vállalkozás regisztrálásához előbb lépj ki.');

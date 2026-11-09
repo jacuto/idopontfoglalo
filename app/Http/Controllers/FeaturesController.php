@@ -97,7 +97,8 @@ final class FeaturesController
         $s = $this->store->read();
         $data = $r->validate(['services' => 'required|array|min:1|max:20', 'services.*' => 'string', 'coupon' => 'nullable|string|max:80', 'passId'=>'nullable|string|max:80','start'=>'nullable|date', 'clientId' => 'nullable|string|max:80']);
         $b = ['services' => $data['services'], 'serviceSnapshot' => array_map(fn($id) => app(\App\Services\BookingRules::class)->service($s['services'], $id), $data['services']), 'guestId' => $r->session()->get('guest_id'), 'clientId' => '', 'public' => true];
-        if ($r->session()->get('admin') === true && (int) $r->session()->get('provider_id', 1) === app(Tenant::class)->id) {
+        if ($r->session()->get('admin') === true && !$r->boolean('public') && (int) $r->session()->get('provider_id', 1) === app(Tenant::class)->id) {
+            \App\Services\StaffAccess::ownClient($s,$data['clientId']??null,$r);
             abort_unless(empty($data['clientId']) || collect($s['clients'])->firstWhere('id', $data['clientId']), 404);
             $b['public'] = false; $b['clientId'] = $data['clientId'] ?? '';
         }

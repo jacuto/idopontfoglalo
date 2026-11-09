@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\DB;
 final class ProviderIdentity{
  public static function signIn(Request $r,int $id,string $method='social'):void{
   abort_unless($id===1||DB::table('providers')->where('id',$id)->where('active',true)->exists(),403,'A szolgáltatói fiók nem elérhető.');
-  $r->session()->regenerate();$r->session()->forget(['guest_id','guest_password_account','guest_password_version','platform_admin','pending_guest_invitation','provider_social_pending']);$r->session()->put(['admin'=>true,'provider_id'=>$id,'provider_auth_method'=>$method,'provider_password_version'=>ProviderPasswords::version($id)]);
+  $r->session()->regenerate();$r->session()->forget(['guest_id','guest_password_account','guest_password_version','platform_admin','pending_guest_invitation','provider_social_pending','provider_member_id','provider_member_version']);$r->session()->put(['admin'=>true,'provider_id'=>$id,'provider_auth_method'=>$method,'provider_password_version'=>ProviderPasswords::version($id)]);ProviderGuest::ensure($r,$id);
  }
  public static function complete(Request $r,string $network,string $subject,?string $email,string $name,string $mode,int $tenant){
   $identity=DB::table('provider_identities')->where('network',$network)->where('subject',$subject)->first();

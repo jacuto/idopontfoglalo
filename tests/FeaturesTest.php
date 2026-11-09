@@ -37,7 +37,7 @@ class FeaturesTest extends TestCase {
   $this->getJson('/api/clients/imported/detail')->assertNotFound();
  }
  public function test_selected_client_is_reused_without_creating_duplicate():void {
-  $this->provider();app(SalonStore::class)->mutate(function(&$s){$s['clients'][]=['id'=>'one','name'=>'Régi vendég','phone'=>'12345','email'=>''];});
+  $this->provider();app(SalonStore::class)->mutate(function(&$s){$s['clients'][]=['id'=>'one','name'=>'Régi vendég','phone'=>'+36 30 123-4567','email'=>''];});
   $this->postJson('/api/bookings',$this->booking(['clientId'=>'one']))->assertCreated()->assertJsonPath('clientId','one')->assertJsonPath('name','Régi vendég');
   $this->assertCount(1,app(SalonStore::class)->read()['clients']);
  }
@@ -79,7 +79,7 @@ class FeaturesTest extends TestCase {
   $this->postJson('/api/quote',['services'=>['cut'],'coupon'=>'LEJART'])->assertUnprocessable();
  }
  public function test_pass_reservation_cannot_be_double_spent_and_cancel_refunds_once():void {
-  $this->provider();app(SalonStore::class)->mutate(function(&$s){$s['clients'][]=['id'=>'one','name'=>'Vendég','phone'=>'12345','email'=>''];});
+  $this->provider();app(SalonStore::class)->mutate(function(&$s){$s['clients'][]=['id'=>'one','name'=>'Vendég','phone'=>'+36 30 123-4567','email'=>''];});
   $p=$this->postJson('/api/passes',['name'=>'Bérlet','price'=>8000,'visits'=>1,'days'=>3650,'services'=>['cut'],'active'=>true])->assertCreated()->json();
   $pass=$this->postJson('/api/client-passes',['clientId'=>'one','passId'=>$p['id']])->assertCreated()->json();
   $b=$this->postJson('/api/bookings',$this->booking(['clientId'=>'one','passId'=>$pass['id']]))->assertCreated()->assertJsonPath('pricing.payable',0)->json();
@@ -184,7 +184,7 @@ class FeaturesTest extends TestCase {
   $this->guest(11);$this->postJson('/api/guest/claim',['token'=>$b['token']])->assertForbidden();$this->getJson('/api/guest')->assertJsonCount(0,'bookings');
  }
  public function test_no_show_consumes_one_pass_visit_and_never_allows_a_review():void {
-  $this->provider();app(SalonStore::class)->mutate(function(&$s){$s['clients'][]=['id'=>'one','name'=>'Vendég','phone'=>'12345','email'=>''];});
+  $this->provider();app(SalonStore::class)->mutate(function(&$s){$s['clients'][]=['id'=>'one','name'=>'Vendég','phone'=>'+36 30 123-4567','email'=>''];});
   $p=$this->postJson('/api/passes',['name'=>'Bérlet','price'=>8000,'visits'=>1,'days'=>3650,'services'=>['cut'],'active'=>true])->json();
   $pass=$this->postJson('/api/client-passes',['clientId'=>'one','passId'=>$p['id']])->json();
   $b=$this->postJson('/api/bookings',$this->booking(['clientId'=>'one','passId'=>$pass['id']]))->assertCreated()->json();

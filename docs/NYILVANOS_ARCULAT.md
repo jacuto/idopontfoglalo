@@ -25,3 +25,11 @@ php artisan view:cache
 ```
 
 Böngészőben Ctrl+F5. A nézetek gyorsítótárazását feltöltés után kell elvégezni.
+
+## Belépés és teljes funkciólista
+
+A szolgáltatói belépés középre rendezett, a közösségi belépés az e-mailes űrlap alatt, kis térközzel található. A vendégfiók belépőoldala a kék-fehér megjelenést használja, a bal oldali bevezető a jobb oldali kártyához felül igazodik.
+
+A `/szolgaltatok` oldalon közvetlenül a kereső után jelennek meg a találatok; a kezdőoldalon továbbra is használhatók a kategóriák. Az automatikusan kiválasztott első szabad nap nem vált ki „választott nap” figyelmeztetést. Ilyen tájékoztató csak kézi napválasztás utáni sikertelen kereséskor jelenik meg.
+
+Az Árak oldalon 71 funkció szerepel hét témakörben, külön megjelölve a központi főadmin eszközeit és a külön díjas külső szolgáltatásokat. Az összes témakör egy gombbal is megnyitható. A listát a `public/pricing-features.js` tartalmazza angol és német fordítással együtt; ezt az új fájlt is fel kell tölteni.

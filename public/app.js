@@ -35,8 +35,9 @@ const api = async (url, method = "GET", body, tenant) => {
     const csrf = await response.json();
     csrfToken = csrf.token;
   }
+  if(isPublic&&/^\/api\/(slots(?:\/next)?|quote)(?:[?]|$)/.test(url))url+=(url.includes('?')?'&':'?')+'public=1';
   url += (url.includes("?") ? "&" : "?") + "provider=" + encodeURIComponent(tenant ?? (new URLSearchParams(location.search).get("provider") || "1"));
-  const r = await fetch(url, {
+  const send = () => fetch(url, {
     method,
     headers: {
       "Content-Type": "application/json",
@@ -46,8 +47,10 @@ const api = async (url, method = "GET", body, tenant) => {
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
+  let r = await send();
+  if(r.status===419&&method!=="GET"){const tokenResponse=await fetch("/api/csrf",{headers:{Accept:"application/json"}});if(tokenResponse.ok){csrfToken=(await tokenResponse.json()).token;r=await send();}}
   const d = await r.json();
-  if (!r.ok) {const message=r.status===429?"Túl sok kérés. Próbáld újra később.":d.error||d.message||"Sikertelen művelet";throw Error(window.raeroTranslate?window.raeroTranslate(message):message);}
+  if (!r.ok) {const seconds=Math.max(1,Number(d.retryAfter||r.headers.get('Retry-After')||60));const message=r.status===429?'Túl sok próbálkozás. Próbáld újra '+seconds+' másodperc múlva.':d.error||d.message||"Sikertelen művelet";throw Error(window.raeroTranslate?window.raeroTranslate(message):message);}
   return d;
 };
 const toast = (t) => {
@@ -297,8 +300,8 @@ async function loadSlots() {
     );
     if (ticket !== slotRequest) return;
     $('#closest-day-note')?.remove();
-    if(!slots.length){const previous=$('#booking-date').value;$('#available-slots').textContent='A legközelebbi szabad napot keresem…';const found=await api('/api/slots/next?'+new URLSearchParams({services:ids.join(','),staff:$('[name=staff]').value}));if(ticket!==slotRequest)return;
-      if(found.date&&found.slots?.length){$('#booking-date').value=found.date;slots=found.slots;const note=document.createElement('p');note.id='closest-day-note';note.className='notice closest-day-note';note.setAttribute('role','status');note.textContent='A választott nap betelt. A mai naphoz legközelebbi szabad napot mutatjuk: '+found.date.replaceAll('-','. ')+'.';$('#available-slots').before(note);}
+    if(!slots.length){const userChosen=$('#booking-date').dataset.userChosen==='true';$('#available-slots').textContent='A legközelebbi szabad napot keresem…';const found=await api('/api/slots/next?'+new URLSearchParams({services:ids.join(','),staff:$('[name=staff]').value}));if(ticket!==slotRequest)return;
+      if(found.date&&found.slots?.length){$('#booking-date').value=found.date;slots=found.slots;if(userChosen){const note=document.createElement('p');note.id='closest-day-note';note.className='notice closest-day-note';note.setAttribute('role','status');note.textContent='A választott napon nincs szabad időpont. A mai naphoz legközelebbi szabad napot mutatjuk: '+found.date.replaceAll('-','. ')+'.';$('#available-slots').before(note);}}
     }
     renderSlotPicker(slots);
   } catch (e) {

@@ -7,9 +7,9 @@ final class CalendarConnectionController
 {
  private function owner(Request $r):array {
   if($r->query('owner','guest')==='staff'){
-   abort_unless($r->session()->get('admin')===true&&(int)$r->session()->get('provider_id',1)===app(Tenant::class)->id,403);$id=$r->query('staff');abort_unless(is_string($id)&&collect(app(SalonStore::class)->read()['staff'])->contains(fn($p)=>$p['id']===$id&&empty($p['archived'])),404);return ['owner_type'=>'staff','owner_id'=>$id,'provider_id'=>app(Tenant::class)->id];
+   abort_unless($r->session()->get('admin')===true&&!\App\Services\StaffAccess::editor($r)&&(int)$r->session()->get('provider_id',1)===app(Tenant::class)->id,403);$id=$r->query('staff');abort_unless(is_string($id)&&collect(app(SalonStore::class)->read()['staff'])->contains(fn($p)=>$p['id']===$id&&empty($p['archived'])),404);return ['owner_type'=>'staff','owner_id'=>$id,'provider_id'=>app(Tenant::class)->id];
   }
-  abort_if($r->session()->get('admin')===true,403,'Vendégnaptárt kizárólag a vendég saját fiókja kapcsolhat.');
+  abort_unless(\App\Services\ProviderGuest::allowed($r),403,'Vendégnaptárt kizárólag a vendég saját fiókja kapcsolhat.');
   $guest=(int)$r->session()->get('guest_id');abort_unless($guest&&DB::table('guest_accounts')->where('id',$guest)->exists(),401);return ['owner_type'=>'guest','owner_id'=>(string)$guest,'provider_id'=>0];
  }
  public function handle(Request $r){
@@ -26,7 +26,7 @@ final class CalendarConnectionController
  }
  public function callback(Request $r){
   $saved=$r->session()->pull('google_calendar_oauth');if(!$saved||$saved['expires']<time()||!is_string($r->query('state'))||!hash_equals($saved['state'],$r->query('state'))||!$r->filled('code'))return redirect('/fiokom?calendarError=state');$owner=$saved['owner'];
-  if($owner['owner_type']==='staff')abort_unless($r->session()->get('admin')===true&&(int)$r->session()->get('provider_id',1)===$owner['provider_id'],403);else abort_unless(!$r->session()->get('admin')&&(int)$r->session()->get('guest_id')===(int)$owner['owner_id'],403);
+  if($owner['owner_type']==='staff')abort_unless($r->session()->get('admin')===true&&!\App\Services\StaffAccess::editor($r)&&(int)$r->session()->get('provider_id',1)===$owner['provider_id'],403);else abort_unless(\App\Services\ProviderGuest::allowed($r)&&(int)$r->session()->get('guest_id')===(int)$owner['owner_id'],403);
   $target=$owner['owner_type']==='staff'?'/?provider='.$owner['provider_id'].'&calendarSettings=1':'/fiokom';
   if($owner['owner_type']==='guest'&&($saved['returnTo']??'')==='booking')$target='/foglalas?provider='.($saved['originProvider']??1);
   try{$shared=SharedConnections::all();$token=Http::timeout(15)->asForm()->post('https://oauth2.googleapis.com/token',['code'=>$r->query('code'),'client_id'=>$shared['google_client_id'],'client_secret'=>$shared['google_client_secret'],'redirect_uri'=>rtrim(config('app.url'),'/').'/auth/google-calendar/callback','grant_type'=>'authorization_code','code_verifier'=>$saved['verifier']])->throw()->json();$user=Http::timeout(10)->withToken($token['access_token'])->get('https://openidconnect.googleapis.com/v1/userinfo')->throw()->json();

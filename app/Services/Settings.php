@@ -51,6 +51,7 @@ final class Settings
         );
         $defaults["primaryStaffId"] = $state["staff"][0]["id"] ?? "";
         $state["settings"] = array_replace($defaults, $old);
+        foreach($state["clients"] as &$contact)$contact["phone"]=Contact::phone($contact["phone"]??"",false);unset($contact);
         $state += [
             "availability" => Availability::defaults(), "groupSessions"=>[], "recurringSeries"=>[],
             "payments" => [],

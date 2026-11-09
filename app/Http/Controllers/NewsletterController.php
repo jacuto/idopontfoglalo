@@ -20,7 +20,7 @@ final class NewsletterController {
   $id=$r->route('id');$action=$r->route('action');
   if($r->isMethod('GET'))return response()->json(['configured'=>app(Newsletters::class)->ready(),'campaigns'=>DB::table('newsletters')->latest('id')->get(),'deliveries'=>DB::table('newsletter_deliveries')->select('id','newsletter_id','email','status','error','updated_at')->latest('id')->limit(300)->get()]);
   if($action==='test'){
-   $v=$r->validate(['email'=>'required|email|max:200']);$n=DB::table('newsletters')->find($id);abort_unless($n,404);$key='newsletter-test:'.$r->ip();abort_if(RateLimiter::tooManyAttempts($key,5),429);RateLimiter::hit($key,60);
+   $v=$r->validate(['email'=>'required|email|max:200']);$n=DB::table('newsletters')->find($id);abort_unless($n,404);$key='newsletter-test:'.$r->ip();\App\Services\AttemptLimit::check($key,5);RateLimiter::hit($key,60);
    app(Newsletters::class)->send($v['email'],'[TESZT] '.$n->subject,$n->content);return response()->json(['accepted'=>true]);
   }
   if($action==='schedule'){

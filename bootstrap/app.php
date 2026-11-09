@@ -10,7 +10,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: "/up",
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->web(append: [\App\Http\Middleware\TenantContext::class]);
+        $middleware->web(append: [\App\Http\Middleware\TenantContext::class,\App\Http\Middleware\MemberPermissions::class]);
         $middleware->prepend(\App\Http\Middleware\EmbedCors::class);
         // Public booking and secret-link management also work in embedded frames.
         $middleware->validateCsrfTokens(
@@ -25,6 +25,10 @@ return Application::configure(basePath: dirname(__DIR__))
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e, Request $r) {
+            if($e->getStatusCode()!==429)return null;$seconds=max(1,(int)($e->getHeaders()['Retry-After']??60));
+            return response()->json(['error'=>'Túl sok próbálkozás. Próbáld újra '.$seconds.' másodperc múlva.','retryAfter'=>$seconds],429,array_replace($e->getHeaders(),['Retry-After'=>(string)$seconds]));
+        });
         $exceptions->render(function (\InvalidArgumentException $e, Request $r) {
             if ($r->is('api/*')) return response()->json(['error' => $e->getMessage()], 422);
         });

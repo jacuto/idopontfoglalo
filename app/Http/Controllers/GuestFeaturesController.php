@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\{DB, Storage};
 final class GuestFeaturesController
 {
     public function calendarPrompt(Request $r){
-        $id=(int)$r->session()->get('guest_id',0);abort_unless($id&&!$r->session()->get('admin')&&DB::table('guest_accounts')->where('id',$id)->exists(),403);
+        $id=(int)$r->session()->get('guest_id',0);abort_unless($id&&\App\Services\ProviderGuest::allowed($r)&&DB::table('guest_accounts')->where('id',$id)->exists(),403);
         if($r->isMethod('POST')){DB::table('guest_accounts')->where('id',$id)->whereNull('calendar_prompt_seen_at')->update(['calendar_prompt_seen_at'=>now()]);return response()->json(['ok'=>true]);}
         $shared=\App\Services\SharedConnections::all();$seen=DB::table('guest_accounts')->where('id',$id)->value('calendar_prompt_seen_at');return response()->json(['offer'=>!$seen&&!empty($shared['google_client_id'])&&!empty($shared['google_client_secret'])&&!DB::table('calendar_connections')->where('owner_type','guest')->where('owner_id',(string)$id)->exists()]);
     }
@@ -19,7 +19,7 @@ final class GuestFeaturesController
         return response()->json(['ok'=>true]);
     }
     public function billing(Request $r){
-        $id=(int)$r->session()->get('guest_id',0);abort_unless($id&&!$r->session()->get('admin')&&DB::table('guest_accounts')->where('id',$id)->exists(),401);
+        $id=(int)$r->session()->get('guest_id',0);abort_unless($id&&\App\Services\ProviderGuest::allowed($r)&&DB::table('guest_accounts')->where('id',$id)->exists(),401);
         if($r->isMethod('GET'))return response()->json(\App\Services\GuestBilling::get($id));
         $v=$r->validate(['name'=>'nullable|string|max:200','email'=>'nullable|email|max:200','country'=>'nullable|string|regex:/^[A-Z]{2}$/','zip'=>'nullable|string|max:20','city'=>'nullable|string|max:100','address'=>'nullable|string|max:250','taxNumber'=>'nullable|string|max:30']);
         $any=collect($v)->except('country')->contains(fn($v)=>$v!==null&&trim((string)$v)!=='');if($any)$v=validator($v,['name'=>'required|string|max:200','email'=>'nullable|email|max:200','country'=>'required|string|regex:/^[A-Z]{2}$/','zip'=>'required|string|max:20','city'=>'required|string|max:100','address'=>'required|string|max:250','taxNumber'=>'nullable|string|max:30'])->validate();
