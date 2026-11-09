@@ -33,3 +33,5 @@ A szolgáltatói belépés középre rendezett, a közösségi belépés az e-ma
 A `/szolgaltatok` oldalon közvetlenül a kereső után jelennek meg a találatok; a kezdőoldalon továbbra is használhatók a kategóriák. Az automatikusan kiválasztott első szabad nap nem vált ki „választott nap” figyelmeztetést. Ilyen tájékoztató csak kézi napválasztás utáni sikertelen kereséskor jelenik meg.
 
 Az Árak oldalon 71 funkció szerepel hét témakörben, külön megjelölve a központi főadmin eszközeit és a külön díjas külső szolgáltatásokat. Az összes témakör egy gombbal is megnyitható. A listát a `public/pricing-features.js` tartalmazza angol és német fordítással együtt; ezt az új fájlt is fel kell tölteni.
+
+A vendégfiókban a fő tartalom mellett hasznos tudnivalók és nyilvános szolgáltatóajánlók jelennek meg. A számlázási település megadása esetén arra a településre szűrünk; helyadatot külön engedély nélkül nem kérünk. Mobilon az oldalsáv a fő tartalom alá kerül. A szolgáltatókereső találatai továbbra is közvetlenül a kereső után jelennek meg, a kategóriák és a vendégeknek szóló előnyök a találatok alatt. A vendégbelépő oldalon ismét látszik a meglévő illusztráció.

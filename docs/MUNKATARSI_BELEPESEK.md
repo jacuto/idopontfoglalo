@@ -18,3 +18,5 @@ A `2026_11_09_000013_add_provider_members` migráció új táblát és új, opci
 ## Elérhetőségek és próbálkozási korlát
 
 A formázott magyar telefonszámokat mentéskor egységesítjük: például `+36 (30) 123-4567` → `06301234567`. A javíthatatlan számoknál hiba jelenik meg. A megjelenítés továbbra is tagolt lehet. A próbálkozási korlát elérésekor az üzenet a tényleges hátralévő másodperceket mutatja; a válasz `Retry-After` fejlécet is ad.
+
+Új munkatárs felvételekor ugyanabban az ablakban a **Külön belépést adok a munkatársnak** jelölővel megadható a jogosultság és a jelszó. Ilyenkor az e-mail-cím kötelező. A munkatárs és a belépés egyetlen tranzakcióban készül el: hibás jelszó vagy betelt naptárkeret esetén egyik sem jön létre. Meglévő munkatárs szerkesztésénél a **Belépési adatok és jogosultság** gomb nyitja meg a fiók kezelését.
