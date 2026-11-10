@@ -35,6 +35,7 @@
     <script src="/team.js?v={{ filemtime(public_path('team.js')) }}" defer></script>
     <script src="/premium.js?v={{ filemtime(public_path('premium.js')) }}" defer></script>
 <script src="/usability.js?v={{ filemtime(public_path('usability.js')) }}" defer></script>
+<script src="/presentation.js?v={{ filemtime(public_path('presentation.js')) }}" defer></script>
 <script src="/boot.js?v={{ filemtime(public_path('boot.js')) }}" defer></script>
   </body>
 </html>

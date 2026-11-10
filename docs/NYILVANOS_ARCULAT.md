@@ -37,3 +37,11 @@ Az Árak oldalon 71 funkció szerepel hét témakörben, külön megjelölve a k
 A vendégfiókban a fő tartalom mellett hasznos tudnivalók és nyilvános szolgáltatóajánlók jelennek meg. A számlázási település megadása esetén arra a településre szűrünk; helyadatot külön engedély nélkül nem kérünk. Mobilon az oldalsáv a fő tartalom alá kerül. A szolgáltatókereső találatai továbbra is közvetlenül a kereső után jelennek meg, a kategóriák és a vendégeknek szóló előnyök a találatok alatt. A vendégbelépő oldalon ismét látszik a meglévő illusztráció.
 
 A dátum- és dátum/idő mezők olvasható megjelenése `2026.11.10.`, illetve `2026.11.10. 10:30`, a böngésző nyelvétől függetlenül. Az API és a natív naptárválasztó ISO-értékei megmaradnak. Gépelés, naptárválasztás és programozott dátumváltás ugyanazt az értéket frissíti; érvénytelen naptári dátum nem menthető. A szolgáltatói új időpontnál naptárból indítva a név és időpont, az általános gombbal indítva a nap és időpont kerül egy sorba.
+
+A szolgáltatói naptárban a kikapcsolt párhuzamos/csoportos funkcióhoz nem jelenik meg csoportosóra-gomb, meglévő alkalmak esetén sem. Az Új naptár másodlagos gombként felül, az új időpont mellett látható. Az időpontválasztó a HH:MM értékhez méretezett, a szolgáltatói telefon/e-mail mezők külön, opcionálisként jelölt hátteret kapnak.
+
+A nyilvános bemutatkozás és általános elérhetőségek a szolgáltatások elé kerülnek. A munkatárskártyák képe és szövege egymás mellett látható; a hosszú szolgáltatás- és munkatársi leírások kinyitható előnézetet kapnak. A teljes formázott szöveg megmarad.
+
+A nyilvános adatlap szerkesztőjében a profilkép/logó a név és rövid bemutatkozás mellett cserélhető. A borítókép és üzletfotók feltöltővel, előnézettel kezelhetők; képcímeket nem kell beírni. A korábbi képcímek a háttérben megmaradnak. Képfeltöltés közben az adatlap mentése megvárja a művelet végét; a még nem mentett szövegek megmaradnak. A település és irányítószám mezői korlátozott szélességűek.
+
+A szolgáltatás szerkesztőablakában közvetlen képfeltöltés van, új szolgáltatásnál is. Előbb a szolgáltatás adatai mentődnek, majd a kép; feltöltési hiba után ugyanaz az azonosító használható újrapróbálkozáshoz, így nem keletkezik újabb szolgáltatás.

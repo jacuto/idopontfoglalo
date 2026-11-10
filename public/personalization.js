@@ -20,7 +20,7 @@ serviceForm=function(id){
  }
 };
 const calendarBeforePersonalization=calendarPage;
-calendarPage=function(){calendarBeforePersonalization();if(!state.settings.advancedBookingEnabled&&!(state.groupSessions||[]).length)document.querySelectorAll('[onclick="groupSessionsDialog()"] ').forEach(b=>b.hidden=true);};
+calendarPage=function(){calendarBeforePersonalization();if(!state.settings.advancedBookingEnabled)document.querySelectorAll('[onclick="groupSessionsDialog()"] ').forEach(b=>b.hidden=true);};
 const groupsBeforePersonalization=groupSessionsDialog;
 groupSessionsDialog=async function(){await groupsBeforePersonalization();if(!state.settings.advancedBookingEnabled)document.querySelector('#modal [onclick="groupSessionForm()"]')?.remove();};
 const offersBeforePersonalization=offersPage;

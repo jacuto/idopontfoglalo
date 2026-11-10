@@ -362,6 +362,7 @@ function servicesPage() {
 }
 function serviceForm(id) {
   const old = state.services.find((s) => s.id === id) || {};
+  let savedServiceId=id,metadataSaved=false;
   showModal(
     `<h2>${id ? "Szolgáltatás szerkesztése" : "Új szolgáltatás"}</h2><form id="service-form"><label>Megnevezés</label><input name="name" value="${esc(old.name || "")}" required><label>Szolgáltatás leírása</label><textarea name="description">${esc(old.description || "")}</textarea><div class="form-grid"><div><label>Időtartam (perc)</label><input name="duration" type="number" min="5" required value="${old.duration || 60}"></div><div><label>Ár (Ft)</label><input name="price" type="number" min="0" step="1" required value="${old.price ?? 10000}"></div></div><label>Szakaszok: munka, hatóidő, munka (opcionális)</label><input name="phases" placeholder="30,35,30" value="${old.phases?.join(",") || ""}"><label class="check"><input name="automatic" type="checkbox" ${old.automatic ? "checked" : ""}>Automatikus megerősítés</label><label>Ki végzi?</label>${activePeople()
       .map(
@@ -377,7 +378,7 @@ function serviceForm(id) {
     const f = new FormData(e.target);
     const v = {
       ...old,
-      id: id || crypto.randomUUID(),
+      id: savedServiceId || crypto.randomUUID(),
       name: f.get("name"),
       description: f.get("description"),
       duration: Number(f.get("duration")),
@@ -389,18 +390,20 @@ function serviceForm(id) {
     else if (f.get("phases").trim())
       v.phases = f.get("phases").split(",").map(Number);
     else delete v.phases;
+    const saveButton=e.target.querySelector('button.primary');if(saveButton.disabled)return;saveButton.disabled=true;
     try {
       await api("/api/config", "PUT", {
-        services: id
-          ? state.services.map((s) => (s.id === id ? v : s))
+        services: state.services.some(s=>s.id===savedServiceId)
+          ? state.services.map((s) => (s.id === savedServiceId ? v : s))
           : [...state.services, v],
       });
-      $("#modal").close();
-      await refresh();
+      savedServiceId=v.id;metadataSaved=true;
+      const image=e.target.elements.image?.files[0];if(image){const upload=new FormData();upload.set('target','service');upload.set('entityId',savedServiceId);upload.set('image',image);await api('/api/media','POST',upload);}
+      state=await api('/api/state');$("#modal").close();render();
       toast("Szolgáltatás mentve");
     } catch (err) {
-      $("#form-error").textContent = err.message;
-    }
+      e.target.querySelector("#form-error").textContent = (metadataSaved?"A szolgáltatás adatai elmentve; a kép feltöltése vagy a nézet frissítése nem sikerült: ":"")+err.message;
+    } finally {saveButton.disabled=false;}
   };
 }
 const csvFields = {
