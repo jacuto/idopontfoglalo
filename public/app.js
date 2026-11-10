@@ -40,17 +40,24 @@ const api = async (url, method = "GET", body, tenant) => {
   const send = () => fetch(url, {
     method,
     headers: {
-      "Content-Type": "application/json",
+      ...(body instanceof FormData ? {} : {"Content-Type": "application/json"}),
       Accept: "application/json",
       "X-App-Language":window.raeroLanguage||"hu",
       ...(csrfToken ? { "X-CSRF-TOKEN": csrfToken } : {}),
     },
-    ...(body ? { body: JSON.stringify(body) } : {}),
+    ...(body ? { body: body instanceof FormData ? body : JSON.stringify(body) } : {}),
   });
   let r = await send();
   if(r.status===419&&method!=="GET"){const tokenResponse=await fetch("/api/csrf",{headers:{Accept:"application/json"}});if(tokenResponse.ok){csrfToken=(await tokenResponse.json()).token;r=await send();}}
-  const d = await r.json();
-  if (!r.ok) {const seconds=Math.max(1,Number(d.retryAfter||r.headers.get('Retry-After')||60));const message=r.status===429?'Túl sok próbálkozás. Próbáld újra '+seconds+' másodperc múlva.':d.error||d.message||"Sikertelen művelet";throw Error(window.raeroTranslate?window.raeroTranslate(message):message);}
+  const d = await r.json().catch(()=>null);
+  if (!r.ok) {
+    const seconds=Math.max(1,Number(d?.retryAfter||r.headers.get('Retry-After')||60));
+    const fallback={401:'A bejelentkezés lejárt. Jelentkezz be újra.',403:'Nincs jogosultságod ehhez a művelethez.',404:'A kért adat vagy végpont nem található.',405:'A szerver nem engedélyezi ezt a kérési módot.',413:'A feltöltött fájl vagy kérés túl nagy.',419:'A munkamenet biztonsági azonosítója lejárt. Frissítsd az oldalt.',422:'Ellenőrizd a megadott adatokat.',500:'Szerverhiba történt. A pontos ok a Laravel naplójában található.',502:'A kiszolgáló átmenetileg nem érhető el.',503:'A kiszolgáló átmenetileg nem érhető el.'};
+    const rawDetail=d?.error||d?.message;const detail=typeof rawDetail==='string'?rawDetail.trim():'';
+    const message=r.status===429?'Túl sok próbálkozás. Próbáld újra '+seconds+' másodperc múlva.':r.status>=500?(fallback[r.status]||fallback[500]):detail&&!['Unauthenticated.','Forbidden','Not Found'].includes(detail)?detail:(fallback[r.status]||'A kérés nem sikerült.');
+    const error=Error((window.raeroTranslate?window.raeroTranslate(message):message)+(r.status===429?'':' (HTTP '+r.status+')'));error.status=r.status;error.url=url;throw error;
+  }
+  if(d===null&&r.status!==204){const error=Error('A szerver nem JSON-választ adott. Frissítsd az oldalt. (HTTP '+r.status+')');error.status=r.status;error.url=url;throw error;}
   return d;
 };
 const toast = (t) => {
