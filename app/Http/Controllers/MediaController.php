@@ -13,11 +13,17 @@ final class MediaController
   $id=(string)Str::uuid();$path=$image->store('media','local');$url=rtrim(config('app.url'),'/').'/media/'.$id;$target=$v['target'];$entity=$v['entityId']??null;
   try{app(SalonStore::class)->mutate(function(&$s)use($id,$path,$url,$target,$entity){
    if(in_array($target,['staff','service'],true)){$key=$target==='staff'?'staff':'services';$found=false;foreach($s[$key] as &$row)if($row['id']===$entity&&empty($row['archived'])){$row['image']=$url;$found=true;break;}unset($row);abort_unless($found,404);}
-   elseif($target==='photo'){if(count($s['profile']['photos']??[])>=12)throw new \InvalidArgumentException('Legfeljebb 12 üzletfotó tölthető fel.');$s['profile']['photos'][]=$url;}
+   elseif($target==='photo'){if(count($s['profile']['photos']??[])>=5)throw new \InvalidArgumentException('Legfeljebb 5 üzletfotó tölthető fel.');$s['profile']['photos'][]=$url;}
    else $s['profile'][$target]=$url;
    DB::table('media_assets')->insert(['id'=>$id,'provider_id'=>app(Tenant::class)->id,'target'=>$target,'entity_id'=>$entity,'path'=>$path,'created_at'=>now(),'updated_at'=>now()]);
   });}catch(\Throwable $e){Storage::disk('local')->delete($path);throw $e;}
   return response()->json(['url'=>$url],201);
+ }
+ public function remove(Request $r){
+  abort_unless($r->session()->get('admin')===true&&!\App\Services\StaffAccess::editor($r)&&(int)$r->session()->get('provider_id',1)===app(Tenant::class)->id,403);
+  $v=$r->validate(['target'=>'required|in:logo,cover,photo','url'=>'required|string|max:1000']);
+  app(SalonStore::class)->mutate(function(&$s)use($v){$profile=&$s['profile'];if($v['target']==='photo'){abort_unless(in_array($v['url'],$profile['photos']??[],true),404,'Ez a kép nem ehhez a vállalkozáshoz tartozik.');$profile['photos']=array_values(array_filter($profile['photos'],fn($url)=>$url!==$v['url']));}else{abort_unless(($profile[$v['target']]??'')===$v['url'],404,'A kép már megváltozott. Frissítsd az oldalt.');$profile[$v['target']]='';}});
+  \Illuminate\Support\Facades\Cache::forget(ProviderDirectoryController::CACHE_KEY);return response()->json(['ok'=>true]);
  }
  public function image(string $id){
   $asset=DB::table('media_assets')->find($id);abort_unless($asset,404);$row=DB::table('salon_state')->find($asset->provider_id);abort_unless($row,404);$s=json_decode($row->data,true);$linked=false;

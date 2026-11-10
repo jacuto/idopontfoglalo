@@ -45,3 +45,9 @@ A nyilvános bemutatkozás és általános elérhetőségek a szolgáltatások e
 A nyilvános adatlap szerkesztőjében a profilkép/logó a név és rövid bemutatkozás mellett cserélhető. A borítókép és üzletfotók feltöltővel, előnézettel kezelhetők; képcímeket nem kell beírni. A korábbi képcímek a háttérben megmaradnak. Képfeltöltés közben az adatlap mentése megvárja a művelet végét; a még nem mentett szövegek megmaradnak. A település és irányítószám mezői korlátozott szélességűek.
 
 A szolgáltatás szerkesztőablakában közvetlen képfeltöltés van, új szolgáltatásnál is. Előbb a szolgáltatás adatai mentődnek, majd a kép; feltöltési hiba után ugyanaz az azonosító használható újrapróbálkozáshoz, így nem keletkezik újabb szolgáltatás.
+
+## Képgaléria és foglalóűrlap
+
+A foglalóűrlap a bal oldali általános adatokkal egy magasságban, felül kezdődik. Az ONLINE IDŐPONTFOGLALÁS felirat a logó mellett van, a borítókép nagyobb. Legfeljebb öt üzletfotó tölthető fel; az előnézetek nagyíthatók és törölhetők, a borító is eltávolítható. Régi, ötnél több képet tartalmazó adatlap más adatai továbbra is menthetők, de új kép csak öt alatt adható hozzá.
+
+Az irányítószám, település és utca/házszám egymás mellett/alatt szerepel; a nyilvános térkép ezekből készül, külön térképhivatkozás nem szükséges. A térkép betöltése a Google Maps szolgáltatását használja. Az elérhetőségek és nyitvatartás ikonokat kapnak.

@@ -24,6 +24,7 @@ Route::match(['GET','PATCH','DELETE'],'/api/calendar/connection',[\App\Http\Cont
 Route::get('/auth/google-calendar',[\App\Http\Controllers\CalendarConnectionController::class,'start']);
 Route::get('/auth/google-calendar/callback',[\App\Http\Controllers\CalendarConnectionController::class,'callback']);
 Route::get('/api/exports/{kind}',[\App\Http\Controllers\ExportController::class,'handle'])->whereIn('kind',['statistics','calendar']);
+Route::delete('/api/media',[\App\Http\Controllers\MediaController::class,'remove']);
 Route::post('/api/media',[\App\Http\Controllers\MediaController::class,'upload']);
 Route::get('/media/{id}',[\App\Http\Controllers\MediaController::class,'image'])->whereUuid('id');
 Route::post('/api/platform/templates/preview',[\App\Http\Controllers\TemplateController::class,'handle']);

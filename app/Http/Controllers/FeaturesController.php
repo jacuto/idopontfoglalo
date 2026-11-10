@@ -33,7 +33,7 @@ final class FeaturesController
             ]);
             $data=\App\Services\Contact::apply($data);
             foreach(['description','terms'] as $key)if(isset($data[$key]))$data[$key]=\App\Services\SafeHtml::clean($data[$key]);
-            $this->store->mutate(function (&$s) use ($data) { $s['profile'] = array_replace($s['profile']??[], $data); });
+            $this->store->mutate(function (&$s) use ($data) { if(isset($data['photos'])&&count($data['photos'])>5&&$data['photos']!==($s['profile']['photos']??[]))throw new \InvalidArgumentException('Legfeljebb 5 üzletfotó adható meg.');$s['profile'] = array_replace($s['profile']??[], $data); });
             \Illuminate\Support\Facades\Cache::forget(ProviderDirectoryController::CACHE_KEY);
             return response()->json(['ok' => true]);
         }

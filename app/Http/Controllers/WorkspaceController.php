@@ -135,7 +135,7 @@ class WorkspaceController
                         if ($kind === 'clients' && !\App\Services\Clients::visible($row)) { if($method==='DELETE') return ['ok'=>true]; abort(404,'A vendég nincs a saját listádban.'); }
                         if ($method === "PATCH") {
                             if($kind==="clients") { \App\Services\Clients::editable($row,$data); if(($row['phone']??'')!==($data['phone']??'')||($row['email']??'')!==($data['email']??''))\App\Services\Clients::preventDuplicate($s['clients'],array_replace($row,$data)); }
-                            $data=\App\Services\Contact::apply($data,$row);if(isset($data['description']))$data['description']=\App\Services\SafeHtml::clean($data['description']);
+                            $data=\App\Services\Contact::apply($data,$row);if($kind==='staff'&&array_key_exists('email',$data))\App\Services\MemberEmails::sync($id,$data['email']??'');if(isset($data['description']))$data['description']=\App\Services\SafeHtml::clean($data['description']);
                             $row = array_replace($row, $data);
                             $row["phone"] = $row["phone"] ?? "";
                             $row["email"] = $row["email"] ?? "";
