@@ -7,6 +7,13 @@ use InvalidArgumentException;
 /** Monthly charges are stable snapshots; payment events settle them under the salon lock. */
 final class Subscriptions
 {
+    public static function monthlyAmount(array $state, ?string $at=null):int{
+        $count=0;foreach($state['subscription']['calendarAddons']??[] as $addon)if($at===null||Time::parse($addon['startsAt'])->lte(Time::parse($at)))$count+=(int)$addon['quantity'];return PlanPricing::base($state,$at)+2000*$count;
+    }
+    public static function amountForPeriod(array $state,string $at):int{foreach($state['subscription']['charges']??[] as $e)if($e['kind']==='monthly'&&Time::parse($e['from'])->equalTo(Time::parse($at)))return (int)$e['amount'];return self::monthlyAmount($state,$at);}
+    public static function nextPeriod(array $state):string{
+        $sub=$state['subscription'];if(empty($sub['id'])&&!empty($sub['paidUntil'])&&Time::parse($sub['paidUntil'])->isFuture())return Time::parse($sub['paidUntil'])->toISOString();if(!empty($sub['trialEndsAt'])&&Time::parse($sub['trialEndsAt'])->isFuture())return Time::parse($sub['trialEndsAt'])->toISOString();foreach($sub['charges']??[] as $entry)if($entry['kind']==='monthly'&&Time::parse($entry['from'])->lte(now())&&Time::parse($entry['to'])->isFuture())return $entry['to'];return now()->addMonthNoOverflow()->toISOString();
+    }
     public static function refresh(array &$state): void
     {
         $sub = &$state['subscription'];
@@ -28,7 +35,7 @@ final class Subscriptions
             if ($from->isFuture()) break;
             $to = $end->addMonthsNoOverflow($i + 1);
             $id = 'month-' . $from->format('Y-m-d-His');
-            $entries[$id] ??= ['id'=>$id, 'kind'=>'monthly', 'amount'=>4000, 'currency'=>'HUF', 'status'=>'pending', 'from'=>$from->toISOString(), 'to'=>$to->toISOString(), 'dueAt'=>$from->addDays(21)->toISOString(), 'paymentId'=>null, 'noInvoice'=>false];
+            $entries[$id] ??= ['id'=>$id, 'kind'=>'monthly', 'amount'=>self::monthlyAmount($state,$from->toISOString()), 'currency'=>'HUF', 'status'=>'pending', 'from'=>$from->toISOString(), 'to'=>$to->toISOString(), 'dueAt'=>$from->addDays(21)->toISOString(), 'paymentId'=>null, 'noInvoice'=>false];
             // Preserve previously credited subscriptions when enabling the charge ledger.
             if ($entries[$id]['status'] === 'pending' && !empty($sub['legacyPaidUntil']) && Time::parse($sub['legacyPaidUntil'])->gte($to)) {
                 $entries[$id]['status'] = 'paid';
@@ -74,6 +81,7 @@ final class Subscriptions
         }
         if($index===null && $periodStart && !$chargeId) foreach($charges as $i=>$entry)if($entry['kind']==='monthly'&&in_array($entry['status'],['pending','overdue'],true)){$index=$i;break;}
         if ($index !== null) {
+            if((int)$payment->amount!==(int)$charges[$index]['amount'])throw new InvalidArgumentException('A befizetés összege nem egyezik a havi díjtétellel. Ellenőrizd az előfizetést.');
             if ($charges[$index]['status'] === 'paid' && empty($charges[$index]['legacyCredit'])) return;
             $charges[$index] = array_replace($charges[$index], ['status'=>'paid','paymentId'=>(int)$payment->id,'paidAt'=>Time::parse($payment->paid_at)->toISOString(),'method'=>$payment->method,'reference'=>$payment->reference,'legacyCredit'=>false]);
         } elseif ($chargeId) throw new InvalidArgumentException('A havi díjtétel nem található.');
@@ -101,7 +109,7 @@ final class Subscriptions
             $base=Time::parse($s['subscription']['paidUntil']??$s['subscription']['trialEndsAt']??now());
             if ($base->isPast()) $base=Time::now();
             $end=$entry?Time::parse($entry['to']):$base->addMonthNoOverflow();
-            $inserted=DB::table('platform_payments')->insertOrIgnore(['provider_id'=>$providerId,'reference'=>$reference,'amount'=>4000,'method'=>'transfer','paid_at'=>Time::parse($paidAt)->setTimezone(config('app.timezone')),'period_start'=>($entry?Time::parse($entry['from']):$end->subMonthNoOverflow())->setTimezone(config('app.timezone')),'period_end'=>$end->setTimezone(config('app.timezone')),'details'=>json_encode(['source'=>'manual_transfer','approvedBy'=>'platform_admin','approvedAt'=>now()->toISOString(),'chargeId'=>$entry['id']??null]),'created_at'=>now(),'updated_at'=>now()]);
+            $inserted=DB::table('platform_payments')->insertOrIgnore(['provider_id'=>$providerId,'reference'=>$reference,'amount'=>$entry['amount']??self::monthlyAmount($s),'method'=>'transfer','paid_at'=>Time::parse($paidAt)->setTimezone(config('app.timezone')),'period_start'=>($entry?Time::parse($entry['from']):$end->subMonthNoOverflow())->setTimezone(config('app.timezone')),'period_end'=>$end->setTimezone(config('app.timezone')),'details'=>json_encode(['source'=>'manual_transfer','approvedBy'=>'platform_admin','approvedAt'=>now()->toISOString(),'chargeId'=>$entry['id']??null]),'created_at'=>now(),'updated_at'=>now()]);
             if (!$inserted) throw new InvalidArgumentException('Ezt a banki tranzakciót már rögzítették. Frissítsd a listát.');
             $payment=DB::table('platform_payments')->where('reference',$reference)->first();
             self::settle($s,$payment,$entry['id']??null);

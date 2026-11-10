@@ -44,7 +44,7 @@ final class PlatformController {
     DB::table('salon_state')->where('id',1)->lockForUpdate()->first();$id=max(2,(int)DB::table('salon_state')->max('id')+1);
     DB::table('providers')->insert(['id'=>$id,'name'=>$v['name'],'email'=>$v['email'],'password_hash'=>Hash::make($v['password']),'trial_started_at'=>now(),'trial_ends_at'=>now()->addMonthsNoOverflow(2),'created_at'=>now(),'updated_at'=>now()]);
     $s=SalonStore::initial();$s['staff']=[['id'=>'owner','name'=>$v['name'],'role'=>'Szolgáltató']];$s['services']=[];$s['settings']=array_replace($s['settings'],['name'=>$v['name'],'providerEmail'=>$v['email'],'businessMode'=>'solo','primaryStaffId'=>'owner']);
-    $s['subscription']=['status'=>'trialing','trialStartedAt'=>now()->toISOString(),'trialEndsAt'=>now()->addMonthsNoOverflow(2)->toISOString(),'price'=>4000,'calendarLimit'=>1];
+    $s['subscription']=['plan'=>'basic','status'=>'trialing','trialStartedAt'=>now()->toISOString(),'trialEndsAt'=>now()->addMonthsNoOverflow(2)->toISOString(),'price'=>4000,'calendarLimit'=>1];
     DB::table('salon_state')->insert(['id'=>$id,'data'=>json_encode($s,JSON_THROW_ON_ERROR|JSON_UNESCAPED_UNICODE)]);return $id;
    });return response()->json(['id'=>$id],201);
   }

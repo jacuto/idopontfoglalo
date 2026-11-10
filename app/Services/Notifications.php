@@ -52,7 +52,7 @@ class Notifications
             $this->add($booking, $event, "email", $provider, "provider", now());
         }
         if (
-            !empty($settings["reminderGuest"]) &&
+            PaidFeatures::enabled($state) && !empty($settings["reminderGuest"]) &&
             in_array($booking["status"], ["pending", "confirmed"], true)
         ) {
             $at = CarbonImmutable::parse($booking["start"])->subHours(
@@ -201,7 +201,7 @@ class Notifications
                                     ? "notifyGuest"
                                     : "notifyProvider"
                             ] ?? false;
-                if($p['event']==='group_missed')$enabled=true;
+                if($p['event']==='group_missed')$enabled=true;if($p['event']==='reminder'&&!PaidFeatures::enabled($s))$enabled=false;
                 if (
                     !$b ||
                     ($p["event"] === "reminder" &&

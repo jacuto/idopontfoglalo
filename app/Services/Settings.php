@@ -100,6 +100,7 @@ final class Settings
         $current=count(array_filter($state['staff'], fn($p)=>empty($p['archived'])));
         $next=count(array_filter($people, fn($p)=>empty($p['archived'])));
         if ($next > max($current,$limit)) throw new \InvalidArgumentException('A csomagod naptárkerete betelt. Több munkatárshoz kérj nagyobb keretet az üzemeltetőtől az Előfizetés menüben.');
+        if($next>$current)PaidFeatures::require($state);
     }
     public static function minutes(string $time): int
     {

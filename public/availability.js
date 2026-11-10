@@ -31,7 +31,7 @@ function calendarSlotBlocked(date, minute, staffOverride) {
   return !people.some(person=>!calendarRanges(date,person).some(([from,to])=>minute>=from&&minute<to));
 }
 function calendarBlockedBands(date, open, close, scale, staffOverride) {
-  const [start,end]=calendarHours(date),ranges=calendarRanges(date,staffOverride||filter||null);
+  const [start,end]=calendarHours(date,staffOverride||filter||null),ranges=calendarRanges(date,staffOverride||filter||null);
   if(start===null)ranges.push([open,close,'Zárva']);else {if(start>open)ranges.push([open,start,'Zárva']);if(end<close)ranges.push([end,close,'Zárva']);}
   return ranges.filter(([a,b])=>b>open&&a<close).map(([a,b,label])=>`<div class="calendar-block" style="top:${(Math.max(open,a)-open)*scale}px;height:${(Math.min(close,b)-Math.max(open,a))*scale}px"><span>${esc(label)}</span></div>`).join('');
 }

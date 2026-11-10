@@ -520,6 +520,7 @@ class SalonController
                             );
                         }
                     }
+                    if(!empty($data['settings']['reminderGuest'])||!empty($data['settings']['autoInvoice'])||($data['settings']['businessMode']??'')==='team')\App\Services\PaidFeatures::require($s);
                     if(isset($data['services']))\App\Services\ProfessionOptions::validateCatalog($s,$data['services'],array_replace($s['settings'],$data['settings']??[]));
                     if(isset($data['services']))foreach($data['services'] as $service){if(($service['bookingMode']??'individual')!=='group'&&collect($s['groupSessions'])->contains(fn($g)=>$g['serviceId']===$service['id']&&empty($g['cancelled'])&&CarbonImmutable::parse($g['start'])->isFuture()))throw new InvalidArgumentException('Előbb mondd le a szolgáltatás meghirdetett csoportos óráit.');if(($service['bookingMode']??'individual')==='group'&&!empty($service['phases']))throw new InvalidArgumentException('Csoportos órához ne adj meg hatóidős szakaszokat.');}
                     if(!empty($data['settings']['defaultServiceId'])){ $catalog=$data['services']??$s['services'];if(!collect($catalog)->contains(fn($v)=>$v['id']===$data['settings']['defaultServiceId']&&empty($v['archived'])&&($v['bookingMode']??'individual')!=='group'))throw new InvalidArgumentException('Alapértelmezettnek aktív, nem csoportos szolgáltatást válassz.');}
@@ -778,7 +779,8 @@ class SalonController
         }
         $step=(int)($s['settings']['slotStep']??10);
         $first=$step===60?(int)(ceil($open/60)*60):$open;
-        for ($minute = $first; $minute < $close; $minute += $step) {
+        $minutes=[];foreach(\App\Services\Settings::activeStaff($s) as $p){if($person&&$person!=='any'&&$p['id']!==$person)continue;[$begin,$end]=\App\Services\Availability::hours($s,$date,$p['id']);if($begin===null)continue;$begin=$step===60?(int)(ceil($begin/60)*60):$begin;for($m=$begin;$m<$end;$m+=$step)$minutes[$m]=true;}ksort($minutes);
+        foreach(array_keys($minutes) as $minute) {
             $start = $day->addMinutes($minute)->utc()->toISOString();
             foreach (\App\Services\Settings::activeStaff($s) as $p) {
                 if ($person && $person !== "any" && $p["id"] !== $person) {

@@ -67,3 +67,4 @@ Az ismétlődés és szolgáltatói belépés folytatása: [útmutató](docs/ISM
 Áttekinthető nyilvános arculat: [részletek és feltöltés](docs/NYILVANOS_ARCULAT.md).
 
 Munkatársi belépés és jogosultságok: [útmutató](docs/MUNKATARSI_BELEPESEK.md).
+Pro csomag, emlékeztetők, munkatársi beosztás és naptárbővítések: [útmutató](docs/PRO_NAPTARAK_EMLEKEZTETOK.md).

@@ -6,9 +6,13 @@ use InvalidArgumentException;
 final class Availability
 {
     public static function defaults(): array { return ['overrides'=>[], 'blocks'=>[], 'dayLunches'=>[], 'lunch'=>['enabled'=>false,'from'=>'12:00','to'=>'12:30','weekdays'=>[1,2,3,4,5],'staffId'=>null]]; }
-    public static function hours(array $state, string $date): array
+    public static function hours(array $state, string $date, ?string $staff=null): array
     {
-        foreach ($state['availability']['overrides'] ?? [] as $day) if ($day['date'] === $date) return [$day['closed'] ? null : Settings::minutes($day['openingTime']), $day['closed'] ? null : Settings::minutes($day['closingTime'])];
+        if($staff===null){$ranges=[];foreach(Settings::activeStaff($state) as $p){$h=self::hours($state,$date,$p['id']);if($h[0]!==null)$ranges[]=$h;}if($ranges)return [min(array_column($ranges,0)),max(array_column($ranges,1))];return [null,null];}
+        $specific=null;$global=null;foreach($state['availability']['overrides']??[] as $day)if($day['date']===$date){if(($day['staffId']??null)===$staff)$specific=$day;elseif(empty($day['staffId']))$global=$day;}
+        $weekday=CarbonImmutable::parse($date)->dayOfWeekIso;$weekly=null;foreach($state['availability']['weeklyStaff']??[] as $day)if($day['staffId']===$staff&&(int)$day['weekday']===$weekday)$weekly=$day;
+        $day=$specific??$global??$weekly;
+        if($day)return !empty($day['closed'])?[null,null]:[Settings::minutes($day['openingTime']),Settings::minutes($day['closingTime'])];
         return [Settings::minutes($state['settings']['openingTime']),Settings::minutes($state['settings']['closingTime'])];
     }
     public static function blocked(array $state, string $date, string $staff): array
@@ -28,7 +32,7 @@ final class Availability
     {
         $start=CarbonImmutable::parse($booking['start'])->setTimezone('Europe/Budapest');
         $date=$start->format('Y-m-d');$minute=$start->hour*60+$start->minute;
-        [$open,$close]=self::hours($state,$date);
+        [$open,$close]=self::hours($state,$date,$booking['staff']);
         if (!empty($booking['public']) && empty($booking['groupSessionId']) && $open !== null) {
             $step=(int)($state['settings']['slotStep']??10);$first=$step===60?(int)(ceil($open/60)*60):$open;
             if (($minute-$first)%$step!==0 || $start->second!==0) throw new InvalidArgumentException('Válassz a felajánlott kezdési időpontok közül.');

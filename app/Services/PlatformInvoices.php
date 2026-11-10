@@ -21,7 +21,7 @@ final class PlatformInvoices {
    $partner=Http::timeout(20)->withHeaders(['X-API-KEY'=>$key])->post('https://api.billingo.hu/v3/partners',['name'=>$buyer['billingName'],'address'=>['country_code'=>$buyer['billingCountry']??'HU','post_code'=>$buyer['billingZip'],'city'=>$buyer['billingCity'],'address'=>$buyer['billingAddress']], 'emails'=>empty($buyer['providerEmail'])?[]:[$buyer['providerEmail']],...!empty($buyer['billingTaxNumber'])?['taxcode'=>$buyer['billingTaxNumber']]:[]])->throw()->json();
    $result=Http::timeout(30)->withHeaders(['X-API-KEY'=>$key])->post('https://api.billingo.hu/v3/documents',[
     'partner_id'=>$partner['id'],'block_id'=>(int)$block,'type'=>'invoice','fulfillment_date'=>\Carbon\CarbonImmutable::parse($payment->paid_at)->format('Y-m-d'),'due_date'=>now()->format('Y-m-d'),'payment_method'=>$payment->method==='transfer'?'wire_transfer':'bankcard','language'=>'hu','currency'=>'HUF','conversion_rate'=>1,'electronic'=>true,'paid'=>true,
-    'items'=>[['name'=>'Ráérő alapcsomag – havi rendszerhasználat','unit_price'=>$payment->amount,'unit_price_type'=>'gross','quantity'=>1,'unit'=>'hónap','vat'=>'AAM']],
+    'items'=>[['name'=>'Ráérő előfizetés – havi rendszerhasználat és naptárbővítések','unit_price'=>$payment->amount,'unit_price_type'=>'gross','quantity'=>1,'unit'=>'hónap','vat'=>'AAM']],
     'comment'=>'Ráérő előfizetés. Befizetésazonosító: '.$payment->id,
    ])->throw()->json();
    if(empty($result['id']))throw new \RuntimeException();

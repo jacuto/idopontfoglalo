@@ -12,8 +12,9 @@ final class AvailabilityController
         $store=app(SalonStore::class);
         if ($r->isMethod('GET')) return response()->json($store->read()['availability']);
         $data=$r->validate([
-            'overrides'=>'present|array|max:500','overrides.*'=>'required|array:date,closed,openingTime,closingTime',
-            'overrides.*.date'=>'required|date_format:Y-m-d|distinct','overrides.*.closed'=>'required|boolean',
+            'overrides'=>'present|array|max:500','overrides.*'=>'required|array:date,closed,openingTime,closingTime,staffId',
+            'overrides.*.staffId'=>'sometimes|nullable|string|max:80','weeklyStaff'=>'sometimes|array|max:700','weeklyStaff.*'=>'array:staffId,weekday,closed,openingTime,closingTime','weeklyStaff.*.staffId'=>'required|string|max:80','weeklyStaff.*.weekday'=>'required|integer|between:1,7','weeklyStaff.*.closed'=>'required|boolean','weeklyStaff.*.openingTime'=>'required|date_format:H:i','weeklyStaff.*.closingTime'=>'required|date_format:H:i',
+            'overrides.*.date'=>'required|date_format:Y-m-d','overrides.*.closed'=>'required|boolean',
             'overrides.*.openingTime'=>'required|date_format:H:i','overrides.*.closingTime'=>'required|date_format:H:i',
             'blocks'=>'present|array|max:500','blocks.*'=>'required|array:id,fromDate,toDate,fromTime,toTime,allDay,staffId,label',
             'blocks.*.id'=>'required|uuid|distinct','blocks.*.fromDate'=>'required|date_format:Y-m-d','blocks.*.toDate'=>'required|date_format:Y-m-d',
@@ -30,6 +31,8 @@ final class AvailabilityController
         $data['lunch']['weekdays']=array_map('intval',$data['lunch']['weekdays']);
         $result=$store->mutate(function(&$state)use($data){
             Subscriptions::guard($state,true);
+            if(!empty($data['weeklyStaff'])||collect($data['overrides'])->contains(fn($d)=>!empty($d['staffId'])))\App\Services\PaidFeatures::require($state);
+            foreach(['overrides','weeklyStaff'] as $kind){$data[$kind]=$data[$kind]??($state['availability'][$kind]??[]);$seen=[];foreach($data[$kind] as $day){$key=($day['date']??$day['weekday']).':'.($day['staffId']??'');if(isset($seen[$key]))throw new \InvalidArgumentException('Egy naphoz és munkatárshoz csak egy beosztás adható.');$seen[$key]=true;if(!empty($day['staffId'])&&!in_array($day['staffId'],array_column($state['staff'],'id'),true))throw new \InvalidArgumentException('A munkatárs nem található.');if(!$day['closed']&&$day['openingTime']>=$day['closingTime'])throw new \InvalidArgumentException('A zárás legyen később, mint a nyitás.');}}
             foreach($data['overrides'] as $day) if(!$day['closed'] && $day['openingTime'] >= $day['closingTime']) throw new \InvalidArgumentException('A napi zárás legyen később, mint a nyitás.');
             foreach($data['blocks'] as $block){
                 if($block['fromDate'] > $block['toDate'] || (!$block['allDay'] && $block['fromTime'] >= $block['toTime'])) throw new \InvalidArgumentException('A kieső idő vége legyen később, mint a kezdete.');

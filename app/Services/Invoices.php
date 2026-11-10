@@ -62,7 +62,10 @@ class Invoices
             $provider,
             $id,
             $booking,
+            $invoiceAmount,
         ) {
+            $current=collect($s['payments'])->firstWhere('id',$data['paymentId']);$currentBooking=collect($s['bookings'])->firstWhere('id',$booking['id']);$currentPaid=collect($s['payments'])->where('bookingId',$booking['id'])->where('status','paid')->sum(fn($p)=>$p['amount']-($p['refundedAmount']??0));if(!$current||$current['status']!=='paid'||!$currentBooking||abs($currentPaid-$invoiceAmount)>0.001||abs($currentPaid-Offers::total($currentBooking))>0.001)throw new InvalidArgumentException('A befizetés megváltozott. Ellenőrizd újra a foglalás rendezését.');
+            if(!empty($data['automatic'])){PaidFeatures::require($s);abort_unless(!empty($s['settings']['autoInvoice']),422);}
             foreach ($s["invoiceRequests"] as $i) {
                 if (
                     ($i["paymentId"] === $data["paymentId"] ||

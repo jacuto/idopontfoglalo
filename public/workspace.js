@@ -588,7 +588,7 @@ function settingsPage() {
       "confirmation",
       "notifyGuest",
       "notifyProvider",
-      "reminderGuest", "skipUnnamedWarning", "reviewRequestsEnabled", "advancedBookingEnabled", "servicePhasesEnabled", "couponsEnabled", "passesEnabled",
+      "reminderGuest", "autoInvoice", "skipUnnamedWarning", "reviewRequestsEnabled", "advancedBookingEnabled", "servicePhasesEnabled", "couponsEnabled", "passesEnabled",
     ])
       v[k] = f.has(k);
     v.reminder = Number(v.reminder);

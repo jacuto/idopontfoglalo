@@ -178,3 +178,6 @@ Artisan::command('raero:review-requests',function(){$this->info((string)\App\Ser
 
 Artisan::command('raero:recurring',function(){$this->info((string)\App\Services\RecurringBookings::run());})->purpose('Ismétlődő sorozatok következő alkalmai');
 \Illuminate\Support\Facades\Schedule::command('raero:recurring')->dailyAt('00:10')->withoutOverlapping();
+
+Artisan::command('raero:auto-invoices {--limit=10}',function(){$this->info(json_encode(app(\App\Services\AutomaticInvoices::class)->run(min(100,max(1,(int)$this->option('limit')))),JSON_UNESCAPED_UNICODE));})->purpose('Automatikus számlázás teljesen rendezett foglalásokról');
+\Illuminate\Support\Facades\Schedule::command('raero:auto-invoices')->everyFiveMinutes()->withoutOverlapping();

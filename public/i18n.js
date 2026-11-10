@@ -851,6 +851,8 @@ Jelképes naptárillusztráció|Symbolic calendar illustration|Symbolische Kalen
 A választott napon nincs szabad időpont.|There are no available appointments on the selected day.|Am ausgewählten Tag sind keine Termine verfügbar.`;
  for(const line of accountPolish.split('\n')){const p=line.trim().split('|');if(p.length===3)dictionary.set(p[0],{en:p[1],de:p[2]});}
  const patterns=[
+  [/^(.+) – heti beosztás$/,m=>m[1]+(language==='en'?' – weekly schedule':' – Wochenplan')],
+  [/^Jelenlegi csomag: (Alap|Pro)$/,m=>(language==='en'?'Current plan: ':'Aktueller Tarif: ')+(m[1]==='Pro'?'Pro':language==='en'?'Basic':'Basis')],
   [/^Túl sok próbálkozás\. Próbáld újra (\d+) másodperc múlva\.$/,m=>language==='en'?`Too many attempts. Try again in ${m[1]} seconds.`:`Zu viele Versuche. Bitte in ${m[1]} Sekunden erneut versuchen.`],
   [/^A választott napon nincs szabad időpont\. A mai naphoz legközelebbi szabad napot mutatjuk: (.+)$/,m=>language==='en'?'There are no available appointments on the selected day. Showing the nearest available day from today: '+m[1]:'Am ausgewählten Tag sind keine Termine verfügbar. Der nächstmögliche freie Tag ab heute wird angezeigt: '+m[1]],
   [/^(\d+) funkció$/,m=>m[1]+(language==='en'?' features':' Funktionen')],

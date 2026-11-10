@@ -143,14 +143,14 @@ class Payments
             ->withHeaders([
                 "Idempotency-Key" =>
                     "salon-subscription-" .
-                    hash("sha256", config("app.url") . app(Tenant::class)->id . now()->format("Y-m-d")),
+                    hash("sha256", config("app.url") . app(Tenant::class)->id . now()->format("Y-m-d").($s["subscription"]["extraCalendars"]??0).($s["subscription"]["plan"]??"basic")),
             ])
             ->asForm()
             ->post("https://api.stripe.com/v1/checkout/sessions", [
                 "mode" => "subscription",
                 "metadata" => ["provider_id" => (string) app(Tenant::class)->id],
                 "subscription_data" => ["metadata" => ["provider_id" => (string) app(Tenant::class)->id], ...(!empty($s["subscription"]["trialEndsAt"]) && \Carbon\CarbonImmutable::parse($s["subscription"]["trialEndsAt"])->isFuture() ? ["trial_end" => \Carbon\CarbonImmutable::parse($s["subscription"]["trialEndsAt"])->timestamp] : [])],
-                "line_items" => [["price" => $price, "quantity" => 1]],
+                "line_items" => [((($s["subscription"]["plan"]??"basic")==="pro")?["price_data"=>["currency"=>"huf","unit_amount"=>PlanPricing::base($s)*100,"product"=>$p["product"],"recurring"=>["interval"=>"month"]],"quantity"=>1]:["price"=>$price,"quantity"=>1]), ...(!empty($s["subscription"]["extraCalendars"])?[["price_data"=>["currency"=>"huf","unit_amount"=>200000,"product"=>$p["product"],"recurring"=>["interval"=>"month"]],"quantity"=>(int)$s["subscription"]["extraCalendars"]]]:[])],
                 "billing_address_collection" => "required",
                 "tax_id_collection" => ["enabled" => "true"],
                 "success_url" =>
@@ -277,11 +277,11 @@ class Payments
                     ],
                 ];
             }
-            if ($platform && ($event['type'] ?? '') === 'invoice.paid' && ($object['paid'] ?? false) === true && ($object['currency'] ?? '') === 'huf' && ($object['amount_paid'] ?? 0) === 400000) {
+            if ($platform && ($event['type'] ?? '') === 'invoice.paid' && ($object['paid'] ?? false) === true && ($object['currency'] ?? '') === 'huf' && ($object['amount_paid'] ?? 0) === Subscriptions::amountForPeriod($s,isset($object['lines']['data'][0]['period']['start'])?\Carbon\CarbonImmutable::createFromTimestamp($object['lines']['data'][0]['period']['start'])->toISOString():now()->toISOString())*100) {
                 $reference = 'stripe-invoice:' . $object['id'];
                 $end = $object['lines']['data'][0]['period']['end'] ?? $object['period_end'] ?? null;
                 if (!$end) throw new InvalidArgumentException('A Stripe nem adta meg az előfizetési időszak végét.');
-                \Illuminate\Support\Facades\DB::table('platform_payments')->insertOrIgnore(['provider_id' => app(Tenant::class)->id, 'reference' => $reference, 'amount' => 4000, 'method' => 'card', 'paid_at' => \Carbon\CarbonImmutable::createFromTimestamp($object['status_transitions']['paid_at']??time())->setTimezone(config('app.timezone')), 'period_start'=>isset($object['lines']['data'][0]['period']['start'])?\Carbon\CarbonImmutable::createFromTimestamp($object['lines']['data'][0]['period']['start'])->setTimezone(config('app.timezone')):null, 'details'=>json_encode(['source'=>'stripe','stripeInvoice'=>$object['id'],'stripeSubscription'=>$object['subscription']??$object['parent']['subscription_details']['subscription']??null,'stripeCustomer'=>$object['customer']??null,'paymentIntent'=>$object['payment_intent']??null,'eventId'=>$event['id']??null,'currency'=>'HUF','amountPaid'=>4000]), 'period_end' => \Carbon\CarbonImmutable::createFromTimestamp($end)->setTimezone(config('app.timezone')), 'created_at' => now(), 'updated_at' => now()]);
+                \Illuminate\Support\Facades\DB::table('platform_payments')->insertOrIgnore(['provider_id' => app(Tenant::class)->id, 'reference' => $reference, 'amount' => (int)($object['amount_paid']/100), 'method' => 'card', 'paid_at' => \Carbon\CarbonImmutable::createFromTimestamp($object['status_transitions']['paid_at']??time())->setTimezone(config('app.timezone')), 'period_start'=>isset($object['lines']['data'][0]['period']['start'])?\Carbon\CarbonImmutable::createFromTimestamp($object['lines']['data'][0]['period']['start'])->setTimezone(config('app.timezone')):null, 'details'=>json_encode(['source'=>'stripe','stripeInvoice'=>$object['id'],'stripeSubscription'=>$object['subscription']??$object['parent']['subscription_details']['subscription']??null,'stripeCustomer'=>$object['customer']??null,'paymentIntent'=>$object['payment_intent']??null,'eventId'=>$event['id']??null,'currency'=>'HUF','amountPaid'=>(int)($object['amount_paid']/100)]), 'period_end' => \Carbon\CarbonImmutable::createFromTimestamp($end)->setTimezone(config('app.timezone')), 'created_at' => now(), 'updated_at' => now()]);
                 $payment = \Illuminate\Support\Facades\DB::table('platform_payments')->where('reference',$reference)->first();
                 $periodStart = $object['lines']['data'][0]['period']['start'] ?? $object['period_start'] ?? null;
                 Subscriptions::settle($s,$payment,null,$periodStart ? \Carbon\CarbonImmutable::createFromTimestamp($periodStart)->toISOString() : null);
