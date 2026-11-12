@@ -130,3 +130,13 @@ A **Főadmin → Előfizetési számlák** részen minden pozitív összegű, m�
 Egy befizetéshez egy számlanyilvántartás tartozik. Folyamatban lévő, bizonytalan eredményű vagy már kiállított Billingo-számlát a kézi űrlap nem ír felül; bizonytalan eredményt előbb a Billingóval kell egyeztetni. Jövőbeli vagy hibás kiállítási dátum, üres sorszám és másik kiállított számlán már használt sorszám nem menthető. Az ismételt kézi mentés nem hoz létre újabb rekordot. A számlaadatok rögzítése nem helyettesíti a tényleges számlakiállítást és a számla ügyfélnek történő átadását.
 
 A `2026_11_12_000015_add_manual_platform_invoice_details` migráció a forrást és a kiállítás dátumát adja hozzá, meglévő adatok törlése nélkül. A korábbi számlák Billingo-forrásúak maradnak, ismeretlen kiállítási dátumukat nem találjuk ki. Feltöltés után `php artisan optimize:clear`, `php artisan raero:upgrade`, majd `php artisan raero:check` szükséges. Új Composer-függőség nincs.
+
+## Beépített központi beállítási útmutatók
+
+A **Főadmin → Központi kapcsolatok** űrlapon a Stripe, Billingo, Twilio, Google, Facebook és Apple külön szakaszt kap. A mezők alatt rövid elérési út található, a **Beállítási útmutató** részben a szolgáltatóhoz tartozó lépések, hivatalos hivatkozások és a szükséges visszahívási címek olvashatók. Az útmutatók alapból csukva vannak; a titkos értékeket továbbra sem jelenítjük meg, és üresen hagyva megmaradnak.
+
+A visszahívási címek a böngészőben megnyitott oldal domainjéből készülnek. Éles domainre költözéskor a szerver APP_URL beállítását és az érintett szolgáltatói alkalmazások engedélyezett domainjeit/URL-jeit együtt kell frissíteni. A Stripe teszt- és éles környezetének kulcsai, árazonosítói és webhook-titkai különállók. A mentés nem indít fizetést, SMS-t vagy számlakiállítást.
+
+A Twilio útmutató külön jelzi az ingyenes próba korlátozásait, a szegmensalapú díjazást és a bérelt telefonszám lehetséges havidíját. Fix SMS-árat nem tárolunk a felületen: az aktuális hivatalos magyarországi árlistára hivatkozunk. Más SMS-szolgáltató kulcsa nem használható a Twilio mezőiben; ehhez külön integráció szükséges.
+
+Ehhez a felületi frissítéshez nincs új migráció vagy Composer-függőség.
