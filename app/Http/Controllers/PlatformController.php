@@ -24,13 +24,22 @@ final class PlatformController {
   }
   if($path==='api/platform/connections'&&$method==='GET')return response()->json(app(\App\Services\PlatformConnections::class)->status());
   if($path==='api/platform/connections'&&$method==='PUT'){
-   $v=$r->validate(['google_client_id'=>'nullable|string|max:300','google_client_secret'=>'nullable|string|max:1000','facebook_client_id'=>'nullable|string|max:300','facebook_client_secret'=>'nullable|string|max:1000','apple_client_id'=>'nullable|string|max:300','apple_team_id'=>'nullable|string|max:100','apple_key_id'=>'nullable|string|max:100','apple_private_key'=>'nullable|string|max:10000','twilio_sid'=>'nullable|string|max:200','twilio_token'=>'nullable|string|max:1000','twilio_from'=>'nullable|string|max:200','stripe_key'=>'nullable|string|max:1000','stripe_price'=>'nullable|string|max:200','stripe_webhook_secret'=>'nullable|string|max:1000','billingo_key'=>'nullable|string|max:1000','billingo_block'=>'nullable|integer|min:1','smtp_host'=>'nullable|string|max:200','smtp_port'=>'nullable|integer|between:1,65535','smtp_username'=>'nullable|string|max:250','smtp_password'=>'nullable|string|max:1000','mail_from'=>'nullable|email|max:200','mail_name'=>'nullable|string|max:150']);
+   $v=$r->validate(['google_enabled'=>'sometimes|boolean','facebook_enabled'=>'sometimes|boolean','apple_enabled'=>'sometimes|boolean','billingo_enabled'=>'sometimes|boolean','google_client_id'=>'nullable|string|max:300','google_client_secret'=>'nullable|string|max:1000','facebook_client_id'=>'nullable|string|max:300','facebook_client_secret'=>'nullable|string|max:1000','apple_client_id'=>'nullable|string|max:300','apple_team_id'=>'nullable|string|max:100','apple_key_id'=>'nullable|string|max:100','apple_private_key'=>'nullable|string|max:10000','twilio_sid'=>'nullable|string|max:200','twilio_token'=>'nullable|string|max:1000','twilio_from'=>'nullable|string|max:200','stripe_key'=>'nullable|string|max:1000','stripe_price'=>'nullable|string|max:200','stripe_webhook_secret'=>'nullable|string|max:1000','billingo_key'=>'nullable|string|max:1000','billingo_block'=>'nullable|integer|min:1','smtp_host'=>'nullable|string|max:200','smtp_port'=>'nullable|integer|between:1,65535','smtp_username'=>'nullable|string|max:250','smtp_password'=>'nullable|string|max:1000','mail_from'=>'nullable|email|max:200','mail_name'=>'nullable|string|max:150']);
    app(\App\Services\PlatformConnections::class)->save($v);return response()->json(['ok'=>true]);
   }
   if(preg_match('#^api/platform/providers/([1-9][0-9]*)/access$#',$path,$m)){
    abort_unless(DB::table('salon_state')->where('id',$m[1])->exists(),404);
    if($method==='GET')return response()->json(app(Tenant::class)->run((int)$m[1],fn()=>array_intersect_key(app(\App\Services\Connections::class)->all(),array_flip(['admin_google_emails','admin_facebook_ids','admin_apple_ids']))));
    $v=$r->validate(['admin_google_emails'=>'nullable|string|max:2000','admin_facebook_ids'=>'nullable|string|max:2000','admin_apple_ids'=>'nullable|string|max:2000']);app(Tenant::class)->run((int)$m[1],fn()=>app(\App\Services\Connections::class)->save($v));return response()->json(['ok'=>true]);
+  }
+  if(preg_match('#^api/platform/providers/([1-9][0-9]*)/subscription$#',$path,$m)&&$method==='PATCH'){
+   $v=$r->validate(['mode'=>'required|in:active,free,suspended','calendarLimit'=>'sometimes|integer|between:1,100']);
+   return response()->json(app(\App\Services\PlatformAccess::class)->change((int)$m[1],$v['mode'],isset($v['calendarLimit'])?(int)$v['calendarLimit']:null));
+  }
+  if($path==='api/platform/legal'&&$method==='GET')return response()->json(app(\App\Services\PublicDocuments::class)->settings());
+  if($path==='api/platform/legal'&&$method==='PUT'){
+   $v=$r->validate(['privacyEmail'=>'required|email|max:200','hostingName'=>'required|string|max:200','hostingAddress'=>'required|string|max:300','hostingPrivacyUrl'=>'nullable|url:https|max:500','scope'=>'required|in:business,all','retentionNotes'=>'required|string|max:4000']);
+   app(\App\Services\PublicDocuments::class)->save($v);return response()->json(['ok'=>true]);
   }
   if(preg_match('#^api/platform/providers/([1-9][0-9]*)/plan$#',$path,$m)&&$method==='PATCH') {
    $v=$r->validate(['calendarLimit'=>'required|integer|between:1,100']);
@@ -60,7 +69,7 @@ final class PlatformController {
   if($path==='api/platform/operator'&&$method==='GET')return response()->json($this->operator());
   if($path==='api/platform/operator'&&$method==='PUT'){
    $rules=[];foreach(['name','country','zip','city','address','taxNumber','registrationNumber','bank','account','iban','bic'] as $key)$rules[$key]='required|string|max:250';
-   $v=$r->validate($rules);$v['vat']='AAM';DB::table('platform_settings')->updateOrInsert(['id'=>1],['data'=>json_encode($v,JSON_THROW_ON_ERROR)]);return response()->json(['ok'=>true]);
+   $v=$r->validate($rules);$v['vat']='AAM';DB::transaction(function()use($v){DB::table('platform_settings')->insertOrIgnore(['id'=>1,'data'=>'{}']);$row=DB::table('platform_settings')->where('id',1)->lockForUpdate()->first();$data=array_replace(json_decode($row->data,true),$v);DB::table('platform_settings')->where('id',1)->update(['data'=>json_encode($data,JSON_THROW_ON_ERROR)]);});return response()->json(['ok'=>true]);
   }
   abort(404);
  }

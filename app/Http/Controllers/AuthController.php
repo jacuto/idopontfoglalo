@@ -11,10 +11,10 @@ class AuthController
         return response()->json([
             "apple" => AppleAuthController::ready($c),
             "google" =>
-                !empty($c["google_client_id"]) &&
+                app(\App\Services\PlatformConnections::class)->enabled("google") && !empty($c["google_client_id"]) &&
                 !empty($c["google_client_secret"]),
             "facebook" =>
-                !empty($c["facebook_client_id"]) &&
+                app(\App\Services\PlatformConnections::class)->enabled("facebook") && !empty($c["facebook_client_id"]) &&
                 !empty($c["facebook_client_secret"]),
         ]);
     }
@@ -23,7 +23,7 @@ class AuthController
         abort_unless(in_array($provider, ["google", "facebook"], true), 404);
         $c = app(Connections::class)->all();
         abort_unless(
-            !empty($c[$provider . "_client_id"]) &&
+            app(\App\Services\PlatformConnections::class)->enabled($provider) && !empty($c[$provider . "_client_id"]) &&
                 !empty($c[$provider . "_client_secret"]),
             503,
             "Ez a belépési mód még nincs beállítva.",
@@ -101,6 +101,7 @@ class AuthController
         app(\App\Services\Tenant::class)->id = (int) ($saved["tenant"] ?? 1);
         $target = in_array($saved["mode"],["provider","provider-link"],true)?"/belepes":($saved["mode"] === "admin" ? "/" : "/fiokom");
         $c = app(Connections::class)->all();
+        abort_unless(app(\App\Services\PlatformConnections::class)->enabled($provider),403,'Ez a belépési mód ki van kapcsolva.');
         $uri =
             rtrim(config("app.url"), "/") . "/auth/" . $provider . "/callback";
         try {

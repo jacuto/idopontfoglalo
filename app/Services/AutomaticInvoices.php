@@ -13,6 +13,7 @@ final class AutomaticInvoices
             if(array_sum($counts)>=$limit)break;
             app(Tenant::class)->run((int)$id,function()use(&$counts,$limit){
                 $s=app(SalonStore::class)->read();
+                if(($s['settings']['invoiceProvider']??'none')==='billingo'&&!app(PlatformConnections::class)->enabled('billingo'))return;
                 if(empty($s['settings']['autoInvoice'])||!PaidFeatures::enabled($s))return;
                 $bookings=array_column($s['bookings'],null,'id');
                 $clients=array_column($s['clients'],null,'id');

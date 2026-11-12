@@ -10,7 +10,7 @@ if(operationQuery.has('calendarConnected'))setTimeout(()=>toast('Google Naptár 
 if(location.pathname==='/'&&!operationQuery.has('provider'))portalPage();
 else if(['/szolgaltatok','/szolgaltato','/belepes','/arak','/kapcsolat'].includes(location.pathname)) portalPage();
 else if(location.pathname==='/uzenetek') guestMessagesPage();
-else if(location.pathname==='/foadmin') platformPage();
+else if(location.pathname==='/foadmin'||location.pathname.startsWith('/foadmin/')) platformPage();
 else if(manageToken) managePage();
 else if(location.pathname.replace(/\/+$/,'')==='/fiokom') guestPage();
 else refresh().catch(loginPage);

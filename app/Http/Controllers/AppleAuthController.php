@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 
 final class AppleAuthController
 {
-    public static function ready(array $c):bool {foreach(['apple_client_id','apple_team_id','apple_key_id','apple_private_key'] as $key)if(empty($c[$key]))return false;return true;}
+    public static function ready(array $c):bool {if(!app(\App\Services\PlatformConnections::class)->enabled('apple'))return false;foreach(['apple_client_id','apple_team_id','apple_key_id','apple_private_key'] as $key)if(empty($c[$key]))return false;return true;}
     public function start(Request $r){
         $c=app(Connections::class)->all();abort_unless(self::ready($c),503,'Az Apple-belépés még nincs beállítva.');
         $state=bin2hex(random_bytes(32));$nonce=bin2hex(random_bytes(32));
@@ -17,6 +17,7 @@ final class AppleAuthController
         return redirect()->away('https://appleid.apple.com/auth/authorize?'.http_build_query(['client_id'=>$c['apple_client_id'],'redirect_uri'=>rtrim(config('app.url'),'/').'/auth/apple/callback','response_type'=>'code','response_mode'=>'form_post','scope'=>'name email','state'=>$state,'nonce'=>$nonce]));
     }
     public function callback(Request $r){
+        abort_unless(app(\App\Services\PlatformConnections::class)->enabled('apple'),403,'Az Apple-belépés ki van kapcsolva.');
         // Apple posts cross-site. A one-use relay restores the Lax session cookie on the same-site GET.
         if($r->isMethod('POST')){
             abort_if(strlen($r->getContent())>20000,413);\App\Services\AttemptLimit::check('apple-relay:'.$r->ip(),30);RateLimiter::hit('apple-relay:'.$r->ip(),60);

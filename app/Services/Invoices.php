@@ -14,6 +14,7 @@ class Invoices
     {
         $s = $this->store->read();
         $provider = $s["settings"]["invoiceProvider"];
+        if($provider==='billingo'&&!app(PlatformConnections::class)->enabled('billingo'))throw new InvalidArgumentException('A Billingo-számlakiállítás központilag ki van kapcsolva.');
         $c = $this->connections->all();
         if (
             $provider === "none" ||

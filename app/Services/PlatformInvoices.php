@@ -25,6 +25,7 @@ final class PlatformInvoices {
  public function issue(int $paymentId):array {
   $recorded=DB::table('platform_invoices')->where('payment_id',$paymentId)->where('status','issued')->first();
   if($recorded)return ['status'=>'issued','number'=>$recorded->number,'alreadyIssued'=>true];
+  if(!app(PlatformConnections::class)->enabled('billingo'))throw new InvalidArgumentException('A Billingo-számlakiállítást a főadmin kikapcsolta. Rögzítsd kézzel a már kiállított számla adatait.');
   $key=config('integrations.platform_billingo.key');$block=config('integrations.platform_billingo.block');
   if(!$key||!$block)throw new InvalidArgumentException('Az üzemeltető saját Billingo API-kulcsa és számlatömbje még nincs beállítva.');
   $payment=DB::table('platform_payments')->find($paymentId);abort_unless($payment,404);

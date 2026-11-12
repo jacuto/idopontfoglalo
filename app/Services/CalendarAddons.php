@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Http;
 use Carbon\CarbonImmutable as Time;
 final class CalendarAddons{
  public function add(string $requestId,string $name):array{
+  abort_unless(PlatformAccess::mode(app(SalonStore::class)->read())==='active',422,'Ezt a hozzáférést az üzemeltető kezeli. Naptárkerethez vagy csomagváltáshoz keresd őt.');
   $order=app(SalonStore::class)->mutate(function(&$s)use($requestId,$name){PaidFeatures::require($s);abort_unless(($s['subscription']['plan']??'basic')==='pro',402,'További naptárhoz válaszd a Pro csomagot az Előfizetés menüben.');$orders=$s['subscription']['calendarOrders']??[];abort_if(collect($s['subscription']['planChanges']??[])->contains(fn($o)=>$o['status']==='pending'),409,'Előbb fejezd be a csomagváltást.');if(isset($orders[$requestId]))return $orders[$requestId];abort_if(collect($orders)->contains(fn($v)=>$v['status']==='pending'),409,'Egy naptárbővítés még folyamatban van. Előbb próbáld újra azt.');$count=count(Settings::activeStaff($s));abort_if($count>=100,422,'Legfeljebb 100 naptár kezelhető.');$limit=(int)($s['subscription']['calendarLimit']??max(1,$count));$quantity=(int)($s['subscription']['extraCalendars']??0)+1;$o=['requestId'=>$requestId,'name'=>$name,'status'=>'pending','quantity'=>$quantity,'limit'=>max($limit,$count)+1,'startsAt'=>Subscriptions::nextPeriod($s),'staffId'=>(string)\Illuminate\Support\Str::uuid(),'stripeId'=>$s['subscription']['id']??null];$s['subscription']['calendarOrders'][$requestId]=$o;return $o;});
   if($order['status']==='complete')return $order;
   $startsAt=$order['startsAt'];

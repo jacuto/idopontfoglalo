@@ -2,6 +2,7 @@
 namespace App\Services;
 final class PaidFeatures{
  public static function enabled(array $s):bool{
+  if(PlatformAccess::mode($s)==='free')return true;if(PlatformAccess::mode($s)==='suspended')return false;
   $sub=$s['subscription']??[];
   if(!isset($sub['plan'])&&!isset($sub['status'])&&empty($sub['trialEndsAt'])&&empty($sub['id']))return empty($sub['calendarBlocked']); // Unconverted legacy accounts retain their existing features.
   return (($sub['plan']??'basic')==='pro'||($sub['status']??'')==='trialing')&&empty($sub['calendarBlocked'])&&!in_array($sub['status']??'', ['canceled','cancelled','blocked','unpaid','incomplete_expired'],true);

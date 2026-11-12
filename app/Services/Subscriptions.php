@@ -8,6 +8,7 @@ use InvalidArgumentException;
 final class Subscriptions
 {
     public static function monthlyAmount(array $state, ?string $at=null):int{
+        if($at===null&&PlatformAccess::mode($state)!=='active')return 0;
         $count=0;foreach($state['subscription']['calendarAddons']??[] as $addon)if($at===null||Time::parse($addon['startsAt'])->lte(Time::parse($at)))$count+=(int)$addon['quantity'];return PlanPricing::base($state,$at)+2000*$count;
     }
     public static function amountForPeriod(array $state,string $at):int{foreach($state['subscription']['charges']??[] as $e)if($e['kind']==='monthly'&&Time::parse($e['from'])->equalTo(Time::parse($at)))return (int)$e['amount'];return self::monthlyAmount($state,$at);}
@@ -18,6 +19,9 @@ final class Subscriptions
     {
         $sub = &$state['subscription'];
         $sub['calendarBlocked'] = false;
+        foreach($sub['charges']??[] as $i=>$entry)if($entry['kind']==='monthly'&&!in_array($entry['status'],['paid','waived'],true)&&PlatformAccess::exempt($sub,Time::parse($entry['from']),Time::parse($entry['to']))){$sub['charges'][$i]['status']='waived';$sub['charges'][$i]['waivedReason']='operator_access_period';}
+        if(PlatformAccess::mode($state)==='free'){$sub['calendarBlocked']=false;$sub['status']='free';return;}
+        if(PlatformAccess::mode($state)==='suspended'){$sub['calendarBlocked']=true;$sub['status']='suspended';return;}
         if (empty($sub['trialEndsAt'])) return; // No invented arrears for unconverted legacy records.
         if (!array_key_exists('legacyPaidUntil',$sub)) $sub['legacyPaidUntil']=$sub['paidUntil']??null;
         $end = Time::parse($sub['trialEndsAt']);
@@ -35,6 +39,7 @@ final class Subscriptions
             if ($from->isFuture()) break;
             $to = $end->addMonthsNoOverflow($i + 1);
             $id = 'month-' . $from->format('Y-m-d-His');
+            if(PlatformAccess::exempt($sub,$from,$to)&&!isset($entries[$id]))continue;
             $entries[$id] ??= ['id'=>$id, 'kind'=>'monthly', 'amount'=>self::monthlyAmount($state,$from->toISOString()), 'currency'=>'HUF', 'status'=>'pending', 'from'=>$from->toISOString(), 'to'=>$to->toISOString(), 'dueAt'=>$from->addDays(21)->toISOString(), 'paymentId'=>null, 'noInvoice'=>false];
             // Preserve previously credited subscriptions when enabling the charge ledger.
             if ($entries[$id]['status'] === 'pending' && !empty($sub['legacyPaidUntil']) && Time::parse($sub['legacyPaidUntil'])->gte($to)) {
@@ -48,7 +53,8 @@ final class Subscriptions
         unset($entry);
         $sub['charges'] = array_values($entries);
         foreach ($sub['charges'] as &$entry) {
-            if ($entry['kind'] === 'monthly' && $entry['status'] !== 'paid') {
+            if($entry['kind']==='monthly'&&$entry['status']!=='paid'&&PlatformAccess::exempt($sub,Time::parse($entry['from']),Time::parse($entry['to']))){$entry['status']='waived';$entry['waivedReason']='operator_access_period';continue;}
+            if ($entry['kind'] === 'monthly' && !in_array($entry['status'],['paid','waived'],true)) {
                 $overdue = Time::parse($entry['dueAt'])->isPast();
                 $entry['status'] = $overdue ? 'overdue' : 'pending';
                 if ($overdue) $sub['calendarBlocked'] = true;
@@ -59,10 +65,13 @@ final class Subscriptions
         elseif ($end->isFuture()) $sub['status'] = 'trialing';
         elseif (collect($sub['charges'])->contains(fn($e)=>in_array($e['status'],['pending','overdue'],true))) $sub['status']='past_due';
         elseif (!empty($sub['paidUntil']) && Time::parse($sub['paidUntil'])->isFuture()) $sub['status']='active';
+        elseif(in_array($sub['status']??'', ['free','suspended'],true))$sub['status']='active';
     }
 
     public static function guard(array $state, bool $provider = true): void
     {
+        if(PlatformAccess::mode($state)==='suspended')abort(423,$provider?'A főadmin szünetelteti a hozzáférést. Az Előfizetés és az üzenetek elérhetők.':'A szolgáltató online foglalása jelenleg szünetel.');
+        if(PlatformAccess::mode($state)==='free')return;
         if (!empty($state['subscription']['calendarBlocked'])) abort(423, $provider ? 'A naptár zárolva van, mert egy havi díj 21 napos fizetési határideje lejárt. Nyisd meg az Előfizetés menüt, és rendezd a függő tételt.' : 'A szolgáltató online foglalása jelenleg szünetel. Időpontért keresd közvetlenül a szolgáltatót.');
     }
 

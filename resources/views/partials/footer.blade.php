@@ -1,0 +1,1 @@
+<footer class="site-footer"><nav aria-label="Hasznos hivatkozások"><a href="/adatvedelem">Adatkezelési tájékoztató</a><a href="/aszf">ÁSZF</a><a href="/adattorles">Adattörlés</a><a href="/sugo">Súgó</a></nav><span>Copyright {{ date('Y') }} <a href="https://digitmarketing.hu/">digitmarketing.hu</a></span></footer>

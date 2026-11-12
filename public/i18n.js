@@ -859,6 +859,20 @@ Számlaadatok mentve.|Invoice details saved.|Rechnungsdaten gespeichert.
 A már kiállított számla adatait kézzel is rögzítheted. Ez nem készít új számlát és nem módosítja a befizetést.|You can manually record an existing invoice. This does not issue a new invoice or change the payment.|Du kannst eine bestehende Rechnung manuell erfassen. Dadurch wird keine neue Rechnung erstellt und keine Zahlung geändert.
 A másutt már kiállított számla sorszámát és dátumát add meg. PDF feltöltése nem szükséges.|Enter the number and date of the invoice already issued elsewhere. No PDF upload is required.|Gib Nummer und Datum der bereits anderweitig ausgestellten Rechnung ein. Ein PDF-Upload ist nicht erforderlich.`;
  for(const line of manualInvoices.split('\n')){const p=line.trim().split('|');if(p.length===3)dictionary.set(p[0],{en:p[1],de:p[2]});}
+ const platformDocuments=`Adatkezelési tájékoztató|Privacy notice|Datenschutzhinweise
+ÁSZF|Terms and conditions|Allgemeine Geschäftsbedingungen
+Adattörlés|Data deletion|Datenlöschung
+Súgó|Help|Hilfe
+Jogi oldalak adatai|Legal page details|Angaben der rechtlichen Seiten
+Előfizetés és ingyenesség|Subscription and free access|Abonnement und kostenloser Zugang
+Hozzáférés mentése|Save access|Zugang speichern
+Korlátlan ideig ingyenes|Free with no expiry|Dauerhaft kostenlos
+Hozzáférés szünetel|Access suspended|Zugang ausgesetzt
+Díjmentesített időszak|Waived period|Gebührenfreier Zeitraum
+Billingo-számlakiállítás engedélyezése|Enable Billingo invoice creation|Billingo-Rechnungserstellung aktivieren
+Belépés és regisztráció engedélyezése|Enable sign-in and registration|Anmeldung und Registrierung aktivieren
+Beállítási útmutató|Setup guide|Einrichtungsanleitung`;
+ for(const line of platformDocuments.split('\n')){const p=line.trim().split('|');if(p.length===3)dictionary.set(p[0],{en:p[1],de:p[2]});}
  const patterns=[
   [/^(.+) – heti beosztás$/,m=>m[1]+(language==='en'?' – weekly schedule':' – Wochenplan')],
   [/^Jelenlegi csomag: (Alap|Pro)$/,m=>(language==='en'?'Current plan: ':'Aktueller Tarif: ')+(m[1]==='Pro'?'Pro':language==='en'?'Basic':'Basis')],

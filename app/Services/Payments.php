@@ -108,6 +108,7 @@ class Payments
             );
         }
         $s = $this->store->read();
+        if(PlatformAccess::mode($s)!=='active')throw new InvalidArgumentException('Ehhez a hozzáférési módhoz nem indítható fizetős előfizetés. Keresd az üzemeltetőt.');
         if (!empty($s['subscription']['id'])) {
             // Reuse a real unpaid Stripe invoice instead of creating a second subscription.
             $existing=Http::timeout(15)->withToken($key)->get('https://api.stripe.com/v1/subscriptions/'.rawurlencode($s['subscription']['id']),['expand'=>['latest_invoice']]);
