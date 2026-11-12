@@ -850,6 +850,15 @@ Jelképes naptárillusztráció|Symbolic calendar illustration|Symbolische Kalen
  const accountPolish=`Vállalkozás keresése név alapján|Find a business by name|Unternehmen nach Namen suchen
 A választott napon nincs szabad időpont.|There are no available appointments on the selected day.|Am ausgewählten Tag sind keine Termine verfügbar.`;
  for(const line of accountPolish.split('\n')){const p=line.trim().split('|');if(p.length===3)dictionary.set(p[0],{en:p[1],de:p[2]});}
+ const manualInvoices=`Számlaadatok kézi rögzítése|Record invoice details manually|Rechnungsdaten manuell erfassen
+Számlaadatok szerkesztése|Edit invoice details|Rechnungsdaten bearbeiten
+Számla sorszáma|Invoice number|Rechnungsnummer
+Kiállítás dátuma|Issue date|Ausstellungsdatum
+Kézzel rögzítve|Recorded manually|Manuell erfasst
+Számlaadatok mentve.|Invoice details saved.|Rechnungsdaten gespeichert.
+A már kiállított számla adatait kézzel is rögzítheted. Ez nem készít új számlát és nem módosítja a befizetést.|You can manually record an existing invoice. This does not issue a new invoice or change the payment.|Du kannst eine bestehende Rechnung manuell erfassen. Dadurch wird keine neue Rechnung erstellt und keine Zahlung geändert.
+A másutt már kiállított számla sorszámát és dátumát add meg. PDF feltöltése nem szükséges.|Enter the number and date of the invoice already issued elsewhere. No PDF upload is required.|Gib Nummer und Datum der bereits anderweitig ausgestellten Rechnung ein. Ein PDF-Upload ist nicht erforderlich.`;
+ for(const line of manualInvoices.split('\n')){const p=line.trim().split('|');if(p.length===3)dictionary.set(p[0],{en:p[1],de:p[2]});}
  const patterns=[
   [/^(.+) – heti beosztás$/,m=>m[1]+(language==='en'?' – weekly schedule':' – Wochenplan')],
   [/^Jelenlegi csomag: (Alap|Pro)$/,m=>(language==='en'?'Current plan: ':'Aktueller Tarif: ')+(m[1]==='Pro'?'Pro':language==='en'?'Basic':'Basis')],

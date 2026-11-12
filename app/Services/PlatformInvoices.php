@@ -3,7 +3,28 @@ namespace App\Services;
 use Illuminate\Support\Facades\{DB,Http};
 use InvalidArgumentException;
 final class PlatformInvoices {
+ public function recordManual(int $paymentId,string $number,string $issuedOn):array {
+  return DB::transaction(function()use($paymentId,$number,$issuedOn){
+   $payment=DB::table('platform_payments')->where('id',$paymentId)->lockForUpdate()->first();abort_unless($payment,404);
+   if((int)$payment->amount<=0)throw new InvalidArgumentException('A díjmentes próbaidőről nem rögzíthető számla.');
+   $old=DB::table('platform_invoices')->where('payment_id',$paymentId)->first();
+   if($old&&!(($old->source==='manual'&&$old->status==='issued')||$old->status==='not_created'))throw new InvalidArgumentException('Ehhez a befizetéshez már indult Billingo-számlázás. Előbb egyeztesd a meglévő számlát.');
+   $number=trim($number);
+   if($number==='')throw new InvalidArgumentException('Add meg a számla sorszámát.');
+   $duplicate=DB::table('platform_invoices')->where('number',$number)->where('status','issued');if($old)$duplicate->where('id','!=',$old->id);
+   if($duplicate->exists())throw new InvalidArgumentException('Ez a számlaszám már másik befizetéshez tartozik.');
+   $values=['source'=>'manual','status'=>'issued','number'=>$number,'issued_on'=>$issuedOn,'reference'=>null,'updated_at'=>now()];
+   if($old)DB::table('platform_invoices')->where('id',$old->id)->update($values);
+   else {
+    $buyer=app(Tenant::class)->run((int)$payment->provider_id,fn()=>app(SalonStore::class)->read()['settings']);
+    DB::table('platform_invoices')->insert($values+['payment_id'=>$paymentId,'provider_id'=>$payment->provider_id,'buyer'=>json_encode($buyer,JSON_THROW_ON_ERROR),'created_at'=>now()]);
+   }
+   return ['ok'=>true,'number'=>$number,'issued_on'=>$issuedOn];
+  });
+ }
  public function issue(int $paymentId):array {
+  $recorded=DB::table('platform_invoices')->where('payment_id',$paymentId)->where('status','issued')->first();
+  if($recorded)return ['status'=>'issued','number'=>$recorded->number,'alreadyIssued'=>true];
   $key=config('integrations.platform_billingo.key');$block=config('integrations.platform_billingo.block');
   if(!$key||!$block)throw new InvalidArgumentException('Az üzemeltető saját Billingo API-kulcsa és számlatömbje még nincs beállítva.');
   $payment=DB::table('platform_payments')->find($paymentId);abort_unless($payment,404);
@@ -25,12 +46,12 @@ final class PlatformInvoices {
     'comment'=>'Ráérő előfizetés. Befizetésazonosító: '.$payment->id,
    ])->throw()->json();
    if(empty($result['id']))throw new \RuntimeException();
-   DB::table('platform_invoices')->where('id',$invoice->id)->update(['status'=>'issued','reference'=>(string)$result['id'],'number'=>$result['invoice_number']??(string)$result['id'],'updated_at'=>now()]);
+   DB::table('platform_invoices')->where('id',$invoice->id)->update(['status'=>'issued','issued_on'=>$result['invoice_date']??now('Europe/Budapest')->format('Y-m-d'),'reference'=>(string)$result['id'],'number'=>$result['invoice_number']??(string)$result['id'],'updated_at'=>now()]);
    return ['status'=>'issued','number'=>$result['invoice_number']??(string)$result['id'],'alreadyIssued'=>false];
   }catch(\Throwable){DB::table('platform_invoices')->where('id',$invoice->id)->update(['status'=>'unknown','updated_at'=>now()]);throw new InvalidArgumentException('A Billingo-kérés eredménye nem igazolható. Ne indíts új számlát: előbb ellenőrizd a Billingóban.');}
  }
  public function download(int $id,?int $providerId=null) {
-  $q=DB::table('platform_invoices')->where('id',$id)->where('status','issued');if($providerId!==null)$q->where('provider_id',$providerId);$invoice=$q->first();abort_unless($invoice&&$invoice->reference,404);
+  $q=DB::table('platform_invoices')->where('id',$id)->where('status','issued');if($providerId!==null)$q->where('provider_id',$providerId);$invoice=$q->first();abort_unless($invoice&&$invoice->source==='billingo'&&$invoice->reference,404);
   $key=config('integrations.platform_billingo.key');if(!$key)throw new InvalidArgumentException('A központi Billingo-kapcsolat nincs beállítva.');
   $r=Http::timeout(30)->withHeaders(['X-API-KEY'=>$key])->get('https://api.billingo.hu/v3/documents/'.rawurlencode($invoice->reference).'/download');
   if(!$r->successful()||!str_starts_with($r->body(),'%PDF-'))throw new InvalidArgumentException('A Billingo PDF-je most nem érhető el. Próbáld később, vagy kérd az üzemeltetőtől.');

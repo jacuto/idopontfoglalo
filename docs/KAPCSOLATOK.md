@@ -122,3 +122,11 @@ Modern, iframe nélküli beágyazás:
 A szolgáltató Beállítások / Beágyazás részében külön engedélyezze a befogadó weboldal pontos HTTPS-originjét. Más vállalkozás originlistája nem ad jogosultságot. A beágyazás nem viszi át a szolgáltatói munkamenetet vagy a harmadik féltől származó sütiket. A vendégoldali kupon-/bérletválasztó a teljes saját foglalóoldalon működik; a beágyazott komponens ennek az alapfoglalási részét tartalmazza.
 
 Saját foglalóoldalak már külön `provider=ID` URL-en vannak. Automatikus aldomain-, DNS-, egyéni domain- és SSL-provizionálás **nincs**; ezekhez külön tárhely-/DNS-integráció szükséges. A digitmarketing.hu főoldalát a fejlesztés nem módosította.
+
+## Előfizetési számla kézi nyilvántartása
+
+A **Főadmin → Előfizetési számlák** részen minden pozitív összegű, már rögzített befizetés mellett választható a **Számlaadatok kézi rögzítése**. A másutt már kiállított számla sorszámát és kiállítási dátumát kell megadni; ez nem állít ki új számlát, nem küld Billingo-kérést, és nem ír jóvá új befizetést. PDF nem szükséges. A kézi adatok ugyanitt később szerkeszthetők, és a szolgáltató saját Előfizetés / Számláim részében is megjelennek. Kézi nyilvántartáshoz nem jelenik meg működésképtelen PDF-letöltés.
+
+Egy befizetéshez egy számlanyilvántartás tartozik. Folyamatban lévő, bizonytalan eredményű vagy már kiállított Billingo-számlát a kézi űrlap nem ír felül; bizonytalan eredményt előbb a Billingóval kell egyeztetni. Jövőbeli vagy hibás kiállítási dátum, üres sorszám és másik kiállított számlán már használt sorszám nem menthető. Az ismételt kézi mentés nem hoz létre újabb rekordot. A számlaadatok rögzítése nem helyettesíti a tényleges számlakiállítást és a számla ügyfélnek történő átadását.
+
+A `2026_11_12_000015_add_manual_platform_invoice_details` migráció a forrást és a kiállítás dátumát adja hozzá, meglévő adatok törlése nélkül. A korábbi számlák Billingo-forrásúak maradnak, ismeretlen kiállítási dátumukat nem találjuk ki. Feltöltés után `php artisan optimize:clear`, `php artisan raero:upgrade`, majd `php artisan raero:check` szükséges. Új Composer-függőség nincs.

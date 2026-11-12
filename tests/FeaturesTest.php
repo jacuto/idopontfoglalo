@@ -18,6 +18,36 @@ class FeaturesTest extends TestCase {
   DB::table('guest_accounts')->insertOrIgnore(['id'=>$id,'name'=>'Vendég','email'=>'guest@example.com','email_verified'=>true,'provider'=>'google','subject'=>(string)$id,'created_at'=>now(),'updated_at'=>now()]);
   $this->withSession(['guest_id'=>$id,'admin'=>false]);
  }
+ public function test_manual_platform_invoice_needs_no_billingo_and_is_visible_only_to_its_provider():void {
+  \Illuminate\Support\Facades\Http::preventStrayRequests();config(['integrations.platform_billingo.key'=>'','integrations.platform_billingo.block'=>null]);
+  $this->withSession(['platform_admin'=>true]);$this->postJson('/api/platform/payments',['providerId'=>1,'reference'=>'manual-invoice-bank','paidAt'=>now()->toISOString()])->assertOk();
+  $id=(int)DB::table('platform_payments')->value('id');$before=DB::table('platform_payments')->find($id);$subscription=app(SalonStore::class)->read()['subscription'];$date=now('Europe/Budapest')->format('Y-m-d');
+  $data=['paymentId'=>$id,'number'=>' DM-2026-001 ','issuedOn'=>$date];
+  $this->putJson('/api/platform/invoices/manual',$data)->assertOk()->assertJsonPath('number','DM-2026-001');
+  $this->putJson('/api/platform/invoices/manual',$data)->assertOk();$this->assertSame(1,DB::table('platform_invoices')->count());
+  $this->postJson('/api/platform/invoices',['paymentId'=>$id])->assertOk()->assertJsonPath('alreadyIssued',true);
+  $invoice=DB::table('platform_invoices')->first();$this->assertSame('manual',$invoice->source);$this->assertSame('issued',$invoice->status);$this->assertNull($invoice->reference);
+  $this->putJson('/api/platform/invoices/manual',array_replace($data,['number'=>'DM-2026-002']))->assertOk();
+  $this->getJson('/api/platform/invoices')->assertJsonPath('0.issued_on',$date)->assertJsonPath('0.source','manual');
+  $this->assertEquals($before,DB::table('platform_payments')->find($id));$this->assertSame($subscription,app(SalonStore::class)->read()['subscription']);
+  $this->provider();$this->withSession(['platform_admin'=>false]);$this->getJson('/api/subscription/info')->assertJsonPath('invoices.0.number','DM-2026-002')->assertJsonPath('invoices.0.issued_on',$date);
+  $this->getJson('/api/subscription/invoices/'.$invoice->id.'/pdf')->assertNotFound();$this->putJson('/api/platform/invoices/manual',$data)->assertUnauthorized();
+  $this->provider(2);$this->getJson('/api/subscription/info')->assertJsonCount(0,'invoices');
+  \Illuminate\Support\Facades\Http::assertNothingSent();
+ }
+ public function test_manual_platform_invoice_validates_and_protects_existing_billingo_records():void {
+  $this->withSession(['platform_admin'=>true]);$id=DB::table('platform_payments')->insertGetId(['provider_id'=>1,'reference'=>'manual-validation','amount'=>4000,'method'=>'transfer','paid_at'=>now(),'period_end'=>now()->addMonth(),'created_at'=>now()]);
+  $data=['paymentId'=>$id,'number'=>'MAN-1','issuedOn'=>now('Europe/Budapest')->format('Y-m-d')];
+  foreach([['number'=>''],['issuedOn'=>'2026-02-30'],['issuedOn'=>now()->addYear()->format('Y-m-d')],['issuedOn'=>'12/11/2026'],['number'=>str_repeat('A',101)]] as $invalid)$this->putJson('/api/platform/invoices/manual',array_replace($data,$invalid))->assertUnprocessable();
+  $this->assertSame(0,DB::table('platform_invoices')->count());
+  $invoice=DB::table('platform_invoices')->insertGetId(['payment_id'=>$id,'provider_id'=>1,'status'=>'unknown','buyer'=>'{}','created_at'=>now(),'updated_at'=>now()]);
+  foreach(['unknown','issuing','issued'] as $status){DB::table('platform_invoices')->where('id',$invoice)->update(['status'=>$status]);$this->putJson('/api/platform/invoices/manual',$data)->assertUnprocessable();}
+  DB::table('platform_invoices')->where('id',$invoice)->update(['status'=>'not_created']);$this->putJson('/api/platform/invoices/manual',$data)->assertOk();
+  $other=DB::table('platform_payments')->insertGetId(['provider_id'=>2,'reference'=>'manual-duplicate','amount'=>4000,'method'=>'transfer','paid_at'=>now(),'period_end'=>now()->addMonth(),'created_at'=>now()]);
+  $this->putJson('/api/platform/invoices/manual',array_replace($data,['paymentId'=>$other]))->assertUnprocessable();$this->assertSame(1,DB::table('platform_invoices')->count());
+  DB::table('platform_payments')->where('id',$id)->update(['amount'=>0]);$this->putJson('/api/platform/invoices/manual',$data)->assertUnprocessable();
+  $this->putJson('/api/platform/invoices/manual',array_replace($data,['paymentId'=>99999999]))->assertNotFound();
+ }
  public function test_guest_account_loads_without_avatar_column_during_upgrade():void {
   $this->guest();
   \Illuminate\Support\Facades\Schema::table('guest_accounts', fn($table) => $table->dropColumn('avatar'));
