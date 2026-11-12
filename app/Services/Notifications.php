@@ -132,6 +132,9 @@ class Notifications
     public function run(int $limit = 50, ?int $providerId = null): array
     {
         $counts = ["sent" => 0, "skipped" => 0, "blocked" => 0, "failed" => 0];
+        foreach(DB::table('deliveries')->when($providerId!==null,fn($q)=>$q->where('provider_id',$providerId))->where('status','processing')->where('locked_at','<',now()->subMinutes(10))->get() as $stale){
+            try{$payload=json_decode(Crypt::decryptString($stale->payload),true);if(($payload['channel']??'')==='sms')$this->finish($stale->id,'unknown',['error'=>'Az SMS-küldés megszakadt. Újraküldés előtt ellenőrizd a BulkGate üzenetelőzményét.']);}catch(\Throwable){}
+        }
         DB::table("deliveries")
             ->when($providerId !== null, fn($q) => $q->where("provider_id", $providerId))
             ->where("status", "processing")
@@ -161,6 +164,7 @@ class Notifications
                 break;
             }
             try {
+                $smsReference=null;
                 $p = json_decode(Crypt::decryptString($job->payload), true);
                 $previousTenant = app(Tenant::class)->id;
                 app(Tenant::class)->id = (int) $job->provider_id;
@@ -220,9 +224,7 @@ class Notifications
                     ($p["channel"] === "email" &&
                         !$this->connections->mailReady()) ||
                     ($p["channel"] === "sms" &&
-                        (empty($c["twilio_sid"]) ||
-                            empty($c["twilio_token"]) ||
-                            empty($c["twilio_from"])))
+                        !BulkGateSms::ready($c))
                 ) {
                     $this->finish($job->id, "blocked", [
                         "error" => "Hiányzó küldőkapcsolat.",
@@ -308,30 +310,22 @@ class Notifications
                             "Az SMS-hez nemzetközi telefonszám szükséges.",
                         );
                     }
-                    Http::timeout(20)
-                        ->withBasicAuth($c["twilio_sid"], $c["twilio_token"])
-                        ->asForm()
-                        ->post(
-                            "https://api.twilio.com/2010-04-01/Accounts/" .
-                                rawurlencode($c["twilio_sid"]) .
-                                "/Messages.json",
-                            [
-                                str_starts_with($c["twilio_from"], "MG")
-                                    ? "MessagingServiceSid"
-                                    : "From" => $c["twilio_from"],
-                                "To" => $p["recipient"],
-                                "Body" => $text,
-                            ],
-                        )
-                        ->throw();
+                    $manage=rtrim(config('app.url'),'/').'/modositas?provider='.app(Tenant::class)->id.'&token='.$b['token'];
+                    $text=mb_strimwidth($s['settings']['name'],0,40,'…').' · '.CarbonImmutable::parse($b['start'])->setTimezone('Europe/Budapest')->format('Y.m.d. H:i').' · '.($p['event']==='group_missed'?'Csoportos óra elmarad':($statuses[$b['status']]??$b['status']))."\n".mb_strimwidth(implode(' + ',array_column($b['serviceSnapshot'],'name')),0,35,'…')."\n".$manage;
+                    $smsReference=app(BulkGateSms::class)->send($p['recipient'],$text,$c);
                 }
                 $this->finish($job->id, "sent", [
                     "error" => null,
+                    "provider_reference" => $smsReference,
                     "attempts" => $job->attempts + 1,
                 ]);
                 $counts["sent"]++;
+            } catch (SmsDeliveryException $e) {
+                $attempts=$job->attempts+1;$status=$e->uncertain?'unknown':($e->retryable&&$attempts<5?'pending':'failed');
+                $this->finish($job->id,$status,['attempts'=>$attempts,'error'=>$e->getMessage(),'available_at'=>now()->addMinutes(5*$attempts)]);$counts['failed']++;
             } catch (\Throwable $e) {
                 // Do not store SMTP/API responses: they can include credentials or personal data.
+                if(!empty($smsReference)){$this->finish($job->id,'unknown',['error'=>'A BulkGate átvette az SMS-t, de a helyi mentés megszakadt. Ellenőrizd az üzenetelőzményt.']);$counts['failed']++;continue;}
                 $attempts = $job->attempts + 1;
                 $this->finish($job->id, $attempts >= 5 ? "failed" : "pending", [
                     "attempts" => $attempts,

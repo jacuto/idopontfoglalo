@@ -1,3 +1,3 @@
-# Későbbre kért fejlesztés
+# Teljesített SMS-szolgáltatócsere
 
-- A felhasználó a Twilio SMS-kapcsolat BulkGate-re cserélését kérte későbbre. A BulkGate-fiók jóváhagyásra vár. Ebben a kiadásban még nem cseréljük le az SMS-küldőt; az új beállítási útmutatók és az adatkezelési tájékoztató a ténylegesen használt Twiliót nevezik meg. A cserével együtt az értesítésküldés, titkos kulcsok, főadmin mezők, díjazási útmutató és adatkezelési szolgáltatólista is frissítendő. A felhasználó most csak SMS-csatornát választott, WhatsApp/Viber integrációt nem kért.
+2026. november 12.: a Twilio helyett BulkGate küldi az SMS-értesítéseket és vendégmeghívókat. A főadmin felület, titkos kapcsolati adatok, útmutató és adatkezelési szolgáltatólista frissült. WhatsApp és Viber nincs bekapcsolva. Az éles Application ID és token megadása, majd ellenőrzött küldési próba még szükséges.

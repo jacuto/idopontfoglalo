@@ -17,9 +17,10 @@ final class Connections
         "stripe_key",
         "stripe_webhook_secret",
         "stripe_price_id",
-        "twilio_sid",
-        "twilio_token",
-        "twilio_from",
+        "bulkgate_application_id",
+        "bulkgate_application_token",
+        "bulkgate_sender_type",
+        "bulkgate_sender_value",
         "apple_client_id", "apple_team_id", "apple_key_id", "apple_private_key", "admin_apple_ids",
         "google_client_id",
         "google_client_secret",
@@ -119,7 +120,8 @@ final class Connections
                 "facebook_client_id",
                 "admin_google_emails",
                 "admin_facebook_ids",
-                "twilio_from",
+                "bulkgate_sender_type",
+                "bulkgate_sender_value",
             ]
             as $key
         ) {

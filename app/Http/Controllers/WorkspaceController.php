@@ -52,9 +52,10 @@ class WorkspaceController
                 "stripe_key" => "nullable|string|max:1000",
                 "stripe_webhook_secret" => "nullable|string|max:1000",
                 "stripe_price_id" => "nullable|string|max:200",
-                "twilio_sid" => "nullable|alpha_num|max:100",
-                "twilio_token" => "nullable|string|max:200",
-                "twilio_from" => "nullable|string|max:100",
+                "bulkgate_application_id" => "nullable|integer|min:1",
+                "bulkgate_application_token" => "nullable|string|max:1000",
+                "bulkgate_sender_type" => "nullable|in:gSystem,gText,gOwn,gProfile",
+                "bulkgate_sender_value" => "nullable|string|max:100",
                 "apple_client_id"=>"nullable|string|max:300", "apple_team_id"=>"nullable|string|max:100", "apple_key_id"=>"nullable|string|max:100", "apple_private_key"=>"nullable|string|max:10000", "admin_apple_ids"=>"nullable|string|max:2000",
                 "google_client_id" => "nullable|string|max:300",
                 "google_client_secret" => "nullable|string|max:500",
@@ -78,6 +79,7 @@ class WorkspaceController
                         "attempts",
                         "available_at",
                         "error",
+                        "provider_reference",
                         "updated_at",
                     )
                     ->latest("id")
@@ -92,14 +94,11 @@ class WorkspaceController
             preg_match('#^/api/deliveries/(\d+)/retry$#', $path, $m) &&
             $method === "POST"
         ) {
-            DB::table("deliveries")->where("provider_id", app(\App\Services\Tenant::class)->id)
-                ->where("id", $m[1])
-                ->whereIn("status", ["failed", "blocked"])
-                ->update([
-                    "status" => "pending",
-                    "attempts" => 0,
-                    "available_at" => now(),
-                ]);
+            DB::transaction(function()use($request,$m){
+                $row=DB::table('deliveries')->where('provider_id',app(\App\Services\Tenant::class)->id)->where('id',$m[1])->lockForUpdate()->first();abort_unless($row,404);
+                if(in_array($row->status,['unknown','on_hold'],true))$request->validate(['confirmedNotSent'=>'required|accepted']);
+                if(in_array($row->status,['failed','blocked','unknown','on_hold'],true))DB::table('deliveries')->where('id',$row->id)->update(['status'=>'pending','attempts'=>0,'available_at'=>now()]);
+            });
             return response()->json(["ok" => true]);
         }
         if (

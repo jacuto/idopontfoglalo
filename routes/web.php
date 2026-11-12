@@ -97,3 +97,5 @@ foreach(['/szolgaltatok','/szolgaltato','/belepes','/arak','/kapcsolat'] as $pag
 
 foreach(['adatvedelem'=>'privacy','aszf'=>'terms','adattorles'=>'deletion','sugo'=>'help'] as $slug=>$document)Route::get('/'.$slug,fn()=>app(\App\Services\PublicDocuments::class)->page($document));
 Route::view('/foadmin/{section}','app')->where('section','kapcsolatok|szamlak|szamla-rogzitese|szamla-egyeztetes|levelek|jogosultsagok|uzenetek|hirlevelek|jogi-oldalak|elofizetes|szolgaltatok|befizetesek|uzemelteto');
+
+Route::get('/gyik',fn()=>app(\App\Services\PublicDocuments::class)->page('help'));

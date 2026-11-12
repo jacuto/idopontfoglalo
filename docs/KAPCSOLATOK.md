@@ -2,7 +2,7 @@
 
 ## Két külön tulajdonos
 
-**Vendég → szolgáltató:** a szolgáltató Beállítások / Kapcsolatok részében saját Stripe-, Billingo- és Számlázz.hu-adatokat adhat meg. Az eredeti vállalkozás korábbi `.env`-adatai és `storage/app/private/connections.enc` fájlja tovább működnek. Az SMTP, Twilio és OAuth közös, csak főadmin által szerkeszthető. Az új vállalkozások saját fizetési kapcsolati fájlja `connections.enc.provider-ID`.
+**Vendég → szolgáltató:** a szolgáltató Beállítások / Kapcsolatok részében saját Stripe-, Billingo- és Számlázz.hu-adatokat adhat meg. Az eredeti vállalkozás korábbi `.env`-adatai és `storage/app/private/connections.enc` fájlja tovább működnek. Az SMTP, BulkGate és OAuth közös, csak főadmin által szerkeszthető. Az új vállalkozások saját fizetési kapcsolati fájlja `connections.enc.provider-ID`.
 
 **Szolgáltató → üzemeltető:** `/foadmin` → Saját Billingo, Stripe és SMTP. A központi kulcsok a `storage/app/private/platform-connections.enc` külön titkosított fájlba kerülnek. A titkos mezőket a böngésző nem kapja vissza; a „Beállítva” jelzés nem jelent sikeres fizetést vagy küldést. Üres mező mentéskor megőrzi a korábbi kulcsot. Az összes titkosított fájlhoz az eredeti APP_KEY szükséges.
 
@@ -72,7 +72,7 @@ Az `accepted` azt jelenti, hogy **az SMTP-szerver elfogadta**, nem azt, hogy a c
 
 ## A szolgáltatók saját kapcsolatai
 
-A korábbi szolgáltatói Stripe-fizetés, Billingo/Számlázz.hu számlázás, SMTP és Twilio SMS megmaradt. A kuponos foglalás fizetése a lefagyasztott kedvezményes összegre épül; a bérletből fedezett foglalás nem kér új bankkártyás fizetést. A szolgáltató saját Stripe-webhookja:
+A korábbi szolgáltatói Stripe-fizetés, Billingo/Számlázz.hu számlázás, SMTP és BulkGate SMS megmaradt. A kuponos foglalás fizetése a lefagyasztott kedvezményes összegre épül; a bérletből fedezett foglalás nem kér új bankkártyás fizetést. A szolgáltató saját Stripe-webhookja:
 
 ```text
 https://foglalo.digitmarketing.hu/api/stripe/webhook?provider=ID
@@ -133,10 +133,8 @@ A `2026_11_12_000015_add_manual_platform_invoice_details` migráció a forrást 
 
 ## Beépített központi beállítási útmutatók
 
-A **Főadmin → Központi kapcsolatok** űrlapon a Stripe, Billingo, Twilio, Google, Facebook és Apple külön szakaszt kap. A mezők alatt rövid elérési út található, a **Beállítási útmutató** részben a szolgáltatóhoz tartozó lépések, hivatalos hivatkozások és a szükséges visszahívási címek olvashatók. Az útmutatók alapból csukva vannak; a titkos értékeket továbbra sem jelenítjük meg, és üresen hagyva megmaradnak.
+A **Főadmin → Központi kapcsolatok** űrlapon a Stripe, Billingo, BulkGate, Google, Facebook és Apple külön szakaszt kap. A mezők alatt rövid elérési út található, a **Beállítási útmutató** részben a szolgáltatóhoz tartozó lépések, hivatalos hivatkozások és a szükséges visszahívási címek olvashatók. Az útmutatók alapból csukva vannak; a titkos értékeket továbbra sem jelenítjük meg, és üresen hagyva megmaradnak.
 
 A visszahívási címek a böngészőben megnyitott oldal domainjéből készülnek. Éles domainre költözéskor a szerver APP_URL beállítását és az érintett szolgáltatói alkalmazások engedélyezett domainjeit/URL-jeit együtt kell frissíteni. A Stripe teszt- és éles környezetének kulcsai, árazonosítói és webhook-titkai különállók. A mentés nem indít fizetést, SMS-t vagy számlakiállítást.
 
-A Twilio útmutató külön jelzi az ingyenes próba korlátozásait, a szegmensalapú díjazást és a bérelt telefonszám lehetséges havidíját. Fix SMS-árat nem tárolunk a felületen: az aktuális hivatalos magyarországi árlistára hivatkozunk. Más SMS-szolgáltató kulcsa nem használható a Twilio mezőiben; ehhez külön integráció szükséges.
-
-Ehhez a felületi frissítéshez nincs új migráció vagy Composer-függőség.
+A BulkGate útmutató az Application ID és Application token létrehozását, az aktív HTTP API-t, az egyenleget és az alapértelmezett rendszerfeladót ismerteti. Az SMS-ek szegmensenként díjazottak; az aktuális magyarországi árlistára hivatkozunk. A beállítás mentése nem küld tesztüzenetet. Részletek: [BULKGATE_SMS_ES_LEVELSZERKESZTO.md](BULKGATE_SMS_ES_LEVELSZERKESZTO.md).

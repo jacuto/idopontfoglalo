@@ -1,10 +1,10 @@
 @extends('documents.layout')
-@section('title','Súgó és beállítási útmutató')
+@section('title','GYIK – gyakori kérdések')
 @section('description','Gyakorlati útmutató a Ráérő foglalásokhoz, hajfestési hatóidőhöz, csoportos órákhoz, kuponokhoz, bérletekhez és nyitvatartáshoz.')
 @section('content')
 <p class="document-lead">Keresd meg, amit be szeretnél állítani. A példák egyéni szakembereknek és több munkatársas vállalkozásoknak is segítenek.</p>
 <label class="help-search">Miben segíthetünk?<input type="search" id="help-search" placeholder="Például hajfestés, szabadság, bérlet…" autocomplete="off"></label><p id="help-count" role="status"></p>
-<nav class="help-topics" aria-label="Súgó témakörei"><a href="#indulas">Indulás</a><a href="#foglalas">Foglalások</a><a href="#festes">Hajfestés és párhuzamosság</a><a href="#nyitvatartas">Nyitvatartás</a><a href="#berlet">Bérletek és kuponok</a><a href="#penzugy">Pénzügyek</a><a href="#fiok">Fiók és kapcsolatok</a></nav>
+<nav class="help-topics" aria-label="GYIK témakörei"><a href="#indulas">Indulás</a><a href="#foglalas">Foglalások</a><a href="#festes">Hajfestés és párhuzamosság</a><a href="#nyitvatartas">Nyitvatartás</a><a href="#berlet">Bérletek és kuponok</a><a href="#penzugy">Pénzügyek</a><a href="#fiok">Fiók és kapcsolatok</a></nav>
 <section class="help-section" id="indulas"><h2>Indulás és a vállalkozás beállítása</h2>
 <details class="help-entry"><summary>Mi az első öt lépés?</summary><ol><li>A Beállításokban add meg a nevedet, elérhetőségeidet és nyilvános címedet.</li><li>Válaszd az egyéni vagy több munkatársas működést, majd állítsd be a nyitvatartást.</li><li>Vegyél fel legalább egy szolgáltatást árral és időtartammal.</li><li>Több munkatársnál rendeld hozzá a megfelelő szakembereket a szolgáltatásokhoz, és ellenőrizd a beosztásukat.</li><li>Nyisd meg a Foglalási oldalam hivatkozást, és próbálj végig egy tesztfoglalást.</li></ol></details>
 <details class="help-entry"><summary>Egyedül dolgozom: miért nincs „Ki végzi?” mező?</summary><p>Egyéni működésnél az elsődleges szakember végzi a szolgáltatásokat; a korábban bejelölt más munkatárs nem szűkítheti le a szabad időket. Több munkatársas működésnél külön hozzárendelések és beosztások használhatók.</p></details>

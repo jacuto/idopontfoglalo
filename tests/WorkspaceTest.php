@@ -451,16 +451,16 @@ class WorkspaceTest extends TestCase
         )->assertRedirect("/");
         $this->getJson("/api/state")->assertOk();
     }
-    public function test_sms_notification_fallback_uses_twilio(): void
+    public function test_sms_notification_uses_bulkgate(): void
     {
         app(Connections::class)->save([
-            "twilio_sid" => "ACtest",
-            "twilio_token" => "token",
-            "twilio_from" => "+36309999999",
+            "bulkgate_application_id" => "12345",
+            "bulkgate_application_token" => "token",
+            "bulkgate_sender_type" => "gSystem",
         ]);
         $this->settings(["notifyGuest" => true, "channel" => "sms"]);
         Http::fake([
-            "api.twilio.com/*" => Http::response(["sid" => "SMtest"], 201),
+            "portal.bulkgate.com/*" => Http::response(["data"=>["status"=>"accepted","sms_id"=>"sms-test"]]),
         ]);
         $this->postJson(
             "/api/bookings",
@@ -469,8 +469,8 @@ class WorkspaceTest extends TestCase
         $result = app(Notifications::class)->run();
         $this->assertSame(1, $result["sent"]);
         Http::assertSent(
-            fn($r) => $r["To"] === "+36301234567" &&
-                str_contains($r["Body"], "/fiokom"),
+            fn($r) =>  $r["number"] === "36301234567" &&
+                str_contains($r["text"], "/modositas"),
         );
     }
     public function test_szamlazz_xml_invoice_and_partial_payment_guard(): void

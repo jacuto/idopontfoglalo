@@ -555,7 +555,7 @@ function settingsPage() {
    )
    .join(
      "",
-   )}</select></div></div><p class="hint">Küldéshez állítsd be az SMTP- vagy Twilio-kapcsolatot és a percenként futó cronfeladatot. A hiányzó kapcsolat miatt várakozó levelek a küldési sorban látszanak.</p></details>
+   )}</select></div></div><p class="hint">Küldéshez állítsd be az SMTP- vagy BulkGate-kapcsolatot és a percenként futó cronfeladatot. A hiányzó kapcsolat miatt várakozó levelek a küldési sorban látszanak.</p></details>
  <details><summary>Számlázási adatok</summary><div class="form-grid">${[
    ["billingName", "Számlázási név"],
    ["billingTaxNumber", "Adószám (ha van)"],
@@ -668,12 +668,14 @@ async function deliveryRows() {
       pending: "Várakozik",
       blocked: "Kapcsolatra vár",
       processing: "Küldés alatt",
-      sent: "Elküldve",
+      sent: "Küldő átvette",
+      unknown: "Ellenőrzést igényel",
+      on_hold: "SMS-csere: ellenőrzendő",
       skipped: "Már nem aktuális",
       failed: "Sikertelen",
     };
     $("#delivery-table").innerHTML =
-      `<table><thead><tr><th>#</th><th>Állapot</th><th>Esedékes</th><th></th></tr></thead><tbody>${rows.map((r) => `<tr><td>${r.id}</td><td>${labels[r.status] || r.status}${r.error ? `<small class="muted"> · ${esc(r.error)}</small>` : ""}</td><td>${new Date(r.available_at).toLocaleString(window.raeroLocale?.()||"hu-HU")}</td><td>${["failed", "blocked"].includes(r.status) ? `<button onclick="retryDelivery(${r.id})">Újrapróbálás</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="4">Nincs küldési feladat.</td></tr>'}</tbody></table>`;
+      `<table><thead><tr><th>#</th><th>Állapot</th><th>Esedékes</th><th></th></tr></thead><tbody>${rows.map((r) => `<tr><td>${r.id}</td><td>${labels[r.status] || r.status}${r.provider_reference?`<small> · ${esc(r.provider_reference)}</small>`:""}${r.error ? `<small class="muted"> · ${esc(r.error)}</small>` : ""}</td><td>${new Date(r.available_at).toLocaleString(window.raeroLocale?.()||"hu-HU")}</td><td>${["failed", "blocked", "unknown", "on_hold"].includes(r.status) ? `<button onclick="retryDelivery(${r.id},${['unknown','on_hold'].includes(r.status)})">Újrapróbálás</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="4">Nincs küldési feladat.</td></tr>'}</tbody></table>`;
   } catch (e) {
     if ($("#delivery-table")) $("#delivery-table").textContent = e.message;
   }
@@ -689,8 +691,9 @@ async function runDeliveries() {
     toast(e.message);
   }
 }
-async function retryDelivery(id) {
-  await api("/api/deliveries/" + id + "/retry", "POST", {});
+async function retryDelivery(id,unknown=false) {
+  if(unknown&&!confirm("Ellenőrizted a BulkGate üzenetelőzményében, hogy ez az SMS biztosan nem lett elküldve? Az újrapróbálás új, fizetős küldést indíthat."))return;
+  await api("/api/deliveries/" + id + "/retry", "POST", unknown?{confirmedNotSent:true}:{});
   deliveryRows();
 }
 function paymentsPage() {

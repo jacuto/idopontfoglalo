@@ -18,7 +18,7 @@ A bővített böngészős ellenőrzés a feltételes kuponmezőt, a szolgáltat�
 
 ## Mit nem bizonyítanak ezek a tesztek?
 
-A külső OAuth-, Stripe-, Billingo-, Számlázz.hu- és Twilio-válaszok szimuláltak. Valós kulcs, valódi kézbesítés, tényleges kártyaterhelés vagy éles számla nem történt. Az üzemeltető külső fiókjain, a konkrét Tárhely.eu-konfiguráción, az éles adatbázis másolatán és valós felhasználókkal külön átvételi próba szükséges. Nem történt nagy terheléses, több ezer szolgáltatós kapacitásmérés.
+A külső OAuth-, Stripe-, Billingo-, Számlázz.hu- és BulkGate-válaszok szimuláltak. Valós kulcs, valódi kézbesítés, tényleges kártyaterhelés vagy éles számla nem történt. Az üzemeltető külső fiókjain, a konkrét Tárhely.eu-konfiguráción, az éles adatbázis másolatán és valós felhasználókkal külön átvételi próba szükséges. Nem történt nagy terheléses, több ezer szolgáltatós kapacitásmérés.
 
 ## Backendtesztek futtatása
 

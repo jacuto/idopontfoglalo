@@ -64,7 +64,7 @@ A frissítés nem törli az eredeti vendég-, foglalás-, katalógus-, befizeté
 
 A végleges teszteredmények a [TESZTELES.md](TESZTELES.md) fájlban vannak. A külső szolgáltatások HTTP-válaszai a tesztekben szimuláltak; nem állítunk éles kézbesítést, fizetést vagy számlázást. A MariaDB-adatbázis és a Chromium ellenőrzés valódi, külön tesztkörnyezeten futott.
 
-Éles használathoz szükséges: saját központi Stripe- és Billingo-fiók/kulcsok, központi SMTP/feladóhitelesítés, szolgáltatónkénti saját kapcsolatok, OAuth-alkalmazások/callbackek, szükség esetén Twilio, valamint a tárhelyes frissítés és cron beállítása. Részletek: [KAPCSOLATOK.md](KAPCSOLATOK.md).
+Éles használathoz szükséges: saját központi Stripe- és Billingo-fiók/kulcsok, központi SMTP/feladóhitelesítés, szolgáltatónkénti saját kapcsolatok, OAuth-alkalmazások/callbackek, szükség esetén BulkGate, valamint a tárhelyes frissítés és cron beállítása. Részletek: [KAPCSOLATOK.md](KAPCSOLATOK.md).
 
 ## Befejezetlen részek összefoglalva
 

@@ -1,6 +1,6 @@
 <?php
 namespace App\Services;
-use Illuminate\Support\Facades\{DB,Crypt,Http,Mail};
+use Illuminate\Support\Facades\{DB,Crypt,Mail};
 use Illuminate\Support\Str;
 final class ClientInvitations
 {
@@ -15,7 +15,7 @@ final class ClientInvitations
   $recipient=$channel==='email'?Contact::email($email):Contact::e164($phone);$id=(string)Str::uuid();$token=bin2hex(random_bytes(32));$provider=app(Tenant::class)->id;$hash=hash_hmac('sha256',$channel.':'.$recipient,(string)config('app.key'));
   $payload=Crypt::encryptString(json_encode(['recipient'=>$recipient,'channel'=>$channel,'token'=>$token],JSON_THROW_ON_ERROR));
   $inserted=DB::table('guest_invitations')->insertOrIgnore(['id'=>$id,'provider_id'=>$provider,'client_id'=>$client['id'],'contact_hash'=>$hash,'token_hash'=>hash('sha256',$token),'payload'=>$payload,'expires_at'=>now()->addDays(30),'created_at'=>now(),'updated_at'=>now()]);if(!$inserted)return;
-  DB::table('deliveries')->insertOrIgnore(['provider_id'=>$provider,'dedup'=>hash('sha256','guest-invitation:'.$id),'payload'=>Crypt::encryptString(json_encode(['kind'=>'guest_invite','invitationId'=>$id])),'available_at'=>now(),'status'=>'pending','attempts'=>0,'created_at'=>now(),'updated_at'=>now()]);
+  DB::table('deliveries')->insertOrIgnore(['provider_id'=>$provider,'dedup'=>hash('sha256','guest-invitation:'.$id),'payload'=>Crypt::encryptString(json_encode(['kind'=>'guest_invite','invitationId'=>$id,'channel'=>$channel])),'available_at'=>now(),'status'=>'pending','attempts'=>0,'created_at'=>now(),'updated_at'=>now()]);
  }
  public static function deliver(string $id,array $s):string{
   $row=DB::table('guest_invitations')->where('provider_id',app(Tenant::class)->id)->find($id);if(!$row||$row->claimed_at||now()->gte($row->expires_at)||($s['settings']['guestInvitationPolicy']??'none')==='none')return 'skipped';
@@ -27,7 +27,7 @@ final class ClientInvitations
    config(['mail.default'=>'smtp','mail.mailers.smtp.host'=>$c['smtp_host'],'mail.mailers.smtp.port'=>(int)($c['smtp_port']?:587),'mail.mailers.smtp.username'=>$c['smtp_username']?:null,'mail.mailers.smtp.password'=>$c['smtp_password']?:null,'mail.mailers.smtp.scheme'=>(int)$c['smtp_port']===465?'smtps':'smtp','mail.from.address'=>$c['mail_from'],'mail.from.name'=>$c['mail_name']?:'Ráérő']);Mail::purge('smtp');
    Mail::to($data['recipient'])->send(new \App\Mail\NotificationMail($template['subject'],$template['html'],filter_var($s['settings']['providerEmail']??'',FILTER_VALIDATE_EMAIL)?$s['settings']['providerEmail']:null,$s['settings']['name']));
   }else{
-   if(empty($c['twilio_sid'])||empty($c['twilio_token'])||empty($c['twilio_from']))return 'blocked';Http::timeout(20)->withBasicAuth($c['twilio_sid'],$c['twilio_token'])->asForm()->post('https://api.twilio.com/2010-04-01/Accounts/'.rawurlencode($c['twilio_sid']).'/Messages.json',[str_starts_with($c['twilio_from'],'MG')?'MessagingServiceSid':'From'=>$c['twilio_from'],'To'=>$data['recipient'],'Body'=>$text])->throw();
+   if(!BulkGateSms::ready($c))return 'blocked';$text=mb_strimwidth($s['settings']['name'],0,40,'…').' – Ráérő vendégfiók: regisztrálj, hogy kezeld a foglalásaidat. '.$url;$reference=app(BulkGateSms::class)->send($data['recipient'],$text,$c);try{DB::table('deliveries')->where('provider_id',app(Tenant::class)->id)->where('dedup',hash('sha256','guest-invitation:'.$id))->update(['provider_reference'=>$reference]);}catch(\Throwable){throw new SmsDeliveryException('A BulkGate átvette az SMS-t, de a helyi mentés megszakadt. Ellenőrizd az üzenetelőzményt.',true);}
   }return 'sent';
  }
  private static function matches(array $client,array $data):bool{return $data['recipient']===($data['channel']==='email'?Contact::email($client['email']??''):Contact::e164($client['phone']??''));}

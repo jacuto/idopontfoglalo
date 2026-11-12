@@ -47,7 +47,7 @@ final class PlatformControlsTest extends TestCase {
  }
  public function test_public_documents_have_footer_and_no_private_configuration():void{
   DB::table('platform_settings')->insert(['id'=>1,'data'=>json_encode(['name'=>'Teszt Üzemeltető','taxNumber'=>'TEST-TAX','account'=>'PRIVATE-BANK','legal'=>['privacyEmail'=>'privacy@example.com','hostingName'=>'Test Host','hostingAddress'=>'Host Address','scope'=>'all']])]);
-  foreach(['/adatvedelem','/aszf','/adattorles','/sugo'] as $url){$r=$this->get($url)->assertOk()->assertSee('href="/adattorles"',false)->assertSee('href="/sugo"',false);$r->assertDontSee('PRIVATE-BANK')->assertDontSee('platform_admin');}
+  foreach(['/adatvedelem','/aszf','/adattorles','/sugo'] as $url){$r=$this->get($url)->assertOk()->assertSee('href="/adattorles"',false)->assertSee('href="/gyik"',false);$r->assertDontSee('PRIVATE-BANK')->assertDontSee('platform_admin');}
   $this->get('/adatvedelem')->assertSee('Test Host')->assertSee('privacy@example.com');$this->get('/aszf')->assertSee('14 napon')->assertSee('magánszemély');$this->get('/sugo')->assertSee('35 perc hatóidő')->assertSee('95 perc');
  }
  public function test_legal_settings_are_private_escaped_and_preserved_when_operator_changes():void{

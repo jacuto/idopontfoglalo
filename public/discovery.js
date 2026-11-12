@@ -56,5 +56,5 @@ profilePage=function(){profileBeforeDiscovery();const form=$('#profile-form');if
 const publicBeforeDiscovery=publicPage;
 publicPage=function(){
  document.querySelector('.visitor-menu #guest-account-nav')?.removeAttribute('id');publicBeforeDiscovery();const root=$('.booking-public');if(!root)return;
- const entry=root.querySelector('.booking-topbar .account-entry'),slot=document.querySelector('.visitor-menu .visitor-account');if(entry&&slot){entry.classList.add('visitor-account');slot.replaceWith(entry);}root.querySelector('.booking-topbar')?.remove();root.querySelectorAll('.guest-login-link').forEach(node=>node.remove());
+ const entry=root.querySelector('.booking-topbar .account-entry'),slot=document.querySelector('.visitor-menu .visitor-account');if(entry&&slot){entry.classList.add('visitor-account');slot.replaceWith(entry);}root.querySelector('.booking-topbar')?.remove();const card=root.querySelector('#public-form'),intro=[...(card?.children||[])].find(n=>n.tagName==='P'&&n.textContent.includes('Regisztráció nem szükséges.')),login=card?.querySelector('.guest-login-link');if(login&&intro){login.innerHTML=`<a href="/fiokom?provider=${providerId()}&returnTo=booking">Belépés / Regisztráció →</a>`;intro.after(login);}
 };

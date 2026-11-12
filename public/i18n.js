@@ -666,7 +666,7 @@ Jóga és pilates|Yoga and Pilates|Yoga und Pilates
 Tanácsadás|Consulting|Beratung
 Egyéb|Other|Sonstiges
 Egyéni módban a munkatársmenü és a naptár munkatársszűrője eltűnik. A vendégek az elsődleges szakemberhez foglalnak; a korábbi adatok megmaradnak.|In solo mode, the staff menu and calendar staff filter are hidden. Guests book the primary specialist; historical data is preserved.|Im Einzelbetrieb werden Mitarbeitermenü und Mitarbeiterfilter ausgeblendet. Kunden buchen bei der Hauptfachkraft; bisherige Daten bleiben erhalten.
-Küldéshez állítsd be az SMTP- vagy Twilio-kapcsolatot és a percenként futó cronfeladatot. A hiányzó kapcsolat miatt várakozó levelek a küldési sorban látszanak.|Configure SMTP or Twilio and the minute-by-minute scheduled task. Messages waiting for missing connections appear in the delivery queue.|Richte SMTP oder Twilio und den minütlichen Cronjob ein. Nachrichten, die auf eine fehlende Verbindung warten, erscheinen in der Versandwarteschlange.
+Küldéshez állítsd be az SMTP- vagy BulkGate-kapcsolatot és a percenként futó cronfeladatot. A hiányzó kapcsolat miatt várakozó levelek a küldési sorban látszanak.|Configure SMTP or BulkGate and the minute-by-minute scheduled task. Messages waiting for missing connections appear in the delivery queue.|Richte SMTP oder BulkGate und den minütlichen Cronjob ein. Nachrichten, die auf eine fehlende Verbindung warten, erscheinen in der Versandwarteschlange.
 Vendégeid számlázója|Invoicing service for your clients|Rechnungsdienst für deine Kunden
 Áfakulcs a vendégszámlákon|VAT rate on client invoices|Umsatzsteuersatz auf Kundenrechnungen
 A saját vállalkozásod számlázási adatai az előfizetéshez tartoznak. A vendég számlázási adatait számlakiállításkor külön kell megadni. A számla a Befizetések menüből indítható.|Your business billing details are used for the subscription. Guest billing details are supplied separately when issuing an invoice. Start invoicing from Payments.|Die Rechnungsdaten deines Unternehmens gelten für das Abonnement. Kundenrechnungsdaten werden bei der Rechnungserstellung separat angegeben. Rechnungen startest du unter Zahlungen.
@@ -862,7 +862,7 @@ A másutt már kiállított számla sorszámát és dátumát add meg. PDF felt�
  const platformDocuments=`Adatkezelési tájékoztató|Privacy notice|Datenschutzhinweise
 ÁSZF|Terms and conditions|Allgemeine Geschäftsbedingungen
 Adattörlés|Data deletion|Datenlöschung
-Súgó|Help|Hilfe
+GYIK|FAQ|FAQ
 Jogi oldalak adatai|Legal page details|Angaben der rechtlichen Seiten
 Előfizetés és ingyenesség|Subscription and free access|Abonnement und kostenloser Zugang
 Hozzáférés mentése|Save access|Zugang speichern

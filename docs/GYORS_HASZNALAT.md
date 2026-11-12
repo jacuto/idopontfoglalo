@@ -48,7 +48,7 @@ A határidő elérésekor elégtelen létszámnál az óra **Elmaradt** állapot
 
 Ha határidőre megvolt a minimum, az ellenőrzés eredményét rögzítjük. Egy későbbi egyéni lemondás önmagában már nem indít új automatikus elmaradást. A feltétel a határidő után nem írható át. A szolgáltató a teljes órát az **Elmaradtnak jelölés** gombbal kézzel is lezárhatja, amennyiben a résztvevők látogatása még nincs véglegesen igazolva. Az elmaradt órák visszanézhetők a csoportos listában; a foglalás adatlapján az ok is szerepel.
 
-A minimumellenőrzést a meglévő percenkénti `php artisan schedule:run` cron indítja. A parancs külön is futtatható: `php artisan raero:group-check`. A foglalási tranzakció a lejárt létszámfeltételt a cron két futása között is figyelembe veszi. A párhuzamos ellenőrzés nem készít dupla lemondást vagy értesítést. A küldés a külön értesítési sorból történik, működő központi SMTP / szükség esetén Twilio kapcsolat kell hozzá. Hiányzó kapcsolatnál az értesítés blokkolt tételként megmarad. A minimum miatti elmaradáshoz saját főadmin HTML-sablon is tartozik.
+A minimumellenőrzést a meglévő percenkénti `php artisan schedule:run` cron indítja. A parancs külön is futtatható: `php artisan raero:group-check`. A foglalási tranzakció a lejárt létszámfeltételt a cron két futása között is figyelembe veszi. A párhuzamos ellenőrzés nem készít dupla lemondást vagy értesítést. A küldés a külön értesítési sorból történik, működő központi SMTP / szükség esetén BulkGate kapcsolat kell hozzá. Hiányzó kapcsolatnál az értesítés blokkolt tételként megmarad. A minimum miatti elmaradáshoz saját főadmin HTML-sablon is tartozik.
 
 ## Befizetések és alapértelmezések
 
