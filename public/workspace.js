@@ -3,7 +3,7 @@ let calendarMode = window.innerWidth < 650 ? "day" : "week",
   reportFrom = datekey(
     new Date(new Date().getFullYear(), new Date().getMonth(), 1),
   ),
-  reportTo = datekey(new Date());
+  reportTo = datekey(new Date()), reportStaff = "";
 const activePeople = () => state.staff.filter((p) => !p.archived);
 const bookingValue = (b) =>
   b.status==='no_show'?Number(b.noShowFee||0):(b.pricing?.payable ?? (b.serviceSnapshot || state.services.filter((s) => b.services.includes(s.id))).reduce((n, s) => n + Number(s.price), 0));
@@ -310,7 +310,7 @@ function staffPage() {
     `<div class="toolbar"><p>${activePeople().length} aktív munkatárs</p><button onclick="exportData('staff')">↓ Exportálás</button><button onclick="importPicker('staff')">↑ Importálás</button></div><div class="entity-grid">${activePeople()
       .map(
         (p) =>
-          `<article class="card item">${photoAvatar(p)}<h3>${esc(p.name)}</h3><p>${esc(p.role)}</p><p>${esc(p.email || "")}<br>${esc(phoneFormatted(p.phone || ""))}</p><p>${state.services.filter((v) => !v.archived && v.staff.includes(p.id)).length} szolgáltatás</p><div class="row item-actions"><button onclick="staffForm('${p.id}')">Szerkesztés</button><button class="danger" onclick="archiveStaff('${p.id}')">Törlés</button></div></article>`,
+          `<article class="card item staff-management-card">${photoAvatar(p)}<h3>${esc(p.name)}</h3><p>${esc(p.role)}</p><p>${esc(p.email || "")}<br>${esc(phoneFormatted(p.phone || ""))}</p><p>${state.services.filter((v) => !v.archived && v.staff.includes(p.id)).length} szolgáltatás</p><div class="row item-actions"><button onclick="staffForm('${p.id}')">Szerkesztés</button><button class="danger" onclick="archiveStaff('${p.id}')">Törlés</button></div></article>`,
       )
       .join("")}</div>`;
 }
@@ -533,6 +533,17 @@ function activityPage() {
         .join("") || '<tr><td colspan="5">Még nincs foglalás.</td></tr>'
     }</tbody></table></div>`;
 }
+function notificationChoices(s) {
+  if(s.notificationRules)return structuredClone(s.notificationRules);
+  const rules={guest:{},provider:{}},email=['email','mindkettő'].includes(s.channel),sms=['sms','mindkettő'].includes(s.channel);
+  for(const event of ['created','confirmed','updated','cancelled','group_missed','no_show']){rules.guest[event]={email:!!s.notifyGuest&&email,sms:!!s.notifyGuest&&sms};rules.provider[event]={email:!!s.notifyProvider,sms:false};}
+  rules.guest.reminder={email:!!s.reminderGuest&&email,sms:!!s.reminderGuest&&sms};return rules;
+}
+function notificationSettings(s){
+ const rules=notificationChoices(s),choice=(audience,event,channel,label)=>`<label class="check notification-channel"><input type="checkbox" data-notification-rule="${audience}.${event}.${channel}" ${rules[audience][event][channel]?'checked':''} aria-label="${esc(label)}">${channel==='sms'?'SMS':'E-mail'}</label>`;
+ const events=[['created','Új foglalás'],['confirmed','Foglalás elfogadása'],['updated','Időpont módosítása'],['cancelled','Lemondás / elutasítás'],['group_missed','Csoportos óra elmaradása'],['no_show','Nem jelent meg']];
+ return `<section class="notification-settings"><h2>Értesítések</h2><section class="reminder-priority" aria-labelledby="reminder-title"><div class="reminder-heading"><span aria-hidden="true">◷</span><div><h3 id="reminder-title">Időpont előtti emlékeztető a vendégnek</h3><p>Segíts, hogy vendégeid időben érkezzenek.</p></div><span class="pro-feature-badge">Pro</span></div><div class="reminder-options"><label class="reminder-timing">Mennyivel előtte?<input name="reminder" type="number" min="1" max="8760" value="${s.reminder}" required><small>órával az időpont előtt</small></label><div class="notification-channels">${choice('guest','reminder','email','Vendég emlékeztető e-mail')}${choice('guest','reminder','sms','Vendég emlékeztető SMS')}</div></div><p class="hint">Mindkét csatorna kikapcsolásával nem küldünk emlékeztetőt. SMS csak külön bekapcsolva indul.</p></section><details class="sms-price-details"><summary>SMS-díj: 0,033–0,0396 € / szegmens + áfa <span>Árképzés és részletek</span></summary><p>A küldést a <a href="https://www.bulkgate.com/en/pricing/sms/hu/hungary/" target="_blank" rel="noopener noreferrer">BulkGate</a> végzi. Rendszerfeladóval, magyar számokra: Telekom 0,033 €, Yettel 0,038 €, One / DIGI / UPC 0,0396 € szegmensenként, áfa nélkül. Tájékoztató árak, ellenőrizve: 2026.11.14.; a pontos díjat az útvonal, feladó és feltöltési kedvezmény módosíthatja.</p><p>400 Ft/€ példaárfolyammal ez körülbelül 13–16 Ft + áfa / szegmens; nem rögzített forintár. Egy SMS 160 GSM-7 karakterig vagy 70 Unicode-egységig egy szegmens. Hosszabb üzenetnél szegmensenként 153, illetve 67 egység fér el; egyes ékezetek és emojik több helyet foglalnak. Egy két szegmenses üzenet díja kétszeres.</p><p>Az SMS-díj külön költség, nem része a havi csomagdíjnak. <a href="https://portal.bulkgate.com/sms-price/list" target="_blank" rel="noopener noreferrer">Részletes BulkGate-árlista →</a></p></details><details class="notification-events"><summary>További értesítések <span>Vendég és szolgáltató · eseményenként</span></summary><p class="hint">Csak a kijelölt csatornákon küldünk. Az automatikusan elfogadott új foglalásról egyetlen visszaigazolás megy.</p>${[['guest','A vendégnek'],['provider','A szolgáltatónak']].map(([audience,title])=>`<fieldset><legend>${title}</legend>${audience==='provider'?`<div class="form-grid"><label>Értesítési e-mail<input name="providerEmail" type="email" value="${esc(s.providerEmail||'')}"></label><label>Értesítési telefonszám<input name="providerPhone" type="tel" inputmode="tel" value="${esc(s.providerPhone||'')}"></label></div><p class="hint">Üresen hagyva az adott munkatárs elérhetőségét használjuk.</p>`:''}<div class="notification-event-list">${events.filter(([event])=>event!=='group_missed'||s.advancedBookingEnabled||rules[audience][event].email||rules[audience][event].sms).map(([event,title])=>`<div class="notification-event"><strong>${title}</strong><div class="notification-channels">${choice(audience,event,'email',title+' · '+(audience==='guest'?'vendég':'szolgáltató')+' e-mail')}${choice(audience,event,'sms',title+' · '+(audience==='guest'?'vendég':'szolgáltató')+' SMS')}</div></div>`).join('')}</div></fieldset>`).join('')}</details><section class="invitation-notification"><label class="check"><input type="checkbox" name="guestInvitationSmsEnabled" ${s.guestInvitationSmsEnabled||['sms','sms_first','email_first'].includes(s.guestInvitationPolicy)?'checked':''}>Egyszeri regisztrációs meghívó SMS-ben</label><p class="hint">A még nem regisztrált vendég egy alkalommal kap linket a saját fiókjához. Csak új vendégfelvitel vagy új foglalás indítja, a régi névjegyzéket nem értesítjük. Ez is díjköteles.</p><div id="invitation-other-options"></div></section><p class="hint">Az automatikus küldéshez működő központi levelezés / BulkGate és percenkénti feldolgozás szükséges.</p></section>`;
+}
 function settingsPage() {
   const s = state.settings;
   $("#content").innerHTML =
@@ -544,18 +555,7 @@ function settingsPage() {
       .join(
         "",
       )}</select></div><div><label>Nyitás</label><input name="openingTime" type="time" required value="${s.openingTime || "08:00"}"></div><div><label>Zárás</label><input name="closingTime" type="time" required value="${s.closingTime || "20:00"}"></div></div><label class="check"><input name="confirmation" type="checkbox" ${s.confirmation ? "checked" : ""}>Az új vendégfoglaláshoz jóváhagyás szükséges</label><p class="hint">Egyéni módban a munkatársmenü és a naptár munkatársszűrője eltűnik. A vendégek az elsődleges szakemberhez foglalnak; a korábbi adatok megmaradnak.</p>
- <details open><summary>E-mailes értesítések és emlékeztetők</summary><label>Szolgáltató értesítési e-mail-címe</label><input name="providerEmail" type="email" value="${esc(s.providerEmail || "")}"><label class="check"><input name="notifyGuest" type="checkbox" ${s.notifyGuest ? "checked" : ""}>Vendég értesítése új foglalásról, módosításról és lemondásról</label><label class="check"><input name="notifyProvider" type="checkbox" ${s.notifyProvider ? "checked" : ""}>Szolgáltató értesítése új foglalásról, módosításról és lemondásról</label><label class="check"><input name="reminderGuest" type="checkbox" ${s.reminderGuest ? "checked" : ""}>Időpont előtti emlékeztető a vendégnek</label><div class="form-grid"><div><label>Hány órával előtte?</label><input name="reminder" type="number" min="1" max="8760" value="${s.reminder}" required></div><div><label>Emlékeztető csatornája</label><select name="channel">${[
-   ["email", "E-mail"],
-   ["sms", "SMS"],
-   ["mindkettő", "E-mail és SMS"],
- ]
-   .map(
-     ([v, l]) =>
-       `<option value="${v}" ${v === s.channel ? "selected" : ""}>${l}</option>`,
-   )
-   .join(
-     "",
-   )}</select></div></div><p class="hint">Küldéshez állítsd be az SMTP- vagy BulkGate-kapcsolatot és a percenként futó cronfeladatot. A hiányzó kapcsolat miatt várakozó levelek a küldési sorban látszanak.</p></details>
+ ${notificationSettings(s)}
  <details><summary>Számlázási adatok</summary><div class="form-grid">${[
    ["billingName", "Számlázási név"],
    ["billingTaxNumber", "Adószám (ha van)"],
@@ -589,11 +589,12 @@ function settingsPage() {
       v = Object.fromEntries(f);
     for (const k of [
       "confirmation",
-      "notifyGuest",
-      "notifyProvider",
-      "reminderGuest", "autoInvoice", "skipUnnamedWarning", "reviewRequestsEnabled", "advancedBookingEnabled", "servicePhasesEnabled", "couponsEnabled", "passesEnabled",
+      "guestInvitationSmsEnabled", "autoInvoice", "skipUnnamedWarning", "reviewRequestsEnabled", "advancedBookingEnabled", "servicePhasesEnabled", "couponsEnabled", "passesEnabled",
     ])
       v[k] = f.has(k);
+    v.notificationRules=notificationChoices(state.settings);
+    e.target.querySelectorAll('[data-notification-rule]').forEach(input=>{const [audience,event,channel]=input.dataset.notificationRule.split('.');v.notificationRules[audience][event][channel]=input.checked;});
+    v.reminderGuest=v.notificationRules.guest.reminder.email||v.notificationRules.guest.reminder.sms;
     v.reminder = Number(v.reminder);
     v.reviewRequestDelayHours=Number(v.reviewRequestDelayHours||24);
     v.open = timeMinutes(v.openingTime) / 60;
@@ -808,10 +809,12 @@ function invoiceForm(paymentId) {
     }
   };
 }
+function reportPeople(){const ids=[...new Set([...state.staff.map(p=>p.id),...state.bookings.map(b=>b.staff)])];return ids.map(id=>({id,name:state.staff.find(p=>p.id===id)?.name||'Korábbi munkatárs',archived:state.staff.find(p=>p.id===id)?.archived}));}
 function reportsPage() {
+  const bookingById=new Map(state.bookings.map(b=>[b.id,b]));
   const ps = (state.payments || []).filter((p) => {
     const d = datekey(new Date(p.paidAt));
-    return d >= reportFrom && d <= reportTo && paymentNet(p) > 0;
+    return d >= reportFrom && d <= reportTo && paymentNet(p) > 0 && (!reportStaff||bookingById.get(p.bookingId)?.staff===reportStaff);
   });
   const total = ps.reduce((n, p) => n + paymentNet(p), 0),
     parts = new Map();
@@ -851,13 +854,16 @@ function reportsPage() {
   const planned = state.bookings
     .filter(
       (b) =>
-        !["cancelled", "rejected"].includes(b.status) &&
+        !["cancelled", "rejected"].includes(b.status) && (!reportStaff||b.staff===reportStaff) &&
         datekey(new Date(b.start)) >= reportFrom &&
         datekey(new Date(b.start)) <= reportTo,
     )
     .reduce((n, b) => n + bookingValue(b), 0);
   $("#content").innerHTML =
-    `<div class="toolbar"><label>Kezdőnap<input id="report-from" type="date" value="${reportFrom}"></label><label>Zárónap<input id="report-to" type="date" value="${reportTo}"></label><button class="primary" onclick="applyReports()">Szűrés</button><button onclick="reportFrom=datekey(new Date(new Date().getFullYear(),new Date().getMonth(),1));reportTo=datekey(new Date());reportsPage()">Ez a hónap</button><button onclick="reportFrom=datekey(new Date(new Date().getFullYear(),0,1));reportTo=datekey(new Date());reportsPage()">Ez az év</button></div><div class="stats"><div class="stat"><div><small>Tényleges befizetés</small><strong>${money(total)}</strong><em>A befizetés dátuma alapján, visszatérítésekkel csökkentve</em></div></div><div class="stat"><div><small>Befizetések száma</small><strong>${ps.length}</strong></div></div><div class="stat"><div><small>Tervezett szolgáltatásérték</small><strong>${money(planned)}</strong><em>A foglalás dátuma alapján</em></div></div></div><div class="card item"><h2>Bevétel szolgáltatásonként</h2><p>A több szolgáltatásos foglalások befizetését az árak arányában osztjuk fel.</p><div class="chart-layout"><div class="donut" role="img" aria-label="Szolgáltatásonkénti bevétel kördiagram" style="background:${entries.length ? `conic-gradient(${gradient})` : "#e2e8f0"}"><div><strong>${money(total)}</strong><small>Beérkezett összeg</small></div></div><div class="chart-legend">${entries.map(([name, v], i) => `<div><span class="chart-dot" style="background:${colors[i % colors.length]}"></span><span>${esc(name)}</span><strong>${money(Math.round(v))}</strong><small>${Math.round((v / (total || 1)) * 100)}%</small></div>`).join("") || "<p>Ebben az időszakban még nincs befizetés.</p>"}</div></div></div>`;
+    `<div class="toolbar report-toolbar">${reportPeople().length>1?`<label>Munkatárs / naptár<select id="report-staff"><option value="">Összes munkatárs</option>${reportPeople().map(p=>`<option value="${esc(p.id)}" ${reportStaff===p.id?'selected':''}>${esc(p.name)}${p.archived?' (korábbi)':''}</option>`).join('')}</select></label>`:''}<label>Kezdőnap<input id="report-from" type="date" value="${reportFrom}"></label><label>Zárónap<input id="report-to" type="date" value="${reportTo}"></label><button class="primary" onclick="applyReports()">Szűrés</button><button onclick="reportFrom=datekey(new Date(new Date().getFullYear(),new Date().getMonth(),1));reportTo=datekey(new Date());reportsPage()">Ez a hónap</button><button onclick="reportFrom=datekey(new Date(new Date().getFullYear(),0,1));reportTo=datekey(new Date());reportsPage()">Ez az év</button></div><div class="stats"><div class="stat"><div><small>Tényleges befizetés</small><strong>${money(total)}</strong><em>A befizetés dátuma alapján, visszatérítésekkel csökkentve</em></div></div><div class="stat"><div><small>Befizetések száma</small><strong>${ps.length}</strong></div></div><div class="stat"><div><small>Tervezett szolgáltatásérték</small><strong>${money(planned)}</strong><em>A foglalás dátuma alapján</em></div></div></div><div class="card item"><h2>Bevétel szolgáltatásonként</h2><p>A több szolgáltatásos foglalások befizetését az árak arányában osztjuk fel.</p><div class="chart-layout"><div class="donut" role="img" aria-label="Szolgáltatásonkénti bevétel kördiagram" style="background:${entries.length ? `conic-gradient(${gradient})` : "#e2e8f0"}"><div><strong>${money(total)}</strong><small>Beérkezett összeg</small></div></div><div class="chart-legend">${entries.map(([name, v], i) => `<div><span class="chart-dot" style="background:${colors[i % colors.length]}"></span><span>${esc(name)}</span><strong>${money(Math.round(v))}</strong><small>${Math.round((v / (total || 1)) * 100)}%</small></div>`).join("") || "<p>Ebben az időszakban még nincs befizetés.</p>"}</div></div></div>`;
+  if($('#report-staff'))$('#report-staff').onchange=()=>{reportStaff=$('#report-staff').value;reportsPage();};
+  if(reportPeople().length>1){const totals=new Map(reportPeople().map(p=>[p.id,{name:p.name,count:0,amount:0}]));for(const b of state.bookings){const d=datekey(new Date(b.start));if(d>=reportFrom&&d<=reportTo&&!['cancelled','rejected'].includes(b.status)&&(!reportStaff||b.staff===reportStaff)){const row=totals.get(b.staff);if(row)row.count++;}}for(const p of ps){const row=totals.get(bookingById.get(p.bookingId)?.staff);if(row)row.amount+=paymentNet(p);}$('#content').insertAdjacentHTML('beforeend',`<section class="card item staff-statistics"><h2>Munkatársankénti összesítés</h2><div class="table-scroll"><table><thead><tr><th>Munkatárs / naptár</th><th>Foglalások</th><th>Beérkezett összeg</th></tr></thead><tbody>${[...totals].filter(([id])=>!reportStaff||id===reportStaff).map(([id,row])=>`<tr><td>${esc(row.name)}</td><td>${row.count}</td><td>${money(row.amount)}</td></tr>`).join('')}</tbody></table></div><p class="hint">A foglalás az időpont napja, a bevétel a befizetés napja szerint számít. A naptár az adott munkatárshoz tartozik.</p></section>`);}
+
 }
 function applyReports() {
   const from = $("#report-from").value,
@@ -868,6 +874,7 @@ function applyReports() {
   }
   reportFrom = from;
   reportTo = to;
+  if($("#report-staff"))reportStaff=$("#report-staff").value;
   reportsPage();
 }
 function billingPage() {

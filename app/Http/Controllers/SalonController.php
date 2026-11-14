@@ -266,6 +266,7 @@ class SalonController
                             }
                             if(in_array($b['status'],['cancelled','rejected'],true)&&in_array($next['status'],['pending','confirmed'],true)&&!empty($b['pricing']['code']))app(\App\Services\Offers::class)->quote($s,$next,$b['pricing']['code']);
                             app(\App\Services\Offers::class)->transitionPass($s, $b, $next);
+                            $acceptedNow = $b["status"] !== "confirmed" && $next["status"] === "confirmed";
                             $b = $next;
                             app(\App\Services\Notifications::class)->enqueue(
                                 $b,
@@ -276,7 +277,7 @@ class SalonController
                                     true,
                                 )
                                     ? "cancelled"
-                                    : "updated",
+                                    : ($acceptedNow ? "confirmed" : "updated"),
                             );
                             return $b;
                         }
@@ -405,6 +406,50 @@ class SalonController
                     "settings.businessMode" => "sometimes|in:solo,team",
                     "settings.primaryStaffId" => "sometimes|string",
                     "settings.providerEmail" => "nullable|email|max:200",
+                    'settings.providerPhone' => 'nullable|string|max:40',
+                    'settings.guestInvitationSmsEnabled' => 'sometimes|boolean',
+                    'settings.notificationRules' => 'sometimes|array:guest,provider',
+                    'settings.notificationRules.guest' => 'required_with:settings.notificationRules|array:created,confirmed,updated,cancelled,group_missed,no_show,reminder',
+                    'settings.notificationRules.provider' => 'required_with:settings.notificationRules|array:created,confirmed,updated,cancelled,group_missed,no_show',
+                    'settings.notificationRules.guest.created' => 'required_with:settings.notificationRules|array:email,sms',
+                    'settings.notificationRules.guest.created.email' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.guest.created.sms' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.guest.confirmed' => 'required_with:settings.notificationRules|array:email,sms',
+                    'settings.notificationRules.guest.confirmed.email' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.guest.confirmed.sms' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.guest.updated' => 'required_with:settings.notificationRules|array:email,sms',
+                    'settings.notificationRules.guest.updated.email' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.guest.updated.sms' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.guest.cancelled' => 'required_with:settings.notificationRules|array:email,sms',
+                    'settings.notificationRules.guest.cancelled.email' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.guest.cancelled.sms' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.guest.group_missed' => 'required_with:settings.notificationRules|array:email,sms',
+                    'settings.notificationRules.guest.group_missed.email' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.guest.group_missed.sms' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.guest.no_show' => 'required_with:settings.notificationRules|array:email,sms',
+                    'settings.notificationRules.guest.no_show.email' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.guest.no_show.sms' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.guest.reminder' => 'required_with:settings.notificationRules|array:email,sms',
+                    'settings.notificationRules.guest.reminder.email' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.guest.reminder.sms' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.provider.created' => 'required_with:settings.notificationRules|array:email,sms',
+                    'settings.notificationRules.provider.created.email' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.provider.created.sms' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.provider.confirmed' => 'required_with:settings.notificationRules|array:email,sms',
+                    'settings.notificationRules.provider.confirmed.email' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.provider.confirmed.sms' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.provider.updated' => 'required_with:settings.notificationRules|array:email,sms',
+                    'settings.notificationRules.provider.updated.email' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.provider.updated.sms' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.provider.cancelled' => 'required_with:settings.notificationRules|array:email,sms',
+                    'settings.notificationRules.provider.cancelled.email' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.provider.cancelled.sms' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.provider.group_missed' => 'required_with:settings.notificationRules|array:email,sms',
+                    'settings.notificationRules.provider.group_missed.email' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.provider.group_missed.sms' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.provider.no_show' => 'required_with:settings.notificationRules|array:email,sms',
+                    'settings.notificationRules.provider.no_show.email' => 'required_with:settings.notificationRules|boolean',
+                    'settings.notificationRules.provider.no_show.sms' => 'required_with:settings.notificationRules|boolean',
                     "settings.notifyGuest" => "sometimes|boolean",
                     "settings.notifyProvider" => "sometimes|boolean",
                     "settings.reminderGuest" => "sometimes|boolean",
@@ -446,7 +491,7 @@ class SalonController
                     "settings.profession" =>
                         "required_with:settings|string|max:80",
                     "settings.channel" =>
-                        "required_with:settings|in:email,sms,mindkettő",
+                        "sometimes|in:email,sms,mindkettő",
                     "settings.reminder" =>
                         "required_with:settings|integer|between:1,8760",
                     "staff" => "sometimes|array|min:1|max:100",
@@ -520,7 +565,8 @@ class SalonController
                             );
                         }
                     }
-                    if(!empty($data['settings']['reminderGuest'])||!empty($data['settings']['autoInvoice'])||($data['settings']['businessMode']??'')==='team')\App\Services\PaidFeatures::require($s);
+                    if(isset($data['settings']['providerPhone']))$data['settings']['providerPhone']=\App\Services\Contact::phone($data['settings']['providerPhone']);
+                    if(!empty($data['settings']['notificationRules']['guest']['reminder']['email'])||!empty($data['settings']['notificationRules']['guest']['reminder']['sms'])||!empty($data['settings']['reminderGuest'])||!empty($data['settings']['autoInvoice'])||($data['settings']['businessMode']??'')==='team')\App\Services\PaidFeatures::require($s);
                     if(isset($data['services']))\App\Services\ProfessionOptions::validateCatalog($s,$data['services'],array_replace($s['settings'],$data['settings']??[]));
                     if(isset($data['services']))foreach($data['services'] as $service){if(($service['bookingMode']??'individual')!=='group'&&collect($s['groupSessions'])->contains(fn($g)=>$g['serviceId']===$service['id']&&empty($g['cancelled'])&&CarbonImmutable::parse($g['start'])->isFuture()))throw new InvalidArgumentException('Előbb mondd le a szolgáltatás meghirdetett csoportos óráit.');if(($service['bookingMode']??'individual')==='group'&&!empty($service['phases']))throw new InvalidArgumentException('Csoportos órához ne adj meg hatóidős szakaszokat.');}
                     if(!empty($data['settings']['defaultServiceId'])){ $catalog=$data['services']??$s['services'];if(!collect($catalog)->contains(fn($v)=>$v['id']===$data['settings']['defaultServiceId']&&empty($v['archived'])&&($v['bookingMode']??'individual')!=='group'))throw new InvalidArgumentException('Alapértelmezettnek aktív, nem csoportos szolgáltatást válassz.');}
@@ -560,13 +606,13 @@ class SalonController
                                 "notifyGuest",
                                 "notifyProvider",
                                 "providerEmail",
-                                "reminderGuest",
+                                "reminderGuest", "notificationRules", "providerPhone",
                             ]
                             as $k
                         ) {
                             if (
                                 array_key_exists($k, $data["settings"]) &&
-                                $data["settings"][$k] !== $s["settings"][$k]
+                                $data["settings"][$k] !== ($s["settings"][$k] ?? null)
                             ) {
                                 $notificationChanged = true;
                             }
@@ -697,7 +743,6 @@ class SalonController
                     }
                     unset($b['allowUnnamed'],$b['rememberUnnamed']);
                     \App\Services\GroupSessions::prepare($b,$s);
-                    $previousClientIds=array_column($s['clients'],'id');
                     \App\Services\Clients::attach($s, $b, $data["clientId"] ?? null, !$b["public"]);
                     $b=\App\Services\Contact::apply($b);
                     \App\Services\Subscriptions::guard($s,!$b["public"]);
@@ -720,7 +765,7 @@ class SalonController
                     $b["pricing"] = app(\App\Services\Offers::class)->quote($s, $b, $data["coupon"] ?? null);
                     app(\App\Services\Offers::class)->reservePass($s, $b, $data["passId"] ?? null, !$b["public"]);
                     $s["bookings"][] = $b;
-                    if(!$b['public']&&!empty($b['clientId'])&&!in_array($b['clientId'],$previousClientIds,true)){ $client=collect($s['clients'])->firstWhere('id',$b['clientId']);if($client)\App\Services\ClientInvitations::queue($s,$client);}
+                    if((!$b['public']||!empty($s['settings']['guestInvitationSmsEnabled']))&&!empty($b['clientId'])){ $client=collect($s['clients'])->firstWhere('id',$b['clientId']);if($client)\App\Services\ClientInvitations::queue($s,$client);}
                     app(\App\Services\Notifications::class)->enqueue(
                         $b,
                         $s,

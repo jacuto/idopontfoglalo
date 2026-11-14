@@ -13,7 +13,7 @@ final class Settings
             "slotStep"=>10,"noShowFee"=>0,"defaultServiceId"=>null,"skipUnnamedWarning"=>false,
             "openingTime" => "08:00",
             "closingTime" => "20:00",
-            "providerEmail" => "",
+            "providerEmail" => "", "providerPhone" => "", "guestInvitationSmsEnabled" => false,
             "notificationVersion" => 1,
             "notifyGuest" => false,
             "notifyProvider" => false,

@@ -13,3 +13,17 @@ A foglalási bevezető alatt ismét van Belépés / Regisztráció link. A GYIK 
 Frissítés az alkalmazás könyvtárában: `php artisan optimize:clear`, `php artisan raero:upgrade`, `php artisan raero:check`. Az .env, APP_KEY, adatbázis és storage megőrzendő. A migráció előtt legyen biztonsági mentés.
 
 Ellenőrzés: szimulált API-válaszok, kulcsvédelem, bizonytalan küldés, kézi újraindítás, migráció, vendégmeghívás és böngészős felületi próba. Éles SMS-küldés nem történt.
+
+## Értesítések szétválasztása – 2026. november 14.
+
+Beállítások → Alapvető beállítások → Értesítések. A kiemelt Pro emlékeztetőnél az időzítés és az e-mail/SMS egymástól függetlenül kapcsolható. A További értesítések alapból csukott részében külön vendég- és szolgáltatói sorok vannak új foglalásra, elfogadásra, módosításra, lemondásra, csoportos elmaradásra és meg nem jelenésre. Két üres pipa kikapcsolt értesítést jelent. Az automatikusan megerősített új foglalás egy létrehozási visszaigazolást kap, nem külön elfogadási üzenetet is. A szolgáltatói SMS a megadott értesítési számra, ennek hiányában az adott munkatárs számára megy; nem kap vendégkezelési tokent.
+
+A régi kapcsolókhoz tartozó bekapcsolások megmaradnak, amíg az új űrlap mentése meg nem történik. Az új mátrix minden csatornát külön tárol, és a küldési sor feldolgozásakor újból ellenőrizzük. Az emlékeztető módosítása új verziót készít és újraütemezi a jövőbeli, megerősített időpontok emlékeztetőit. Az elavult sor nem küldhető ki. Pro nélkül az emlékeztető sem az API-n, sem a küldőben nem aktiválható.
+
+Az SMS-ár rövid összefoglalója lenyitható részleteket és BulkGate-hivatkozásokat tartalmaz. A 2026.11.14-én ellenőrzött standard gSystem magyar ár 0,033–0,0396 EUR + áfa / szegmens (Telekom 0,033; Yettel 0,038; One / DIGI / UPC 0,0396). A 400 Ft/EUR csak szemléltető átváltás, nem rögzített díj vagy élő árfolyam. Gazdaságos útvonal, feladó és feltöltés módosíthatja a tényleges árat. Hosszú vagy Unicode SMS több díjazott szegmens lehet. Az ár nem jelent új automatikus terhelést a Ráérőben.
+
+Az Egyszeri regisztrációs meghívó SMS-ben kapcsoló alapból ki van kapcsolva. Bekapcsolva új vendégfelvitel és új foglalás indíthat meghívót, ha nincs regisztrált fiók az elérhetőséghez. Nem járja végig a régi névjegyzéket. A szalonon és vendégen / normalizált elérhetőségen alapuló adatbázis-egyediségi védelem miatt nem ismétlődik minden foglaláskor, lejáratkor és ki-be kapcsoláskor sem. A link 30 napos; a küldés előtti kikapcsolás vagy közben létrejött regisztráció leállítja a meghívót. Az e-mailes meghívó külön, lenyitható kiegészítő beállítás marad.
+
+A munkatársak három gombja egy sorba rendeződik. A foglalópanel saját világoskék háttérrel és hangsúlyos kerettel jelenik meg. Google-térkép teljes irányítószám, település és utca/házszám esetén töltődik, a korábbi teljes címmezőt is támogatva; hiányos utcanév alapján nem készül pontatlan térkép. A Statisztika munkatárs / naptár szűrőt és munkatársankénti összehasonlítást kapott. A naptár ebben a rendszerben munkatárshoz tartozik. Az Excel ugyanazt a szűrőt használja és külön Munkatársak lapot tartalmaz. A vendégkereső először foglalásszám, majd legutóbbi foglalás szerint rendez; a lemondott/elutasított foglalásokat nem számolja. A munkatársi jogosultság csak a saját adatokon belül enged keresést.
+
+Nincs új adatbázis-migráció ehhez a részhez; a szokásos adatmegőrző frissítés futtatható. Szimulált tesztek és helyi böngészős próba ellenőrzi a működést; éles SMS-küldés nem történt.

@@ -11,94 +11,45 @@ class Notifications
     public function __construct(private Connections $connections) {}
     public function enqueue(array $booking, array $state, string $event): void
     {
-        $settings = $state["settings"]; $critical=$event==='group_missed';
-        $booking["notificationVersion"] = $settings["notificationVersion"] ?? 1;
-        $staff = collect($state["staff"])->firstWhere("id", $booking["staff"]);
-        if (
-            $event !== "reminder" &&
-            ($critical||!empty($settings["notifyGuest"])) &&
-            !empty($booking["email"]) && ($critical||in_array($settings["channel"], ["email", "mindkettő"], true))
-        ) {
-            $this->add(
-                $booking,
-                $event,
-                "email",
-                $booking["email"],
-                "guest",
-                now(),
-            );
-        }
-        if (
-            $event !== "reminder" &&
-            ($critical||!empty($settings["notifyGuest"])) &&
-            !empty($booking["phone"]) &&
-            ($critical&&empty($booking["email"])||in_array($settings["channel"], ["sms", "mindkettő"], true))
-        ) {
-            $this->add(
-                $booking,
-                $event,
-                "sms",
-                $booking["phone"],
-                "guest",
-                now(),
-            );
-        }
-        $provider = $settings["providerEmail"] ?: $staff["email"] ?? "";
-        if (
-            $event !== "reminder" &&
-            !$critical&&!empty($settings["notifyProvider"]) &&
-            $provider
-        ) {
-            $this->add($booking, $event, "email", $provider, "provider", now());
-        }
-        if (
-            PaidFeatures::enabled($state) && !empty($settings["reminderGuest"]) &&
-            in_array($booking["status"], ["pending", "confirmed"], true)
-        ) {
-            $at = CarbonImmutable::parse($booking["start"])->subHours(
-                $settings["reminder"],
-            );
-            if ($at->isFuture()) {
-                if (
-                    in_array(
-                        $settings["channel"],
-                        ["email", "mindkettő"],
-                        true,
-                    ) &&
-                    !empty($booking["email"])
-                ) {
-                    $this->add(
-                        $booking,
-                        "reminder",
-                        "email",
-                        $booking["email"],
-                        "guest",
-                        $at,
-                    );
+        $settings = $state['settings'];
+        $event = NotificationPreferences::event($event, $booking);
+        $booking['notificationVersion'] = $settings['notificationVersion'] ?? 1;
+        $staff = collect($state['staff'])->firstWhere('id', $booking['staff']);
+        if ($event !== 'reminder') {
+            foreach (['guest', 'provider'] as $audience) {
+                // One provider notice per cancelled group, rather than one per participant.
+                if ($event === 'group_missed' && $audience === 'provider') continue;
+                foreach (['email', 'sms'] as $channel) {
+                    $recipient = $audience === 'guest'
+                        ? ($booking[$channel === 'email' ? 'email' : 'phone'] ?? '')
+                        : ($channel === 'email' ? ($settings['providerEmail'] ?: ($staff['email'] ?? '')) : (($settings['providerPhone'] ?? '') ?: ($staff['phone'] ?? '')));
+                    if ($recipient && NotificationPreferences::enabled($settings, $audience, $event, $channel, $booking)) {
+                        $this->add($booking, $event, $channel, $recipient, $audience, now());
+                    }
                 }
-                if (
-                    in_array(
-                        $settings["channel"],
-                        ["sms", "mindkettő"],
-                        true,
-                    ) &&
-                    !empty($booking["phone"])
-                ) {
-                    $this->add(
-                        $booking,
-                        "reminder",
-                        "sms",
-                        $booking["phone"],
-                        "guest",
-                        $at,
-                    );
+            }
+        }
+        if (PaidFeatures::enabled($state) && in_array($booking['status'], ['pending', 'confirmed'], true)) {
+            $at = CarbonImmutable::parse($booking['start'])->subHours($settings['reminder']);
+            if ($at->isFuture()) foreach (['email', 'sms'] as $channel) {
+                $recipient = $booking[$channel === 'email' ? 'email' : 'phone'] ?? '';
+                if ($recipient && NotificationPreferences::enabled($settings, 'guest', 'reminder', $channel, $booking)) {
+                    $this->add($booking, 'reminder', $channel, $recipient, 'guest', $at);
                 }
             }
         }
     }
-    public function groupNotice(array $g,array $s):void {
-        $staff=collect($s['staff'])->firstWhere('id',$g['staff']);$recipient=$s['settings']['providerEmail']?:($staff['email']??'');if(!$recipient)return;
-        $payload=['kind'=>'group_notice','groupId'=>$g['id'],'version'=>$g['minimumCheckedAt'],'recipient'=>$recipient];DB::table('deliveries')->insertOrIgnore(['provider_id'=>app(Tenant::class)->id,'dedup'=>hash('sha256',json_encode($payload)),'payload'=>Crypt::encryptString(json_encode($payload)),'available_at'=>now(),'status'=>'pending','attempts'=>0,'created_at'=>now(),'updated_at'=>now()]);
+    public function groupNotice(array $g, array $s): void
+    {
+        $staff = collect($s['staff'])->firstWhere('id', $g['staff']);
+        foreach (['email', 'sms'] as $channel) {
+            // Historical group notices were email-only and always enabled.
+            $enabled = !isset($s['settings']['notificationRules']) ? $channel === 'email' : NotificationPreferences::enabled($s['settings'], 'provider', 'group_missed', $channel);
+            $recipient = $channel === 'email' ? ($s['settings']['providerEmail'] ?: ($staff['email'] ?? '')) : (($s['settings']['providerPhone'] ?? '') ?: ($staff['phone'] ?? ''));
+            if (!$recipient || !$enabled) continue;
+            $payload = ['kind'=>'group_notice','groupId'=>$g['id'],'version'=>$g['minimumCheckedAt'],'recipient'=>$recipient,'channel'=>$channel];
+            DB::table('deliveries')->insertOrIgnore(['provider_id'=>app(Tenant::class)->id,'dedup'=>hash('sha256',json_encode($payload)),'payload'=>Crypt::encryptString(json_encode($payload)),'available_at'=>now(),'status'=>'pending','attempts'=>0,'created_at'=>now(),'updated_at'=>now()]);
+        }
     }
     private function add(
         array $b,
@@ -183,8 +134,11 @@ class Notifications
                 if(($p['kind']??'')==='guest_invite'){$status=ClientInvitations::deliver($p['invitationId'],$s);$this->finish($job->id,$status,$status==='blocked'?['error'=>'Hiányzó központi küldőkapcsolat.','available_at'=>now()->addMinutes(5)]:[]);$counts[$status]++;continue;}
                 if(($p['kind']??'')==='group_notice'){
                     $g=collect($s['groupSessions'])->firstWhere('id',$p['groupId']);if(!$g||empty($g['cancelled'])){$this->finish($job->id,'skipped');$counts['skipped']++;continue;}
-                    if(!$this->connections->mailReady()){$this->finish($job->id,'blocked',['error'=>'Hiányzó központi SMTP-kapcsolat.','available_at'=>now()->addMinutes(5)]);$counts['blocked']++;continue;}
+                    $channel=$p['channel']??'email';
+                    if(isset($s['settings']['notificationRules'])&&!NotificationPreferences::enabled($s['settings'],'provider','group_missed',$channel)){$this->finish($job->id,'skipped');$counts['skipped']++;continue;}
+                    if(($channel==='email'&&!$this->connections->mailReady())||($channel==='sms'&&!BulkGateSms::ready($this->connections->all()))){$this->finish($job->id,'blocked',['error'=>'Hiányzó központi SMTP-kapcsolat.','available_at'=>now()->addMinutes(5)]);$counts['blocked']++;continue;}
                     $text=$g['serviceSnapshot']['name'].' · '.CarbonImmutable::parse($g['start'])->setTimezone('Europe/Budapest')->format('Y.m.d. H:i').' – elmarad. '.(($g['cancellationReason']??'')==='minimum'?'A minimumlétszám nem teljesült.':'Szolgáltatói lemondás.');
+                    if($channel==='sms'){$smsReference=app(BulkGateSms::class)->send($p['recipient'],mb_strimwidth($s['settings']['name'],0,40,'…').' · Csoportos óra elmarad · '.CarbonImmutable::parse($g['start'])->setTimezone('Europe/Budapest')->format('Y.m.d. H:i'),$this->connections->all());$this->finish($job->id,'sent',['provider_reference'=>$smsReference]);$counts['sent']++;continue;}
                     $sent=$this->sendMail($this->connections->all(),$p['recipient'],'Csoportos óra elmarad',$text,'group_missed',rtrim(config('app.url'),'/').'/?provider='.app(Tenant::class)->id);$this->finish($job->id,$sent?'sent':'skipped');$counts[$sent?'sent':'skipped']++;continue;
                 }
                 if (($p['kind'] ?? '') === 'message') {
@@ -197,15 +151,9 @@ class Notifications
                     $this->finish($job->id, 'sent', ['attempts' => $job->attempts + 1]); $counts['sent']++; continue;
                 }
                 $b = collect($s["bookings"])->firstWhere("id", $p["bookingId"]);
-                $enabled =
-                    $p["event"] === "reminder"
-                        ? $s["settings"]["reminderGuest"] ?? false
-                        : $s["settings"][
-                                $p["audience"] === "guest"
-                                    ? "notifyGuest"
-                                    : "notifyProvider"
-                            ] ?? false;
-                if($p['event']==='group_missed')$enabled=true;if($p['event']==='reminder'&&!PaidFeatures::enabled($s))$enabled=false;
+                $event = NotificationPreferences::event($p['event'], $b ?? []);
+                $enabled = NotificationPreferences::enabled($s['settings'], $p['audience'], $event, $p['channel'], $b ?? []);
+                if ($event === 'reminder' && !PaidFeatures::enabled($s)) $enabled = false;
                 if (
                     !$b ||
                     ($p["event"] === "reminder" &&
@@ -234,7 +182,7 @@ class Notifications
                     continue;
                 }
                 $labels = [
-                    "created" => "Új foglalás",
+                    "created" => "Új foglalás", "confirmed" => "Foglalás elfogadva", "no_show" => "Nem jelent meg",
                     "updated" => "Foglalás módosítva",
                     "cancelled" => "Foglalás lemondva", "group_missed"=>"Csoportos óra elmarad",
                     "reminder" => "Közelgő időpont",
@@ -310,8 +258,8 @@ class Notifications
                             "Az SMS-hez nemzetközi telefonszám szükséges.",
                         );
                     }
-                    $manage=rtrim(config('app.url'),'/').'/modositas?provider='.app(Tenant::class)->id.'&token='.$b['token'];
-                    $text=mb_strimwidth($s['settings']['name'],0,40,'…').' · '.CarbonImmutable::parse($b['start'])->setTimezone('Europe/Budapest')->format('Y.m.d. H:i').' · '.($p['event']==='group_missed'?'Csoportos óra elmarad':($statuses[$b['status']]??$b['status']))."\n".mb_strimwidth(implode(' + ',array_column($b['serviceSnapshot'],'name')),0,35,'…')."\n".$manage;
+                    $manage=rtrim(config('app.url'),'/').($p['audience']==='guest'?'/modositas?provider='.app(Tenant::class)->id.'&token='.$b['token']:'/?provider='.app(Tenant::class)->id);
+                    $text=mb_strimwidth($s['settings']['name'],0,40,'…').' · '.CarbonImmutable::parse($b['start'])->setTimezone('Europe/Budapest')->format('Y.m.d. H:i').' · '.($labels[$event]??($statuses[$b['status']]??$b['status'])).($event==='created'?' · '.($statuses[$b['status']]??$b['status']):'')."\n".($p['audience']==='provider'?mb_strimwidth($b['name'],0,25,'…').' · ':'').mb_strimwidth(implode(' + ',array_column($b['serviceSnapshot'],'name')),0,35,'…')."\n".$manage;
                     $smsReference=app(BulkGateSms::class)->send($p['recipient'],$text,$c);
                 }
                 $this->finish($job->id, "sent", [

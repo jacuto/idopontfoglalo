@@ -13,11 +13,7 @@ final class FeaturesController
     {
         $path = $r->path(); $method = $r->method();
         if ($path === 'api/clients/search' && $method === 'GET') {
-            $query = trim((string) $r->query('q', ''));
-            if (mb_strlen($query) < 3) return response()->json([]);
-            $digits = Clients::phone($query);
-            $matches = array_values(array_filter($this->store->read()['clients'], fn($c) => Clients::visible($c) && (str_contains(mb_strtolower($c['name']), mb_strtolower($query)) || (strlen($digits) >= 3 && str_contains(Clients::phone($c['phone'] ?? ''), $digits)))));
-            return response()->json(array_map(fn($c) => array_intersect_key($c, array_flip(['id', 'name', 'phone', 'email'])), array_slice($matches, 0, 20)));
+            return response()->json(Clients::search($this->store->read(), (string)$r->query('q', '')))->header('Cache-Control','no-store');
         }
         if (preg_match('#^api/clients/([a-zA-Z0-9_-]+)/detail$#', $path, $m) && $method === 'GET') return response()->json(Clients::detail($this->store->read(), $m[1]));
         if (preg_match('#^api/bookings/([a-zA-Z0-9_-]+)/review$#', $path, $m) && $method === 'POST') return $this->review($r, $m[1], 'provider');

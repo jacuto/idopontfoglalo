@@ -4,6 +4,22 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 final class Clients
 {
+    public static function search(array $state, string $query): array
+    {
+        $query = mb_strtolower(trim($query));
+        if (mb_strlen($query) < 3) return [];
+        $digits = self::phone($query);
+        $matches = array_values(array_filter($state['clients'], fn($c) => self::visible($c) && (str_contains(mb_strtolower($c['name']), $query) || (strlen($digits) >= 3 && str_contains(self::phone($c['phone'] ?? ''), $digits)))));
+        $counts = []; $last = [];
+        foreach ($state['bookings'] as $booking) {
+            $id = $booking['clientId'] ?? null;
+            if (!$id || in_array($booking['status'], ['cancelled', 'rejected'], true)) continue;
+            $counts[$id] = ($counts[$id] ?? 0) + 1;
+            $last[$id] = max($last[$id] ?? '', $booking['createdAt'] ?? $booking['start']);
+        }
+        usort($matches, fn($a, $b) => (($counts[$b['id']] ?? 0) <=> ($counts[$a['id']] ?? 0)) ?: strcmp($last[$b['id']] ?? '', $last[$a['id']] ?? '') ?: strnatcasecmp($a['name'], $b['name']) ?: strcmp($a['id'], $b['id']));
+        return array_map(fn($c) => array_intersect_key($c, array_flip(['id', 'name', 'phone', 'email'])), array_slice($matches, 0, 20));
+    }
     public static function editable(array $client,array $input):void {
         if(empty($client['guestId']))return;
         if(!empty($client['nameManaged'])&&isset($input['name'])&&$input['name']!==$client['name'])throw new InvalidArgumentException('A regisztrált vendég saját nevét a vendég módosíthatja a fiókjában.');
