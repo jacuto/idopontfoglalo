@@ -47,6 +47,7 @@ final class NotificationOptionsTest extends TestCase
   $legacy=NotificationPreferences::choices(['notifyGuest'=>true,'notifyProvider'=>true,'reminderGuest'=>true,'channel'=>'sms']);$this->assertTrue($legacy['guest']['updated']['sms']);$this->assertFalse($legacy['provider']['updated']['sms']);$this->assertTrue($legacy['provider']['updated']['email']);$this->assertTrue($legacy['guest']['reminder']['sms']);
  }
  public function test_provider_group_cancellation_sends_one_sms_and_uses_no_guest_manage_token():void{
+  \App\Services\SmsWallet::credit(1,10000,'test-start','test');
   $path=storage_path('framework/notification-options-'.bin2hex(random_bytes(6)));config(['operator.connections_path'=>$path,'integrations.path'=>$path.'-provider']);
   try{app(\App\Services\PlatformConnections::class)->save(['bulkgate_application_id'=>'12345','bulkgate_application_token'=>'fake-token','bulkgate_sender_type'=>'gSystem']);Http::fake(['portal.bulkgate.com/*'=>Http::response(['data'=>['status'=>'accepted','sms_id'=>'group-sms-test']])]);
    $rules=$this->rules();$rules['provider']['group_missed']['sms']=true;$this->settings(['notificationRules'=>$rules,'providerPhone'=>'06701234567'])->assertOk();

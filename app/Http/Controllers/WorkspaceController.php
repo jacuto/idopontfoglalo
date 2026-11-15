@@ -49,6 +49,7 @@ class WorkspaceController
                 "billingo_key" => "nullable|string|max:1000",
                 "billingo_block" => "nullable|integer|min:1",
                 "szamlazz_key" => "nullable|string|max:1000",
+                "simplepay_merchant"=>"nullable|alpha_dash|max:100", "simplepay_secret"=>"nullable|string|max:500", "simplepay_environment"=>"nullable|in:sandbox,live",
                 "stripe_key" => "nullable|string|max:1000",
                 "stripe_webhook_secret" => "nullable|string|max:1000",
                 "stripe_price_id" => "nullable|string|max:200",
@@ -84,7 +85,7 @@ class WorkspaceController
                     )
                     ->latest("id")
                     ->limit(100)
-                    ->get(),
+                    ->get()->map(function($row){$row->sms_wallet_status=\App\Services\SmsWallet::item($row->id)?->status;return $row;}),
             );
         }
         if ($path === "/api/deliveries/run" && $method === "POST") {
@@ -95,8 +96,10 @@ class WorkspaceController
             $method === "POST"
         ) {
             DB::transaction(function()use($request,$m){
+                \App\Services\SmsWallet::locked(app(\App\Services\Tenant::class)->id);
                 $row=DB::table('deliveries')->where('provider_id',app(\App\Services\Tenant::class)->id)->where('id',$m[1])->lockForUpdate()->first();abort_unless($row,404);
                 if(in_array($row->status,['unknown','on_hold'],true))$request->validate(['confirmedNotSent'=>'required|accepted']);
+                $reservation=\App\Services\SmsWallet::item($row->id);if($reservation){abort_if($reservation->status==='sent',422,'A küldést már elszámoltuk, újraküldés nem indítható.');if(in_array($row->status,['unknown','on_hold','failed'],true))\App\Services\SmsWallet::finish($row->id,'released');}
                 if(in_array($row->status,['failed','blocked','unknown','on_hold'],true))DB::table('deliveries')->where('id',$row->id)->update(['status'=>'pending','attempts'=>0,'available_at'=>now()]);
             });
             return response()->json(["ok" => true]);

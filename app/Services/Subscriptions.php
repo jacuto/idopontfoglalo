@@ -100,6 +100,7 @@ final class Subscriptions
         $until=Time::parse($payment->period_end)->toISOString();
         if (empty($state['subscription']['paidUntil']) || Time::parse($until)->gt(Time::parse($state['subscription']['paidUntil']))) $state['subscription']['paidUntil']=$until;
         self::refresh($state);
+        SmsWallet::welcome($payment);
     }
 
     public function transfer(int $providerId, string $reference, string $paidAt, ?string $chargeId = null): array

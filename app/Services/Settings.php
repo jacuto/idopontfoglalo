@@ -24,7 +24,7 @@ final class Settings
             "billingZip" => "",
             "billingCity" => "",
             "billingAddress" => "",
-            "invoiceProvider" => "none",
+            "invoiceProvider" => "none", "paymentProvider"=>"stripe", "szamlazzPrefix"=>"", "szamlazzBank"=>"", "szamlazzAccount"=>"", "szamlazzSendEmail"=>false,
             "autoInvoice" => false,
             "invoiceVat" => "AAM",
             "embedOrigins" => [],

@@ -453,6 +453,7 @@ class WorkspaceTest extends TestCase
     }
     public function test_sms_notification_uses_bulkgate(): void
     {
+        \App\Services\SmsWallet::credit(1,10000,'test-start','test');
         app(Connections::class)->save([
             "bulkgate_application_id" => "12345",
             "bulkgate_application_token" => "token",
@@ -483,12 +484,12 @@ class WorkspaceTest extends TestCase
             "method" => "cash",
             "paidAt" => now()->toISOString(),
         ])->json();
-        $this->settings(["invoiceProvider" => "szamlazz"]);
+        $this->settings(["invoiceProvider" => "szamlazz", "szamlazzPrefix"=>"PROBA", "szamlazzBank"=>"Teszt & Bank", "szamlazzAccount"=>"12345678-12345678", "szamlazzSendEmail"=>true]);
         app(Connections::class)->save(["szamlazz_key" => "agent-secret"]);
         $v = [
             "paymentId" => $p["id"],
             "buyer" => [
-                "name" => "Buyer & Partner",
+                "name" => "Buyer & Partner", "email"=>"buyer@example.com",
                 "country" => "HU",
                 "zip" => "1111",
                 "city" => "Budapest",
@@ -512,6 +513,7 @@ class WorkspaceTest extends TestCase
         $this->postJson("/api/invoices", $v)
             ->assertOk()
             ->assertJsonPath("number", "TEST-2");
+        Http::assertSent(function($r){$body=$r->body();return str_contains($body,'<szamlaszamElotag>PROBA</szamlaszamElotag>')&&str_contains($body,'Teszt &amp; Bank')&&str_contains($body,'<sendEmail>true</sendEmail>')&&str_contains($body,'<szamlaKulsoAzon>raero-1-');});
     }
     public function test_enabling_and_retiming_reminders_reschedules_existing_bookings(): void
     {

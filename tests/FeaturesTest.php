@@ -167,18 +167,16 @@ class FeaturesTest extends TestCase {
   $url=\Illuminate\Support\Facades\URL::signedRoute('newsletter.unsubscribe',['id'=>$consent->id]);
   $this->get($url)->assertOk();$this->getJson('/api/newsletter/consent')->assertJsonPath('subscribed',false);
   $this->withSession(['platform_admin'=>true]);
-  $n=$this->postJson('/api/platform/newsletters',['subject'=>'Hírlevél','content'=>'Tartalom','audience'=>'guest'])->assertCreated()->json();
-  $this->postJson('/api/platform/newsletters/'.$n['id'].'/schedule',['scheduledAt'=>now()->addMinutes(2)->toISOString()])->assertOk();
-  DB::table('newsletters')->where('id',$n['id'])->update(['scheduled_at'=>now()->subMinute()]);
+  $this->postJson('/api/platform/newsletters',['subject'=>'Hírlevél','content'=>'Tartalom','audience'=>'guest'])->assertUnprocessable();
   app(\App\Services\Newsletters::class)->run();$this->assertSame(0,DB::table('newsletter_deliveries')->count());
  }
- public function test_newsletter_queue_is_unique_and_records_smtp_acceptance():void {
+ public function test_legacy_newsletter_queue_is_paused_and_never_uses_smtp():void {
   $this->guest();$this->putJson('/api/newsletter/consent',['subscribed'=>true])->assertOk();
   $n=DB::table('newsletters')->insertGetId(['audience'=>'guest','subject'=>'Hír','content'=>'Levél','status'=>'scheduled','scheduled_at'=>now()->subMinute(),'created_at'=>now(),'updated_at'=>now()]);
   $service=new class extends \App\Services\Newsletters { public int $calls=0; public function ready():bool{return true;} public function send(string $to,string $subject,string $content,bool $html=false):void{$this->calls++;} };
   $this->app->instance(\App\Services\Newsletters::class,$service);
-  $service->run();$service->run();$this->assertSame(1,$service->calls);$this->assertSame(1,DB::table('newsletter_deliveries')->count());
-  $this->assertSame('accepted',DB::table('newsletter_deliveries')->value('status'));
+  $service->run();$service->run();$this->assertSame(0,$service->calls);$this->assertSame(0,DB::table('newsletter_deliveries')->count());
+  $this->assertSame('paused',DB::table('newsletters')->value('status'));
  }
  public function test_operator_invoice_is_aam_separate_and_idempotent():void {
   $this->provider();app(SalonStore::class)->mutate(function(&$s){$s['settings']=array_replace($s['settings'],['billingName'=>'Vevő','billingCountry'=>'HU','billingZip'=>'1111','billingCity'=>'Budapest','billingAddress'=>'Teszt utca 1.']);});

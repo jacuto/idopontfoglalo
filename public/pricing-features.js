@@ -64,7 +64,9 @@ const pricingFeatureGroups=[
   'Esedékes díjak és állítható alapértelmezett befizetési paraméterek',
   'Napi összegek, bevételi statisztikák és diagramok',
   'Statisztikák letöltése Excelben',
-  'Bankkártyás foglalásfizetés Stripe-kapcsolattal',
+  'Bankkártyás foglalásfizetés saját Stripe- vagy SimplePay-kapcsolattal',
+  'Brevo- vagy Mailchimp-hírlevelek saját fiókkal, hozzájárulással és leiratkozással',
+  'Előre feltölthető SMS-egyenleg, csoportos fedezetellenőrzéssel',
   'Billingo- és Számlázz.hu-kapcsolat kézi számlázással',
   'Automatikus számlakiállítás teljes befizetés után',
   'A vendég mentett számlázási adatainak használata a számlázásnál'
@@ -91,7 +93,7 @@ const pricingFeatureGroups=[
   'Közvetlen üzemeltetői levelezés és saját számlázási, fizetési kapcsolatok'
  ]]
 ];
-function pricingCatalogue(){return `<section class="pricing-catalogue" aria-labelledby="pricing-catalogue-heading"><header><h2 id="pricing-catalogue-heading">A rendszer összes funkciója</h2><p>Az automatikus emlékeztetők, a munkatársi jogosultságok, az eltérő beosztás és az automatikus számlázás a Pro csomag részei. További naptár a Pro csomaghoz +2 000 Ft/hó.</p><button type="button" class="catalogue-expand-all" onclick="document.querySelectorAll('.pricing-feature-groups>details').forEach(item=>item.open=true)">Összes témakör megnyitása</button></header><div class="pricing-feature-groups">${pricingFeatureGroups.map(([name,items],i)=>`<details ${i===0?'open':''}><summary>${esc(name)} <span>${items.length} funkció</span></summary>${i===6?'<p class="platform-feature-note">Ezeket a rendszer üzemeltetője kezeli a főadminfelületen; nem a szolgáltató saját beállításai.</p>':''}<ul>${items.map(item=>`<li>${esc(item)}${/munkatárs|Munkatárs|Szerkesztőként|Automatikus számlakiállítás|emlékeztetők/.test(item)?' <span class="pro-feature-badge">Pro</span>':''}</li>`).join('')}</ul></details>`).join('')}</div><p class="pricing-catalogue-note">Az SMS-küldés, a fizetési és számlázási szolgáltatók használata külön díjjal járhat. A részleteket a külön díjas tételeknél találod.</p></section>`;}
+function pricingCatalogue(){return `<section class="pricing-catalogue" aria-labelledby="pricing-catalogue-heading"><header><h2 id="pricing-catalogue-heading">A rendszer összes funkciója</h2><p>Az automatikus emlékeztetők, a munkatársi jogosultságok, az eltérő beosztás az automatikus számlázás és a hírlevélküldés a Pro csomag részei. További naptár a Pro csomaghoz +2 000 Ft/hó.</p><button type="button" class="catalogue-expand-all" onclick="document.querySelectorAll('.pricing-feature-groups>details').forEach(item=>item.open=true)">Összes témakör megnyitása</button></header><div class="pricing-feature-groups">${pricingFeatureGroups.map(([name,items],i)=>`<details ${i===0?'open':''}><summary>${esc(name)} <span>${items.length} funkció</span></summary>${i===6?'<p class="platform-feature-note">Ezeket a rendszer üzemeltetője kezeli a főadminfelületen; nem a szolgáltató saját beállításai.</p>':''}<ul>${items.map(item=>`<li>${esc(item)}${/munkatárs|Munkatárs|Szerkesztőként|Automatikus számlakiállítás|emlékeztetők|hírlevelek/.test(item)?' <span class="pro-feature-badge">Pro</span>':''}</li>`).join('')}</ul></details>`).join('')}</div><p class="pricing-catalogue-note">Az SMS-küldés, a fizetési és számlázási szolgáltatók használata külön díjjal járhat. A részleteket a külön díjas tételeknél találod.</p></section>`;}
 const pricingFeatureCopy=`Foglalás és vendégfiók|Booking and guest accounts|Buchung und Kundenkonto
 Saját, nyilvános online foglalóoldal|Your own public online booking page|Eigene öffentliche Onlinebuchungsseite
 Szolgáltatókeresés név, kategória és település szerint, helymeghatározással|Provider search by name, category and town, with location detection|Anbietersuche nach Name, Kategorie und Ort mit Standortbestimmung

@@ -20,7 +20,7 @@ Route::match(['GET','PUT'],'/api/guest/billing',[\App\Http\Controllers\GuestFeat
 Route::get('/api/clients/{id}/billing',[\App\Http\Controllers\GuestFeaturesController::class,'clientBilling']);
 Route::match(['GET','POST'],'/api/group-sessions',[\App\Http\Controllers\GroupSessionController::class,'handle']);
 Route::match(['GET','POST'],'/api/guest/calendar-prompt',[\App\Http\Controllers\GuestFeaturesController::class,'calendarPrompt']);
-Route::match(['GET','PATCH','DELETE'],'/api/calendar/connection',[\App\Http\Controllers\CalendarConnectionController::class,'handle']);
+Route::match(['GET','PATCH','DELETE','POST'],'/api/calendar/connection',[\App\Http\Controllers\CalendarConnectionController::class,'handle']);
 Route::get('/auth/google-calendar',[\App\Http\Controllers\CalendarConnectionController::class,'start']);
 Route::get('/auth/google-calendar/callback',[\App\Http\Controllers\CalendarConnectionController::class,'callback']);
 Route::get('/api/exports/{kind}',[\App\Http\Controllers\ExportController::class,'handle'])->whereIn('kind',['statistics','calendar']);
@@ -66,7 +66,19 @@ Route::get('/hirlevel/leiratkozas/{id}', [\App\Http\Controllers\NewsletterContro
 Route::match(['GET','POST'], '/api/platform/newsletters/{id?}/{action?}', [\App\Http\Controllers\NewsletterController::class,'handle'])->whereNumber('id')->whereIn('action',['test','schedule']);
 Route::match(['GET','POST'], '/api/platform-messages', [\App\Http\Controllers\PlatformMessagesController::class,'handle']);
 Route::patch('/api/platform-messages/read', [\App\Http\Controllers\PlatformMessagesController::class,'read']);
+Route::match(['GET','POST'],'/api/sms-wallet',[\App\Http\Controllers\SmsWalletController::class,'handle']);
+Route::post('/api/sms-wallet/deliveries/{id}/resolve',[\App\Http\Controllers\SmsWalletController::class,'resolve'])->whereNumber('id');
+Route::match(['GET','POST'],'/api/platform/sms-wallet',[\App\Http\Controllers\SmsWalletController::class,'operator']);
+foreach(['/api/marketing','/api/platform/marketing'] as $prefix){
+ Route::match(['GET','PUT','POST','DELETE'],$prefix.'/connection',[\App\Http\Controllers\MarketingController::class,'connection']);
+ Route::match(['GET','POST'],$prefix.'/campaigns/{id?}/{action?}',[\App\Http\Controllers\MarketingController::class,'campaigns'])->whereUuid('id')->whereIn('action',['prepare','send','test','report','cancel']);
+ Route::match(['GET','POST'],$prefix.'/consents',[\App\Http\Controllers\MarketingController::class,'consents']);
+}
+Route::match(['GET','PUT'],'/api/guest/marketing-consent',[\App\Http\Controllers\MarketingController::class,'guestConsent']);
+Route::match(['GET','POST'],'/api/marketing/webhook/{providerId}/{engine}/{token}',fn(\Illuminate\Http\Request $r,int $providerId,string $engine,string $token)=>app(\App\Http\Controllers\MarketingController::class)->webhook($r,$providerId,$engine,$token))->whereNumber('providerId')->whereIn('engine',['brevo','mailchimp'])->where('token','[a-f0-9]{64}');
 Route::any("/api/platform/{path}", [\App\Http\Controllers\PlatformController::class, "handle"])->where("path", ".*");
+Route::post('/api/simplepay/ipn',fn(\Illuminate\Http\Request $r)=>app(\App\Services\SimplePay::class)->ipn($r));
+Route::get('/simplepay/visszateres',fn(\Illuminate\Http\Request $r)=>app(\App\Services\SimplePay::class)->returned($r));
 Route::post(
     "/api/stripe/webhook",
     fn(\Illuminate\Http\Request $r) => app(
@@ -79,6 +91,7 @@ Route::post(
         \App\Services\Payments::class,
     )->webhook($r, true),
 );
+Route::get('/api/message-recipients',[\App\Http\Controllers\MessagesController::class,'recipients']);
 Route::match(['GET', 'POST', 'PATCH'], '/api/messages', [\App\Http\Controllers\MessagesController::class, 'handle']);
 Route::patch('/api/guest/profile', [\App\Http\Controllers\GuestFeaturesController::class, 'profile']);
 Route::get('/api/guest/passes', [\App\Http\Controllers\GuestFeaturesController::class, 'passes']);
@@ -96,6 +109,6 @@ Route::view("/modositas", "app");
 foreach(['/szolgaltatok','/szolgaltato','/belepes','/arak','/kapcsolat'] as $page)Route::view($page,'app');
 
 foreach(['adatvedelem'=>'privacy','aszf'=>'terms','adattorles'=>'deletion','sugo'=>'help'] as $slug=>$document)Route::get('/'.$slug,fn()=>app(\App\Services\PublicDocuments::class)->page($document));
-Route::view('/foadmin/{section}','app')->where('section','kapcsolatok|szamlak|szamla-rogzitese|szamla-egyeztetes|levelek|jogosultsagok|uzenetek|hirlevelek|jogi-oldalak|elofizetes|szolgaltatok|befizetesek|uzemelteto');
+Route::view('/foadmin/{section}','app')->where('section','sms-egyenlegek|kapcsolatok|szamlak|szamla-rogzitese|szamla-egyeztetes|levelek|jogosultsagok|uzenetek|hirlevelek|jogi-oldalak|elofizetes|szolgaltatok|befizetesek|uzemelteto');
 
 Route::get('/gyik',fn()=>app(\App\Services\PublicDocuments::class)->page('help'));

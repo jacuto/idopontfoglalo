@@ -306,11 +306,7 @@ class SalonController
                         if (hash_equals($b["token"], $token)) {
                             return response()->json([
                                 "booking" => $b,
-                                "paymentReady" => !empty(
-                                    app(
-                                        \App\Services\Connections::class,
-                                    )->all()["stripe_key"]
-                                ),
+                                "paymentReady" => \App\Services\Payments::ready($s),
                                 "balance" => max(
                                     0,
                                     \App\Services\Offers::total($b) -
@@ -459,6 +455,11 @@ class SalonController
                     "settings.billingZip" => "nullable|string|max:20",
                     "settings.billingCity" => "nullable|string|max:100",
                     "settings.billingAddress" => "nullable|string|max:250",
+                    "settings.paymentProvider" => "sometimes|in:stripe,simplepay",
+                    "settings.szamlazzPrefix" => "nullable|string|max:10",
+                    "settings.szamlazzBank" => "nullable|string|max:100",
+                    "settings.szamlazzAccount" => "nullable|string|max:50",
+                    "settings.szamlazzSendEmail" => "sometimes|boolean",
                     "settings.invoiceProvider" =>
                         "sometimes|in:none,billingo,szamlazz",
                     "settings.autoInvoice" => "sometimes|boolean",

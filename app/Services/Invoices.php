@@ -31,6 +31,7 @@ class Invoices
         if (!$payment || $payment["status"] !== "paid") {
             throw new InvalidArgumentException("Nincs ilyen aktív befizetés.");
         }
+        if($provider==='szamlazz'&&!empty($s["settings"]["szamlazzSendEmail"])&&empty($data["buyer"]["email"]))throw new InvalidArgumentException("A Számlázz.hu e-mailes számlaküldéséhez a vevő e-mail-címe szükséges.");
         $booking = collect($s["bookings"])->firstWhere(
             "id",
             $payment["bookingId"],
@@ -177,10 +178,13 @@ class Invoices
                 ][$vat];
                 $net = round($amount / (1 + $percent / 100), 2);
                 $tax = round($amount - $net, 2);
+                $prefix=empty($s['settings']['szamlazzPrefix'])?'':'<szamlaszamElotag>'.$x($s['settings']['szamlazzPrefix']).'</szamlaszamElotag>';
+                $seller='<elado>'.(empty($s['settings']['szamlazzBank'])?'':'<bank>'.$x($s['settings']['szamlazzBank']).'</bank>').(empty($s['settings']['szamlazzAccount'])?'':'<bankszamlaszam>'.$x($s['settings']['szamlazzAccount']).'</bankszamlaszam>').'</elado>';
+                $sendEmail=!empty($s['settings']['szamlazzSendEmail'])?'true':'false';
                 $xml =
-                    '<?xml version="1.0" encoding="UTF-8"?><xmlszamla xmlns="http://www.szamlazz.hu/xmlszamla" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.szamlazz.hu/xmlszamla https://www.szamlazz.hu/szamla/docs/xsds/agent.xsd"><beallitasok><szamlaagentkulcs>' .
+                    '<?xml version="1.0" encoding="UTF-8"?><xmlszamla xmlns="http://www.szamlazz.hu/xmlszamla" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.szamlazz.hu/xmlszamla https://www.szamlazz.hu/szamla/docs/xsds/agent/xmlszamla.xsd"><beallitasok><szamlaagentkulcs>' .
                     $x($c["szamlazz_key"]) .
-                    "</szamlaagentkulcs><eszamla>true</eszamla><szamlaLetoltes>false</szamlaLetoltes><valaszVerzio>2</valaszVerzio></beallitasok><fejlec><keltDatum>" .
+                    "</szamlaagentkulcs><eszamla>true</eszamla><szamlaLetoltes>false</szamlaLetoltes><valaszVerzio>2</valaszVerzio><szamlaKulsoAzon>raero-" . app(Tenant::class)->id . "-" . $id . "</szamlaKulsoAzon></beallitasok><fejlec><keltDatum>" .
                     $today .
                     "</keltDatum><teljesitesDatum>" .
                     $today .
@@ -196,7 +200,7 @@ class Invoices
                     ) .
                     "</fizmod><penznem>HUF</penznem><szamlaNyelve>hu</szamlaNyelve><megjegyzes>" .
                     $x("Befizetés: " . $payment["id"]) .
-                    "</megjegyzes><fizetve>true</fizetve></fejlec><elado/><vevo><nev>" .
+                    "</megjegyzes>" . $prefix . "<fizetve>true</fizetve></fejlec>" . $seller . "<vevo><nev>" .
                     $x($buyer["name"]) .
                     "</nev><irsz>" .
                     $x($buyer["zip"]) .
@@ -206,7 +210,7 @@ class Invoices
                     $x($buyer["address"]) .
                     "</cim><email>" .
                     $x($buyer["email"] ?? "") .
-                    "</email><sendEmail>false</sendEmail><adoszam>" .
+                    "</email><sendEmail>" . $sendEmail . "</sendEmail><adoszam>" .
                     $x($buyer["taxNumber"] ?? "") .
                     "</adoszam></vevo><tetelek><tetel><megnevezes>" .
                     $x(

@@ -10,9 +10,11 @@ class Payments
         private Connections $connections,
         private SalonStore $store,
     ) {}
+    public static function ready(array $s):bool{$c=app(Connections::class)->all();return ($s["settings"]["paymentProvider"]??"stripe")==="simplepay"?(!empty($c["simplepay_merchant"])&&!empty($c["simplepay_secret"])):!empty($c["stripe_key"]);}
     public function checkout(string $bookingId): array
     {
         $s = $this->store->read();
+        if(($s["settings"]["paymentProvider"]??"stripe")==="simplepay")return app(SimplePay::class)->checkout($bookingId);
         $b = collect($s["bookings"])->firstWhere("id", $bookingId);
         if (!$b) {
             abort(404);
@@ -203,6 +205,7 @@ class Payments
         $object = $event["data"]["object"] ?? [];
         // Keep only identifiers from optionally expanded Stripe references, never client secrets.
         foreach(['subscription','customer','payment_intent'] as $field) if(isset($object[$field])&&is_array($object[$field]))$object[$field]=$object[$field]['id']??null;
+        if($platform&&SmsTopups::webhook($event,$object))return response()->json(['received'=>true]);
         if ($platform && isset($object["metadata"]["provider_id"])) {
             $tenant = filter_var($object["metadata"]["provider_id"], FILTER_VALIDATE_INT, ["options" => ["min_range" => 1]]);
             if (!$tenant || !\Illuminate\Support\Facades\DB::table("salon_state")->where("id", $tenant)->exists()) return response()->json(["error" => "Ismeretlen szolgáltató."], 400);

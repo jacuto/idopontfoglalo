@@ -18,6 +18,7 @@ final class NewsletterController {
  public function handle(Request $r){
   abort_unless($r->session()->get('platform_admin')===true,401);
   $id=$r->route('id');$action=$r->route('action');
+  if(!$r->isMethod('GET'))throw new \InvalidArgumentException('A hírlevélküldés átkerült a Brevo / Mailchimp kapcsolathoz. SMTP-n nem indítunk hírlevélkampányt.');
   if($r->isMethod('GET'))return response()->json(['configured'=>app(Newsletters::class)->ready(),'campaigns'=>DB::table('newsletters')->latest('id')->get(),'deliveries'=>DB::table('newsletter_deliveries')->select('id','newsletter_id','email','status','error','updated_at')->latest('id')->limit(300)->get()]);
   if($action==='test'){
    $v=$r->validate(['email'=>'required|email|max:200']);$n=DB::table('newsletters')->find($id);abort_unless($n,404);$key='newsletter-test:'.$r->ip();\App\Services\AttemptLimit::check($key,5);RateLimiter::hit($key,60);

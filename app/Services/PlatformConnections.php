@@ -3,6 +3,7 @@ namespace App\Services;
 use Illuminate\Support\Facades\Crypt;
 final class PlatformConnections {
  private const MAP=[
+  'sms_segment_price'=>'integrations.sms_segment_price',
   'google_enabled'=>'integrations.google_enabled','facebook_enabled'=>'integrations.facebook_enabled','apple_enabled'=>'integrations.apple_enabled','billingo_enabled'=>'integrations.billingo_enabled',
   'stripe_key'=>'integrations.platform_stripe.key','stripe_price'=>'integrations.platform_stripe.price','stripe_webhook_secret'=>'integrations.platform_stripe.webhook_secret',
   'billingo_key'=>'integrations.platform_billingo.key','billingo_block'=>'integrations.platform_billingo.block',

@@ -17,6 +17,13 @@ final class ClientInvitations
   $inserted=DB::table('guest_invitations')->insertOrIgnore(['id'=>$id,'provider_id'=>$provider,'client_id'=>$client['id'],'contact_hash'=>$hash,'token_hash'=>hash('sha256',$token),'payload'=>$payload,'expires_at'=>now()->addDays(30),'created_at'=>now(),'updated_at'=>now()]);if(!$inserted)return;
   DB::table('deliveries')->insertOrIgnore(['provider_id'=>$provider,'dedup'=>hash('sha256','guest-invitation:'.$id),'payload'=>Crypt::encryptString(json_encode(['kind'=>'guest_invite','invitationId'=>$id,'channel'=>$channel])),'available_at'=>now(),'status'=>'pending','attempts'=>0,'created_at'=>now(),'updated_at'=>now()]);
  }
+ public static function smsContent(string $id,array $s):?array{
+  $row=DB::table('guest_invitations')->where('provider_id',app(Tenant::class)->id)->find($id);if(!$row||$row->claimed_at||now()->gte($row->expires_at))return null;
+  $client=collect($s['clients'])->firstWhere('id',$row->client_id);if(!$client||!Clients::visible($client)||!empty($client['guestId'])||self::registered($client))return null;
+  $data=json_decode(Crypt::decryptString($row->payload),true,32,JSON_THROW_ON_ERROR);$policy=$s['settings']['guestInvitationPolicy']??'none';
+  if($data['channel']!=='sms'||!self::matches($client,$data)||(empty($s['settings']['guestInvitationSmsEnabled'])&&!in_array($policy,['sms','email_first','sms_first'],true)))return null;
+  return ['recipient'=>$data['recipient'],'text'=>mb_strimwidth($s['settings']['name'],0,40,'…').' – Ráérő vendégfiók: regisztrálj, hogy kezeld a foglalásaidat. '.rtrim(config('app.url'),'/').'/meghivo/'.$data['token']];
+ }
  public static function deliver(string $id,array $s):string{
   $row=DB::table('guest_invitations')->where('provider_id',app(Tenant::class)->id)->find($id);if(!$row||$row->claimed_at||now()->gte($row->expires_at)||(($s['settings']['guestInvitationPolicy']??'none')==='none'&&empty($s['settings']['guestInvitationSmsEnabled'])))return 'skipped';
   $client=collect($s['clients'])->firstWhere('id',$row->client_id);if(!$client||!Clients::visible($client)||!empty($client['guestId'])||self::registered($client))return 'skipped';
@@ -27,7 +34,7 @@ final class ClientInvitations
    config(['mail.default'=>'smtp','mail.mailers.smtp.host'=>$c['smtp_host'],'mail.mailers.smtp.port'=>(int)($c['smtp_port']?:587),'mail.mailers.smtp.username'=>$c['smtp_username']?:null,'mail.mailers.smtp.password'=>$c['smtp_password']?:null,'mail.mailers.smtp.scheme'=>(int)$c['smtp_port']===465?'smtps':'smtp','mail.from.address'=>$c['mail_from'],'mail.from.name'=>$c['mail_name']?:'Ráérő']);Mail::purge('smtp');
    Mail::to($data['recipient'])->send(new \App\Mail\NotificationMail($template['subject'],$template['html'],filter_var($s['settings']['providerEmail']??'',FILTER_VALIDATE_EMAIL)?$s['settings']['providerEmail']:null,$s['settings']['name']));
   }else{
-   if(!BulkGateSms::ready($c))return 'blocked';$text=mb_strimwidth($s['settings']['name'],0,40,'…').' – Ráérő vendégfiók: regisztrálj, hogy kezeld a foglalásaidat. '.$url;$reference=app(BulkGateSms::class)->send($data['recipient'],$text,$c);try{DB::table('deliveries')->where('provider_id',app(Tenant::class)->id)->where('dedup',hash('sha256','guest-invitation:'.$id))->update(['provider_reference'=>$reference]);}catch(\Throwable){throw new SmsDeliveryException('A BulkGate átvette az SMS-t, de a helyi mentés megszakadt. Ellenőrizd az üzenetelőzményt.',true);}
+   return 'blocked'; // SMS is sent only through the wallet-reserved delivery worker.
   }return 'sent';
  }
  private static function matches(array $client,array $data):bool{return $data['recipient']===($data['channel']==='email'?Contact::email($client['email']??''):Contact::e164($client['phone']??''));}

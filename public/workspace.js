@@ -591,11 +591,11 @@ function settingsPage() {
       "confirmation",
       "guestInvitationSmsEnabled", "autoInvoice", "skipUnnamedWarning", "reviewRequestsEnabled", "advancedBookingEnabled", "servicePhasesEnabled", "couponsEnabled", "passesEnabled",
     ])
-      v[k] = f.has(k);
+      v[k] = e.target.elements[k] ? f.has(k) : !!state.settings[k];
     v.notificationRules=notificationChoices(state.settings);
     e.target.querySelectorAll('[data-notification-rule]').forEach(input=>{const [audience,event,channel]=input.dataset.notificationRule.split('.');v.notificationRules[audience][event][channel]=input.checked;});
     v.reminderGuest=v.notificationRules.guest.reminder.email||v.notificationRules.guest.reminder.sms;
-    v.reminder = Number(v.reminder);
+    v.reminder = Number(v.reminder ?? state.settings.reminder);
     v.reviewRequestDelayHours=Number(v.reviewRequestDelayHours||24);
     v.open = timeMinutes(v.openingTime) / 60;
     v.close = timeMinutes(v.closingTime) / 60;
@@ -669,14 +669,14 @@ async function deliveryRows() {
       pending: "Várakozik",
       blocked: "Kapcsolatra vár",
       processing: "Küldés alatt",
-      sent: "Küldő átvette",
+      sent: "Küldő átvette", waiting_balance:"SMS-egyenlegre vár",
       unknown: "Ellenőrzést igényel",
       on_hold: "SMS-csere: ellenőrzendő",
       skipped: "Már nem aktuális",
       failed: "Sikertelen",
     };
     $("#delivery-table").innerHTML =
-      `<table><thead><tr><th>#</th><th>Állapot</th><th>Esedékes</th><th></th></tr></thead><tbody>${rows.map((r) => `<tr><td>${r.id}</td><td>${labels[r.status] || r.status}${r.provider_reference?`<small> · ${esc(r.provider_reference)}</small>`:""}${r.error ? `<small class="muted"> · ${esc(r.error)}</small>` : ""}</td><td>${new Date(r.available_at).toLocaleString(window.raeroLocale?.()||"hu-HU")}</td><td>${["failed", "blocked", "unknown", "on_hold"].includes(r.status) ? `<button onclick="retryDelivery(${r.id},${['unknown','on_hold'].includes(r.status)})">Újrapróbálás</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="4">Nincs küldési feladat.</td></tr>'}</tbody></table>`;
+      `<table><thead><tr><th>#</th><th>Állapot</th><th>Esedékes</th><th></th></tr></thead><tbody>${rows.map((r) => `<tr><td>${r.id}</td><td>${labels[r.status] || r.status}${r.provider_reference?`<small> · ${esc(r.provider_reference)}</small>`:""}${r.error ? `<small class="muted"> · ${esc(r.error)}</small>` : ""}</td><td>${new Date(r.available_at).toLocaleString(window.raeroLocale?.()||"hu-HU")}</td><td>${r.status==='unknown'&&r.sms_wallet_status==='unknown'?`<button onclick="resolveSmsDelivery(${r.id})">SMS eredményének rendezése</button>`:["failed", "blocked", "unknown", "on_hold"].includes(r.status) ? `<button onclick="retryDelivery(${r.id},${['unknown','on_hold'].includes(r.status)})">Újrapróbálás</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="4">Nincs küldési feladat.</td></tr>'}</tbody></table>`;
   } catch (e) {
     if ($("#delivery-table")) $("#delivery-table").textContent = e.message;
   }
@@ -711,7 +711,7 @@ function paymentsPage() {
                 (i.paymentId === p.id || i.bookingId === p.bookingId) &&
                 ["issued", "issuing", "unknown"].includes(i.status),
             );
-          return `<tr><td><strong>${esc(b?.name || "Ismeretlen")}</strong><small>${b ? new Date(b.start).toLocaleString(window.raeroLocale?.()||"hu-HU") : ""}</small></td><td>${new Date(p.paidAt).toLocaleDateString(window.raeroLocale?.()||"hu-HU")}</td><td><strong>${money(paymentNet(p))}</strong>${p.refundedAmount ? `<small>Visszatérítve: ${money(p.refundedAmount)}</small>` : ""}</td><td>${{ cash: "Készpénz", card: "Bankkártya", transfer: "Átutalás" }[p.method]}<small>${p.status === "void" ? "Érvénytelenítve" : p.status === "refunded" ? "Visszatérítve" : p.source === "stripe" ? "Stripe által igazolva" : "Kézzel rögzítve"}</small></td><td>${invoice ? esc(invoice.number || { issuing: "Folyamatban", unknown: "Ellenőrzendő" }[invoice.status]) + (invoice.status === "unknown" ? `<button onclick="invoiceReconcileForm('${invoice.id}')">Egyeztetés</button>` : "") : p.status === "paid" ? `<button onclick="invoiceForm('${p.id}')">Számla készítése</button>` : "—"}</td><td>${p.source === "manual" && p.status === "paid" ? `<button onclick="voidPayment('${p.id}')">Érvénytelenítés</button>` : ""}</td></tr>`;
+          return `<tr><td><strong>${esc(b?.name || "Ismeretlen")}</strong><small>${b ? new Date(b.start).toLocaleString(window.raeroLocale?.()||"hu-HU") : ""}</small></td><td>${new Date(p.paidAt).toLocaleDateString(window.raeroLocale?.()||"hu-HU")}</td><td><strong>${money(paymentNet(p))}</strong>${p.refundedAmount ? `<small>Visszatérítve: ${money(p.refundedAmount)}</small>` : ""}</td><td>${{ cash: "Készpénz", card: "Bankkártya", transfer: "Átutalás" }[p.method]}<small>${p.status === "void" ? "Érvénytelenítve" : p.status === "refunded" ? "Visszatérítve" : p.source === "stripe" ? "Stripe által igazolva" : p.source === "simplepay" ? "SimplePay által igazolva" : "Kézzel rögzítve"}</small></td><td>${invoice ? esc(invoice.number || { issuing: "Folyamatban", unknown: "Ellenőrzendő" }[invoice.status]) + (invoice.status === "unknown" ? `<button onclick="invoiceReconcileForm('${invoice.id}')">Egyeztetés</button>` : "") : p.status === "paid" ? `<button onclick="invoiceForm('${p.id}')">Számla készítése</button>` : "—"}</td><td>${p.source === "manual" && p.status === "paid" ? `<button onclick="voidPayment('${p.id}')">Érvénytelenítés</button>` : ""}</td></tr>`;
         })
         .join("") ||
       '<tr><td colspan="6">Még nincs rögzített befizetés.</td></tr>'
