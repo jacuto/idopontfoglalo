@@ -29,6 +29,7 @@ class WorkspaceController
             $v=$request->validate(['name'=>'required|string|max:150','phone'=>'nullable|string|max:40','email'=>'nullable|email|max:200']);$v=\App\Services\Contact::apply($v);if(empty($v['phone'])&&empty($v['email']))throw new InvalidArgumentException('Legalább egy telefonszámot vagy emailcímet adj meg.');
             return response()->json($this->store->mutate(function(&$s)use($v){$c=array_replace(['phone'=>'','email'=>''],$v,['id'=>(string)Str::uuid()]);\App\Services\Clients::preventDuplicate($s['clients'],$c);$s['clients'][]=$c;\App\Services\ClientInvitations::queue($s,$c);return $c;}),201);
         }
+        if($path==='/api/subscription/renewal'&&$method==='POST'){$v=$request->validate(['renew'=>'required|boolean','confirmed'=>'accepted']);return response()->json(\App\Services\SubscriptionRenewal::change($v['renew']));}
         if($path==='/api/subscription/plan'&&$method==='POST'){$v=$request->validate(['requestId'=>'required|uuid','plan'=>'required|in:basic,pro','acceptMonthlyFee'=>'accepted']);return response()->json(app(\App\Services\PlanChanges::class)->change($v['requestId'],$v['plan']));}
         if($path==='/api/subscription/calendars'&&$method==='POST'){$v=$request->validate(['requestId'=>'required|uuid','name'=>'required|string|max:150','acceptMonthlyFee'=>'accepted']);return response()->json(app(\App\Services\CalendarAddons::class)->add($v['requestId'],trim($v['name'])));}
         if ($path === "/api/subscription/info" && $method === "GET") {
@@ -49,7 +50,7 @@ class WorkspaceController
                 "billingo_key" => "nullable|string|max:1000",
                 "billingo_block" => "nullable|integer|min:1",
                 "szamlazz_key" => "nullable|string|max:1000",
-                "simplepay_merchant"=>"nullable|alpha_dash|max:100", "simplepay_secret"=>"nullable|string|max:500", "simplepay_environment"=>"nullable|in:sandbox,live",
+                "barion_pos_key"=>"nullable|uuid", "barion_payee"=>"nullable|email|max:200", "barion_environment"=>"nullable|in:sandbox,live", "simplepay_szep_merchant"=>"nullable|alpha_dash|max:100", "simplepay_szep_secret"=>"nullable|string|max:500", "simplepay_szep_environment"=>"nullable|in:sandbox,live", "simplepay_merchant"=>"nullable|alpha_dash|max:100", "simplepay_secret"=>"nullable|string|max:500", "simplepay_environment"=>"nullable|in:sandbox,live",
                 "stripe_key" => "nullable|string|max:1000",
                 "stripe_webhook_secret" => "nullable|string|max:1000",
                 "stripe_price_id" => "nullable|string|max:200",
@@ -76,7 +77,7 @@ class WorkspaceController
                 DB::table("deliveries")->where("provider_id", app(\App\Services\Tenant::class)->id)
                     ->select(
                         "id",
-                        "status",
+                        "status", "payload",
                         "attempts",
                         "available_at",
                         "error",
@@ -85,7 +86,7 @@ class WorkspaceController
                     )
                     ->latest("id")
                     ->limit(100)
-                    ->get()->map(function($row){$row->sms_wallet_status=\App\Services\SmsWallet::item($row->id)?->status;return $row;}),
+                    ->get()->map(function($row){$row=\App\Services\DeliveryDescriptions::for($row,$this->store->read());$row->sms_wallet_status=\App\Services\SmsWallet::item($row->id)?->status;return $row;}),
             );
         }
         if ($path === "/api/deliveries/run" && $method === "POST") {

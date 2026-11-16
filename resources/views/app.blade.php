@@ -7,7 +7,8 @@
     <title>Ráérő — időpontok egyszerűen</title>
     <link rel="stylesheet" href="/style.css?v={{ filemtime(public_path('style.css')) }}" />
     <link rel="stylesheet" href="/showcase.css?v={{ filemtime(public_path('showcase.css')) }}" />
-  </head>
+  <link rel="stylesheet" href="/launch-tools.css?v={{ filemtime(public_path('launch-tools.css')) }}">
+</head>
   <body>
     <header class="visitor-header"><a class="visitor-brand" href="/" aria-label="Ráérő főoldal"><span>◷</span> ráérő.</a><details class="visitor-menu"><summary>Menü <span aria-hidden="true">☰</span></summary><nav aria-label="Felső menü"><a href="/szolgaltato">Szolgáltatóknak</a><a href="/arak">Árak</a><a href="/kapcsolat">Kapcsolat</a><a class="booking-nav" href="/szolgaltatok">Időpontfoglalás</a><a class="visitor-account" href="/fiokom">Saját fiókom</a></nav></details></header>
     <div id="app"></div>
@@ -38,6 +39,8 @@
 <script src="/presentation.js?v={{ filemtime(public_path('presentation.js')) }}" defer></script>
 <script src="/gallery.js?v={{ filemtime(public_path('gallery.js')) }}" defer></script>
 <script src="/commerce.js?v={{ filemtime(public_path('commerce.js')) }}" defer></script>
+<script src="/launch-tools.js?v={{ filemtime(public_path('launch-tools.js')) }}" defer></script>
+<script src="/booking-payments.js?v={{ filemtime(public_path('booking-payments.js')) }}" defer></script>
 <script src="/boot.js?v={{ filemtime(public_path('boot.js')) }}" defer></script>
   </body>
 </html>

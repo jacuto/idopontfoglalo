@@ -35,7 +35,7 @@ final class MarketingCampaigns
      if($job->engine==='brevo'){$account=$gateway->call('GET','account');foreach($account['plan']??[] as $plan)if(($plan['type']??'')==='free'&&isset($plan['credits'])&&(int)$plan['credits']<count($items))throw new MarketingException('A Brevo napi ingyenes keretébe nem fér bele a teljes kampány. Csökkentsd a címzettlistát vagy válassz nagyobb küldési keretet.');}
      $gateway->send($job->remote_id);DB::table('marketing_campaigns')->where('id',$job->id)->update(['status'=>'submitted','submitted_at'=>now(),'error'=>null,'updated_at'=>now()]);$counts['submitted']++;
     }
-   }catch(\Throwable $e){$message=$e instanceof MarketingException?$e->getMessage():'A hírlevélküldő válasza nem igazolható. Ellenőrizd a külső fiókot.';DB::table('marketing_campaigns')->where('id',$job->id)->update(['status'=>'unknown','error'=>mb_substr($message,0,500),'updated_at'=>now()]);$counts['unknown']++;}
+   }catch(\Throwable $e){SystemIssues::capture($e,'newsletter',app(Tenant::class)->id);$message=$e instanceof MarketingException?$e->getMessage():'A hírlevélküldő válasza nem igazolható. Ellenőrizd a külső fiókot.';DB::table('marketing_campaigns')->where('id',$job->id)->update(['status'=>'unknown','error'=>mb_substr($message,0,500),'updated_at'=>now()]);$counts['unknown']++;}
   }
   return $counts;
  }

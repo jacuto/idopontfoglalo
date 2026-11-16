@@ -127,6 +127,7 @@ class Invoices
                         "payment_method" => [
                             "cash" => "cash",
                             "card" => "bankcard",
+                            "szep" => "szep_card",
                             "transfer" => "wire_transfer",
                         ][$payment["method"]],
                         "language" => "hu",
@@ -195,6 +196,7 @@ class Invoices
                         [
                             "cash" => "készpénz",
                             "card" => "bankkártya",
+                            "szep" => "SZÉP kártya",
                             "transfer" => "átutalás",
                         ][$payment["method"]],
                     ) .
@@ -261,7 +263,7 @@ class Invoices
                 }
             });
             return ["ok" => true, "number" => $number];
-        } catch (\Throwable $e) {
+        } catch (\Throwable $e) {SystemIssues::capture($e,'invoice',app(Tenant::class)->id);
             $this->store->mutate(function (&$s) use ($id) {
                 foreach ($s["invoiceRequests"] as &$i) {
                     if ($i["id"] === $id) {

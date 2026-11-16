@@ -316,7 +316,7 @@ class WorkspaceTest extends TestCase
                 "url" => "https://checkout.stripe.com/c/pay/test",
             ]),
         ]);
-        $this->admin();
+        $this->admin();$this->settings(["prepaymentEnabled"=>true]);
         $this->postJson("/api/checkout", ["bookingId" => $b["id"]])->assertOk();
         $event = [
             "id" => "evt_test",

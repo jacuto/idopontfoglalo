@@ -115,6 +115,7 @@ class BookingRules
         } catch (\Exception) {
             throw new InvalidArgumentException("Érvénytelen időpont.");
         }
+        if(!$historical&&!empty($booking['public']))BookingHorizon::guard($state,$start);
         if (!$historical && $start->getTimestamp() < time() - 60) {
             throw new InvalidArgumentException(
                 "Múltbeli időpontra nem lehet foglalni.",

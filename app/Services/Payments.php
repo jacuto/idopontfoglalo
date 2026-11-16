@@ -10,95 +10,19 @@ class Payments
         private Connections $connections,
         private SalonStore $store,
     ) {}
-    public static function ready(array $s):bool{$c=app(Connections::class)->all();return ($s["settings"]["paymentProvider"]??"stripe")==="simplepay"?(!empty($c["simplepay_merchant"])&&!empty($c["simplepay_secret"])):!empty($c["stripe_key"]);}
-    public function checkout(string $bookingId): array
-    {
-        $s = $this->store->read();
-        if(($s["settings"]["paymentProvider"]??"stripe")==="simplepay")return app(SimplePay::class)->checkout($bookingId);
-        $b = collect($s["bookings"])->firstWhere("id", $bookingId);
-        if (!$b) {
-            abort(404);
-        }
-        if (!in_array($b["status"], ["pending", "confirmed"], true)) {
-            throw new InvalidArgumentException("Ez a foglalás nem fizethető.");
-        }
-        $paid = collect($s["payments"])
-            ->where("bookingId", $b["id"])
-            ->where("status", "paid")
-            ->sum(fn($p) => $p["amount"] - ($p["refundedAmount"] ?? 0));
-        $amount =
-            \App\Services\Offers::total($b) - $paid;
-        if ($amount <= 0) {
-            throw new InvalidArgumentException(
-                "Nincs fennmaradó fizetendő összeg.",
-            );
-        }
-        $key = $this->connections->all()["stripe_key"];
-        if (!$key) {
-            throw new InvalidArgumentException(
-                "Előbb add meg a Stripe titkos API-kulcsot.",
-            );
-        }
-        $reference = hash(
-            "sha256",
-            $b["id"] . "|" . $amount . "|" . now()->format("Y-m-d"),
-        );
-        $base = rtrim(config("app.url"), "/");
-        $response = Http::timeout(20)
-            ->withToken($key)
-            ->withHeaders(["Idempotency-Key" => $reference])
-            ->asForm()
-            ->post("https://api.stripe.com/v1/checkout/sessions", [
-                "mode" => "payment",
-                "line_items" => [
-                    [
-                        "price_data" => [
-                            "currency" => "huf",
-                            "product_data" => [
-                                "name" =>
-                                    "Szolgáltatások — " .
-                                    $s["settings"]["name"],
-                            ],
-                            "unit_amount" => $amount * 100,
-                        ],
-                        "quantity" => 1,
-                    ],
-                ],
-                "success_url" =>
-                    $base .
-                    "/modositas?provider=" . app(Tenant::class)->id . "&token=" .
-                    $b["token"] .
-                    "&payment=success",
-                "cancel_url" => $base . "/modositas?provider=" . app(Tenant::class)->id . "&token=" . $b["token"],
-                "client_reference_id" => $b["id"],
-                "metadata" => ["booking_id" => $b["id"]],
-                "billing_address_collection" => "required",
-                ...!empty($b["email"]) ? ["customer_email" => $b["email"]] : [],
-            ]);
-        if (!$response->successful()) {
-            throw new InvalidArgumentException(
-                "A Stripe nem hozta létre a fizetési oldalt. Ellenőrizd a kulcsot és a Stripe-fiókot.",
-            );
-        }
-        $session = $response->json();
-        if (
-            empty($session["id"]) ||
-            !str_starts_with(
-                $session["url"] ?? "",
-                "https://checkout.stripe.com/",
-            )
-        ) {
-            throw new InvalidArgumentException("Érvénytelen Stripe-válasz.");
-        }
-        $this->store->mutate(function (&$s) use ($session, $b, $amount) {
-            $s["checkouts"][$session["id"]] = [
-                "bookingId" => $b["id"],
-                "amount" => $amount,
-                "type" => "booking",
-                "createdAt" => now()->toISOString(),
-            ];
-        });
-        return ["url" => $session["url"]];
+    public static function cardReady(array $s):bool{$c=app(Connections::class)->all();return match($s['settings']['paymentProvider']??'stripe'){'simplepay'=>!empty($c['simplepay_merchant'])&&!empty($c['simplepay_secret']),'barion'=>!empty($c['barion_pos_key'])&&!empty($c['barion_payee']),default=>!empty($c['stripe_key'])&&!empty($c['stripe_webhook_secret'])};}
+    public static function szepReady():bool{$c=app(Connections::class)->all();return !empty($c['simplepay_szep_merchant'])&&!empty($c['simplepay_szep_secret']);}
+    public static function ready(array $s):bool{return BookingPrepayments::enabled($s)&&(self::cardReady($s)||self::szepReady());}
+    public function checkout(string $bookingId,string $mode="full",string $rail="card"):array {
+        $s=$this->store->read();abort_unless(in_array($rail,['card','szep'],true),422);if($rail==='szep')return app(SimplePay::class)->checkout($bookingId,$mode,true);abort_unless(self::cardReady($s),422,'A szolgáltató bankkártyás kapcsolata még nincs teljesen beállítva.');if(($s['settings']['paymentProvider']??'stripe')==='simplepay')return app(SimplePay::class)->checkout($bookingId,$mode);if(($s['settings']['paymentProvider']??'stripe')==='barion')return app(Barion::class)->checkout($bookingId,$mode);
+        $key=$this->connections->all()['stripe_key']??null;abort_unless($key,422,'A szolgáltató Stripe-kapcsolata nincs beállítva.');
+        $order=$this->store->mutate(function(&$s)use($bookingId,$mode){$b=collect($s['bookings'])->firstWhere('id',$bookingId);abort_unless($b,404);abort_unless(in_array($b['status'],['pending','confirmed'],true),422,'Ez a foglalás nem fizethető.');$amount=BookingPrepayments::amount($s,$b,$mode);
+            foreach($s['checkouts'] as $old)if(($old['type']??'')==='booking'&&$old['bookingId']===$bookingId&&($old['status']??'pending')!=='paid'&&(($old['status']??'')==='unknown'||\Carbon\CarbonImmutable::parse($old['createdAt'])->gt(now()->subMinutes(35)))){if(($old['gateway']??'stripe')==='stripe'&&$old['amount']===$amount&&($old['status']??'pending')==='pending'&&!empty($old['url']))return ['reuse'=>$old['url']];if(!in_array($old['status']??'pending',['paid','failed'],true))throw new InvalidArgumentException('Ehhez a foglaláshoz már indult fizetés. Előbb ellenőrizd vagy fejezd be a korábbi tranzakciót.');}
+            $ref='stripe-start-'.Str::uuid();$s['checkouts'][$ref]=['type'=>'booking','gateway'=>'stripe','bookingId'=>$bookingId,'amount'=>$amount,'status'=>'creating','createdAt'=>now()->toISOString()];return ['ref'=>$ref,'amount'=>$amount,'booking'=>$b,'business'=>$s['settings']['name']];
+        });if(isset($order['reuse']))return ['url'=>$order['reuse']];$b=$order['booking'];$base=rtrim(config('app.url'),'/').'/modositas?provider='.app(Tenant::class)->id.'&token='.$b['token'];
+        try{$response=Http::timeout(20)->withToken($key)->withHeaders(['Idempotency-Key'=>$order['ref']])->asForm()->post('https://api.stripe.com/v1/checkout/sessions',['mode'=>'payment','expires_at'=>now()->addMinutes(30)->timestamp,'line_items'=>[['price_data'=>['currency'=>'huf','product_data'=>['name'=>($mode==='deposit'?'Előleg – ':'Szolgáltatások – ').$order['business']],'unit_amount'=>$order['amount']*100],'quantity'=>1]],'success_url'=>$base.'&payment=success','cancel_url'=>$base,'client_reference_id'=>$b['id'],'metadata'=>['booking_id'=>$b['id']],'billing_address_collection'=>'required',...!empty($b['email'])?['customer_email'=>$b['email']]:[]])->throw();$session=$response->json();abort_unless(!empty($session['id'])&&parse_url($session['url']??'',PHP_URL_HOST)==='checkout.stripe.com'&&parse_url($session['url']??'',PHP_URL_SCHEME)==='https',422,'Érvénytelen Stripe-válasz.');
+            $this->store->mutate(function(&$s)use($session,$order){$s['checkouts'][$session['id']]=array_replace($s['checkouts'][$order['ref']],['status'=>'pending','url'=>$session['url']]);unset($s['checkouts'][$order['ref']]);});return ['url'=>$session['url']];
+        }catch(\Throwable $e){SystemIssues::capture($e,'stripe',app(Tenant::class)->id);$this->store->mutate(function(&$s)use($order){if(isset($s['checkouts'][$order['ref']]))$s['checkouts'][$order['ref']]['status']='unknown';});throw new InvalidArgumentException('A fizetés indítása nem igazolható. Ellenőrizd a Stripe-fiókot, mielőtt új fizetést indítasz.');}
     }
     public function subscription(): array
     {
@@ -232,9 +156,10 @@ class Payments
                     return;
                 }
                 if ($checkout["type"] === "subscription" && $platform && in_array($object["payment_status"] ?? "", ["paid","no_payment_required"],true)) {
+                    if(!empty($s['subscription']['cancelAt'])&&\Carbon\CarbonImmutable::parse($s['subscription']['cancelAt'])->lte(now()))$s['subscription']['billingRestartAt']=now()->toISOString();
                     $s["subscription"] = array_replace($s["subscription"], [
                         "id" => $object["subscription"],
-                        "customer" => $object["customer"],
+                        "customer" => $object["customer"], "cancelAt"=>null,"renewalEnabled"=>true,
                         "status" => ($event["created"] ?? 0) >= ($s["subscription"]["lastEventAt"] ?? 0) ? (($object["payment_status"]??"")==="no_payment_required"?"trialing":"active") : ($s["subscription"]["status"] ?? "active"),
                         "lastEventAt" => max($event["created"] ?? 0, $s["subscription"]["lastEventAt"] ?? 0),
                     ]);
@@ -242,7 +167,7 @@ class Payments
                 }
                 if (
                     $platform ||
-                    $checkout["type"] !== "booking" ||
+                    $checkout["type"] !== "booking" || ($checkout["gateway"]??"stripe")!=="stripe" ||
                     ($object["payment_status"] ?? "") !== "paid" ||
                     ($object["currency"] ?? "") !== "huf" ||
                     ($object["amount_total"] ?? 0) !== $checkout["amount"] * 100
@@ -254,6 +179,7 @@ class Payments
                         return;
                     }
                 }
+                $s['checkouts'][$object['id']]['status']='paid';
                 $details = $object["customer_details"] ?? [];
                 $address = $details["address"] ?? [];
                 $s["payments"][] = [
@@ -329,6 +255,8 @@ class Payments
             ) {
                 if (($event["created"] ?? 0) >= ($s["subscription"]["lastEventAt"] ?? 0)) {
                     $s["subscription"]["status"] = $object["status"];
+                    $cancel=$object['cancel_at']??$object['current_period_end']??$object['items']['data'][0]['current_period_end']??null;
+                    if(!empty($object['cancel_at_period_end'])&&$cancel){$s['subscription']['cancelAt']=\Carbon\CarbonImmutable::createFromTimestamp($cancel)->toISOString();$s['subscription']['renewalEnabled']=false;}elseif(($object['status']??'')==='canceled'){$s['subscription']['cancelAt']=\Carbon\CarbonImmutable::createFromTimestamp($object['ended_at']??time())->toISOString();$s['subscription']['renewalEnabled']=false;}else{$s['subscription']['cancelAt']=null;$s['subscription']['renewalEnabled']=true;}
                     $s["subscription"]["lastEventAt"] = $event["created"] ?? time();
                 }
             }

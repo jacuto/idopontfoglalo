@@ -384,6 +384,7 @@ function serviceForm(id) {
       duration: Number(f.get("duration")),
       price: Number(f.get("price")),
       staff: f.getAll("staff"),
+      prepaymentPolicy:f.get("prepaymentPolicy")||old.prepaymentPolicy||"inherit",depositType:f.get("depositType")||old.depositType||"percent",depositValue:Number(f.get("depositValue")||old.depositValue||30),
       automatic: f.has("automatic"), bookingMode:state.settings.advancedBookingEnabled?(f.get("bookingMode")||"individual"):(old.bookingMode||"individual"),capacity:state.settings.advancedBookingEnabled?Number(f.get("capacity")||1):(old.capacity||1),
     };
     if (!state.settings.servicePhasesEnabled) { if(old.phases)v.phases=old.phases; else delete v.phases; }
@@ -589,13 +590,13 @@ function settingsPage() {
       v = Object.fromEntries(f);
     for (const k of [
       "confirmation",
-      "guestInvitationSmsEnabled", "autoInvoice", "skipUnnamedWarning", "reviewRequestsEnabled", "advancedBookingEnabled", "servicePhasesEnabled", "couponsEnabled", "passesEnabled",
+      "guestInvitationSmsEnabled", "waitlistEnabled", "autoInvoice", "skipUnnamedWarning", "reviewRequestsEnabled", "advancedBookingEnabled", "servicePhasesEnabled", "couponsEnabled", "passesEnabled",
     ])
       v[k] = e.target.elements[k] ? f.has(k) : !!state.settings[k];
     v.notificationRules=notificationChoices(state.settings);
     e.target.querySelectorAll('[data-notification-rule]').forEach(input=>{const [audience,event,channel]=input.dataset.notificationRule.split('.');v.notificationRules[audience][event][channel]=input.checked;});
     v.reminderGuest=v.notificationRules.guest.reminder.email||v.notificationRules.guest.reminder.sms;
-    v.reminder = Number(v.reminder ?? state.settings.reminder);
+    v.reminder = Number(v.reminder ?? state.settings.reminder);if(v.bookingHorizonMonths)v.bookingHorizonMonths=Number(v.bookingHorizonMonths);
     v.reviewRequestDelayHours=Number(v.reviewRequestDelayHours||24);
     v.open = timeMinutes(v.openingTime) / 60;
     v.close = timeMinutes(v.closingTime) / 60;
@@ -711,11 +712,11 @@ function paymentsPage() {
                 (i.paymentId === p.id || i.bookingId === p.bookingId) &&
                 ["issued", "issuing", "unknown"].includes(i.status),
             );
-          return `<tr><td><strong>${esc(b?.name || "Ismeretlen")}</strong><small>${b ? new Date(b.start).toLocaleString(window.raeroLocale?.()||"hu-HU") : ""}</small></td><td>${new Date(p.paidAt).toLocaleDateString(window.raeroLocale?.()||"hu-HU")}</td><td><strong>${money(paymentNet(p))}</strong>${p.refundedAmount ? `<small>Visszatérítve: ${money(p.refundedAmount)}</small>` : ""}</td><td>${{ cash: "Készpénz", card: "Bankkártya", transfer: "Átutalás" }[p.method]}<small>${p.status === "void" ? "Érvénytelenítve" : p.status === "refunded" ? "Visszatérítve" : p.source === "stripe" ? "Stripe által igazolva" : p.source === "simplepay" ? "SimplePay által igazolva" : "Kézzel rögzítve"}</small></td><td>${invoice ? esc(invoice.number || { issuing: "Folyamatban", unknown: "Ellenőrzendő" }[invoice.status]) + (invoice.status === "unknown" ? `<button onclick="invoiceReconcileForm('${invoice.id}')">Egyeztetés</button>` : "") : p.status === "paid" ? `<button onclick="invoiceForm('${p.id}')">Számla készítése</button>` : "—"}</td><td>${p.source === "manual" && p.status === "paid" ? `<button onclick="voidPayment('${p.id}')">Érvénytelenítés</button>` : ""}</td></tr>`;
+          return `<tr><td><strong>${esc(b?.name || "Ismeretlen")}</strong><small>${b ? new Date(b.start).toLocaleString(window.raeroLocale?.()||"hu-HU") : ""}</small></td><td>${new Date(p.paidAt).toLocaleDateString(window.raeroLocale?.()||"hu-HU")}</td><td><strong>${money(paymentNet(p))}</strong>${p.refundedAmount ? `<small>Visszatérítve: ${money(p.refundedAmount)}</small>` : ""}</td><td>${{ cash: "Készpénz", card: "Bankkártya", szep: "SZÉP-kártya", transfer: "Átutalás" }[p.method]}<small>${p.status === "void" ? "Érvénytelenítve" : p.status === "refunded" ? "Visszatérítve" : p.source === "stripe" ? "Stripe által igazolva" : p.source === "simplepay" ? "SimplePay által igazolva" : p.source === "barion" ? "Barion által igazolva" : "Kézzel rögzítve"}</small></td><td>${invoice ? esc(invoice.number || { issuing: "Folyamatban", unknown: "Ellenőrzendő" }[invoice.status]) + (invoice.status === "unknown" ? `<button onclick="invoiceReconcileForm('${invoice.id}')">Egyeztetés</button>` : "") : p.status === "paid" ? `<button onclick="invoiceForm('${p.id}')">Számla készítése</button>` : "—"}</td><td>${p.source === "manual" && p.status === "paid" ? `<button onclick="voidPayment('${p.id}')">Érvénytelenítés</button>` : ""}</td></tr>`;
         })
         .join("") ||
       '<tr><td colspan="6">Még nincs rögzített befizetés.</td></tr>'
-    }</tbody></table></div><div class="notice">Kézi rögzítéskor a beérkezést te igazolod. A Stripe-befizetést csak ellenőrzött webhook írja jóvá. A számlázás külön művelet.</div>`;
+    }</tbody></table></div><div class="notice">Kézi rögzítéskor a beérkezést te igazolod. Az online befizetést csak hiteles Stripe/SimplePay szerverértesítés írja jóvá. A számlázás külön művelet.</div>`;
 }
 function paymentForm(bookingId) {
   const choices = state.bookings.filter(
@@ -836,7 +837,7 @@ function reportsPage() {
   }
   const entries = [...parts].sort((a, b) => b[1] - a[1]);
   const colors = [
-    "#176b56",
+    "#315ee8",
     "#5b56d6",
     "#d38a17",
     "#0e8ea1",

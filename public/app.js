@@ -204,7 +204,7 @@ async function submitBooking(e) {
       }
       trackBooking();
       $("#public-form").innerHTML =
-        `<div class="success">${remembered}<h2>${b.status === "pending" ? "Foglalási kérésed megérkezett!" : "Az időpontod megerősítve!"}</h2><p>${b.status === "pending" ? "A szalon jóváhagyására vár." : "Várunk szeretettel!"}</p><p>Mentsd el a módosítási hivatkozásod. A szalon beállításai alapján e-mailes értesítőt is kaphatsz:</p><a href="/modositas?provider=${providerId()}&token=${b.token}">Foglalásom kezelése →</a></div>`;
+        `<div class="success">${remembered}<h2>${b.status === "pending" ? "Foglalási kérésed megérkezett!" : "Az időpontod megerősítve!"}</h2><p>${b.awaitingPayment ? "A foglalás a kért előrefizetés igazolásáig függőben marad. A fizetéshez nyisd meg az alábbi hivatkozást." : b.status === "pending" ? "A szalon jóváhagyására vár." : "Várunk szeretettel!"}</p><p>Mentsd el a módosítási hivatkozásod. A szalon beállításai alapján e-mailes értesítőt is kaphatsz:</p><a href="/modositas?provider=${providerId()}&token=${b.token}" class="${state.prepaymentAvailable?'primary':''}">${state.prepaymentAvailable?'Előrefizetés / előleg és foglalás kezelése →':'Foglalásom kezelése →'}</a></div>`;
     } else {
       $("#modal").close();
       await refresh();

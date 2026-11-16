@@ -21,7 +21,7 @@ final class SmsWallet
  }
  public static function info(int $provider):array{
   $w=DB::table('sms_wallets')->where('provider_id',$provider)->first();$balance=(int)($w->balance??0);$reserved=(int)($w->reserved??0);
-  return ['balance'=>$balance,'reserved'=>$reserved,'available'=>$balance-$reserved,'price'=>self::price(),'packages'=>[2000,5000,10000],'blocked'=>DB::table('deliveries')->where('provider_id',$provider)->where('status','waiting_balance')->count(),'ledger'=>DB::table('sms_ledger')->where('provider_id',$provider)->latest('id')->limit(100)->get(),'topups'=>DB::table('sms_topups')->where('provider_id',$provider)->select('id','amount','refunded','status','invoice_number','invoice_issued_on','created_at')->latest('created_at')->limit(50)->get()];
+  return ['balance'=>$balance,'reserved'=>$reserved,'available'=>$balance-$reserved,'price'=>self::price(),'packages'=>[3000,5000,10000],'minimumTopup'=>3000,'transfer'=>SmsTopups::bank(),'blocked'=>DB::table('deliveries')->where('provider_id',$provider)->where('status','waiting_balance')->count(),'ledger'=>DB::table('sms_ledger')->where('provider_id',$provider)->latest('id')->limit(100)->get(),'topups'=>DB::table('sms_topups')->where('provider_id',$provider)->select('id','amount','refunded','status','invoice_number','invoice_issued_on','created_at')->latest('created_at')->limit(50)->get()];
  }
  /** Reserve every due SMS for this provider together, before any can leave the process. */
  public static function prepare(int $provider):array{

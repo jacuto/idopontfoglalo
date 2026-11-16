@@ -102,7 +102,7 @@ class SalonController
                 \App\Services\AttemptLimit::check("checkout:".$request->ip(),10);
                 RateLimiter::hit("checkout:" . $request->ip(), 60);
                 return response()->json(
-                    app(\App\Services\Payments::class)->checkout($b["id"]),
+                    app(\App\Services\Payments::class)->checkout($b["id"],$request->validate(["mode"=>"sometimes|in:full,deposit","rail"=>"sometimes|in:card,szep"])["mode"]??"full",$request->input("rail","card")),
                 );
             }
             if ($path === "/api/public" && $method === "GET") {
@@ -120,9 +120,10 @@ class SalonController
                         array_flip([
                             "name",
                             "businessMode",
-                            "primaryStaffId",
+                            "primaryStaffId", "bookingHorizonMode", "bookingHorizonDate", "bookingHorizonMonths", "waitlistEnabled", "prepaymentEnabled", "prepaymentMode", "depositType", "depositValue", "prepaymentTerms",
                         ]),
                     ),
+                    "prepaymentAvailable"=>\App\Services\BookingPrepayments::enabled($s),
                     "services" => array_values(
                         array_filter(
                             $s["services"],
@@ -266,6 +267,7 @@ class SalonController
                             }
                             if(in_array($b['status'],['cancelled','rejected'],true)&&in_array($next['status'],['pending','confirmed'],true)&&!empty($b['pricing']['code']))app(\App\Services\Offers::class)->quote($s,$next,$b['pricing']['code']);
                             app(\App\Services\Offers::class)->transitionPass($s, $b, $next);
+                            if(($data['status']??'')==='confirmed'&&!empty($b['awaitingPayment'])&&\App\Services\BookingPrepayments::info($s,$b)['requiredDue']>0)throw new InvalidArgumentException('A kötelező előrefizetés még nincs rendezve. Előbb rögzítsd az igazolt befizetést.');
                             $acceptedNow = $b["status"] !== "confirmed" && $next["status"] === "confirmed";
                             $b = $next;
                             app(\App\Services\Notifications::class)->enqueue(
@@ -306,7 +308,7 @@ class SalonController
                         if (hash_equals($b["token"], $token)) {
                             return response()->json([
                                 "booking" => $b,
-                                "paymentReady" => \App\Services\Payments::ready($s),
+                                "paymentReady" => \App\Services\Payments::ready($s),"prepayment"=>\App\Services\BookingPrepayments::info($s,$b),
                                 "balance" => max(
                                     0,
                                     \App\Services\Offers::total($b) -
@@ -455,7 +457,7 @@ class SalonController
                     "settings.billingZip" => "nullable|string|max:20",
                     "settings.billingCity" => "nullable|string|max:100",
                     "settings.billingAddress" => "nullable|string|max:250",
-                    "settings.paymentProvider" => "sometimes|in:stripe,simplepay",
+                    "settings.paymentProvider" => "sometimes|in:stripe,simplepay,barion",
                     "settings.szamlazzPrefix" => "nullable|string|max:10",
                     "settings.szamlazzBank" => "nullable|string|max:100",
                     "settings.szamlazzAccount" => "nullable|string|max:50",
@@ -463,6 +465,8 @@ class SalonController
                     "settings.invoiceProvider" =>
                         "sometimes|in:none,billingo,szamlazz",
                     "settings.autoInvoice" => "sometimes|boolean",
+                    "settings.bookingHorizonMode"=>"sometimes|in:none,date,months","settings.bookingHorizonDate"=>"nullable|date_format:Y-m-d","settings.bookingHorizonMonths"=>"sometimes|integer|between:1,36",
+                    "settings.waitlistEnabled"=>"sometimes|boolean","settings.prepaymentEnabled"=>"sometimes|boolean", "settings.prepaymentMode"=>"sometimes|in:optional,full,deposit", "settings.depositType"=>"sometimes|in:percent,fixed", "settings.depositValue"=>"sometimes|integer|min:1|max:1000000", "settings.prepaymentBank"=>"nullable|string|max:100", "settings.prepaymentAccountName"=>"nullable|string|max:150", "settings.prepaymentAccount"=>"nullable|string|max:100", "settings.prepaymentTerms"=>"nullable|string|max:1500",
                     "settings.invoiceVat" => "sometimes|in:AAM,27%,18%,5%,0%",
                     "settings.googleAnalyticsId" => [
                         "nullable",
@@ -512,6 +516,7 @@ class SalonController
                     "services.*.duration" => "required|integer|between:5,1440",
                     "services.*.staff" => "required|array|min:1",
                     "services.*.staff.*" => "required|string",
+                    "services.*.prepaymentPolicy"=>"sometimes|in:inherit,none,full,deposit","services.*.depositType"=>"sometimes|in:percent,fixed","services.*.depositValue"=>"sometimes|integer|between:1,1000000",
                     "services.*.automatic" => "sometimes|boolean", "services.*.bookingMode"=>"sometimes|in:individual,parallel,group", "services.*.capacity"=>"sometimes|integer|between:1,100",
                     "services.*.phases" => "sometimes|array|size:3",
                     "services.*.phases.*" => "required|integer|min:0",
@@ -568,6 +573,8 @@ class SalonController
                     }
                     if(isset($data['settings']['providerPhone']))$data['settings']['providerPhone']=\App\Services\Contact::phone($data['settings']['providerPhone']);
                     if(!empty($data['settings']['notificationRules']['guest']['reminder']['email'])||!empty($data['settings']['notificationRules']['guest']['reminder']['sms'])||!empty($data['settings']['reminderGuest'])||!empty($data['settings']['autoInvoice'])||($data['settings']['businessMode']??'')==='team')\App\Services\PaidFeatures::require($s);
+                    \App\Services\BookingPrepayments::validateConfig(array_replace($s,['settings'=>array_replace($s['settings'],$data['settings']??[]),'services'=>$data['services']??$s['services']]));
+                    $plannedSettings=array_replace($s['settings'],$data['settings']??[]);if(($plannedSettings['bookingHorizonMode']??'none')==='date'&&empty($plannedSettings['bookingHorizonDate']))throw new InvalidArgumentException('Add meg az online foglalás utolsó napját.');
                     if(isset($data['services']))\App\Services\ProfessionOptions::validateCatalog($s,$data['services'],array_replace($s['settings'],$data['settings']??[]));
                     if(isset($data['services']))foreach($data['services'] as $service){if(($service['bookingMode']??'individual')!=='group'&&collect($s['groupSessions'])->contains(fn($g)=>$g['serviceId']===$service['id']&&empty($g['cancelled'])&&CarbonImmutable::parse($g['start'])->isFuture()))throw new InvalidArgumentException('Előbb mondd le a szolgáltatás meghirdetett csoportos óráit.');if(($service['bookingMode']??'individual')==='group'&&!empty($service['phases']))throw new InvalidArgumentException('Csoportos órához ne adj meg hatóidős szakaszokat.');}
                     if(!empty($data['settings']['defaultServiceId'])){ $catalog=$data['services']??$s['services'];if(!collect($catalog)->contains(fn($v)=>$v['id']===$data['settings']['defaultServiceId']&&empty($v['archived'])&&($v['bookingMode']??'individual')!=='group'))throw new InvalidArgumentException('Alapértelmezettnek aktív, nem csoportos szolgáltatást válassz.');}
@@ -600,6 +607,7 @@ class SalonController
                     }
                     $notificationChanged = false;
                     if (isset($data["settings"])) {
+                        $combined=array_replace($s['settings'],$data['settings']);if(($combined['depositType']??'percent')==='percent'&&(int)($combined['depositValue']??30)>100)throw new InvalidArgumentException('A százalékos előleg legfeljebb 100% lehet.');
                         foreach (
                             [
                                 "reminder",
@@ -765,6 +773,7 @@ class SalonController
                         : "confirmed";
                     $b["pricing"] = app(\App\Services\Offers::class)->quote($s, $b, $data["coupon"] ?? null);
                     app(\App\Services\Offers::class)->reservePass($s, $b, $data["passId"] ?? null, !$b["public"]);
+                    \App\Services\BookingPrepayments::attach($s,$b);
                     $s["bookings"][] = $b;
                     if((!$b['public']||!empty($s['settings']['guestInvitationSmsEnabled']))&&!empty($b['clientId'])){ $client=collect($s['clients'])->firstWhere('id',$b['clientId']);if($client)\App\Services\ClientInvitations::queue($s,$client);}
                     app(\App\Services\Notifications::class)->enqueue(
@@ -780,10 +789,11 @@ class SalonController
         $today=CarbonImmutable::now('Europe/Budapest')->startOfDay();$group=collect($s['services'])->contains(fn($v)=>in_array($v['id'],$ids,true)&&($v['bookingMode']??'individual')==='group');
         $dates=$group?array_values(array_unique(array_map(fn($g)=>CarbonImmutable::parse($g['start'])->setTimezone('Europe/Budapest')->format('Y-m-d'),array_filter($s['groupSessions'],fn($g)=>!\App\Services\GroupMinimum::unavailable($g,$s)&&in_array($g['serviceId'],$ids,true)&&CarbonImmutable::parse($g['start'])->isFuture())))):array_map(fn($d)=>$today->addDays($d)->format('Y-m-d'),range(0,365));sort($dates);
         $s['_googleBusy']=app(\App\Services\GoogleCalendar::class)->busy($s,(int)$request->session()->get('guest_id',0));
+        $horizon=\App\Services\BookingHorizon::end($s);if(!$request->session()->get('admin')||$request->boolean('public'))$dates=array_values(array_filter($dates,fn($d)=>!$horizon||$d<=$horizon->format('Y-m-d')));
         foreach($dates as $date){[$open,$close]=\App\Services\Availability::hours($s,$date);if($open===null)continue;if(!$group){$free=array_filter($eligible,fn($p)=>!array_filter(\App\Services\Availability::blocked($s,$date,$p['id']),fn($range)=>$range[0]<=$open&&$range[1]>=$close));if(!$free)continue;}$probe=$request->duplicate(array_replace($request->query->all(),['date'=>$date]));$slots=$this->slots($probe,$s);if($slots)return ['date'=>$date,'slots'=>$slots];}
         return ['date'=>null,'slots'=>[],'searchedDays'=>$group?null:366];
     }
-    private function slots(Request $request,?array $cached=null): array
+    public function slots(Request $request,?array $cached=null): array
     {
         $date = $request->query("date");
         $ids = array_filter(

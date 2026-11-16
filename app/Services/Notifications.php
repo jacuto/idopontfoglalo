@@ -83,7 +83,7 @@ class Notifications
     /** Build the same immutable SMS used for both the preflight and actual send. */
     public function smsContent(array $p,array $s):?array
     {
-        if(($p['kind']??'')==='guest_invite')return ClientInvitations::smsContent($p['invitationId'],$s);
+        if(($p['kind']??'')==='guest_invite'){$row=DB::table('guest_invitations')->find($p['invitationId']);if(!$row||(!empty($p['tokenHash'])&&!hash_equals($row->token_hash,$p['tokenHash'])))return null;$data=json_decode(Crypt::decryptString($row->payload),true);if(!empty($data['manual'])&&empty($p['tokenHash']))return null;return ClientInvitations::smsContent($p['invitationId'],$s);}
         if(($p['kind']??'')==='group_notice'){
             $g=collect($s['groupSessions'])->firstWhere('id',$p['groupId']);
             if(!$g||empty($g['cancelled'])||(isset($s['settings']['notificationRules'])&&!NotificationPreferences::enabled($s['settings'],'provider','group_missed','sms')))return null;
@@ -95,6 +95,7 @@ class Notifications
         if($event==='reminder'&&(!PaidFeatures::enabled($s)||$b['status']!=='confirmed'||CarbonImmutable::parse($b['start'])->isPast()||($p['settingsVersion']??1)!==($s['settings']['notificationVersion']??1)))return null;
         $labels=['created'=>'Új foglalás','confirmed'=>'Foglalás elfogadva','updated'=>'Foglalás módosítva','cancelled'=>'Foglalás lemondva','group_missed'=>'Csoportos óra elmarad','reminder'=>'Közelgő időpont','no_show'=>'Nem jelent meg'];
         $statuses=['pending'=>'Jóváhagyásra vár','confirmed'=>'Megerősítve','cancelled'=>'Lemondva','rejected'=>'Elutasítva','no_show'=>'Nem jelent meg'];
+        $statuses['pending']=!empty($b['awaitingPayment'])?'Előrefizetésre vár':'Jóváhagyásra vár';
         $manage=rtrim(config('app.url'),'/').($p['audience']==='guest'?'/modositas?provider='.app(Tenant::class)->id.'&token='.$b['token']:'/?provider='.app(Tenant::class)->id);
         $text=mb_strimwidth($s['settings']['name'],0,40,'…').' · '.CarbonImmutable::parse($b['start'])->setTimezone('Europe/Budapest')->format('Y.m.d. H:i').' · '.($labels[$event]??$event).($event==='created'?' · '.($statuses[$b['status']]??$b['status']):'')."\n".($p['audience']==='provider'?mb_strimwidth($b['name'],0,25,'…').' · ':'').mb_strimwidth(implode(' + ',array_column($b['serviceSnapshot'],'name')),0,35,'…')."\n".$manage;
         return ['recipient'=>$p['recipient'],'text'=>$text];
@@ -140,6 +141,7 @@ class Notifications
                 $p = json_decode(Crypt::decryptString($job->payload), true);
                 $previousTenant = app(Tenant::class)->id;
                 app(Tenant::class)->id = (int) $job->provider_id;
+                if(in_array($p['kind']??'',['waitlist_verify','waitlist_available'],true)){$status=Waitlist::deliver($p['entryId'],$p['kind']);$this->finish($job->id,$status,$status==='blocked'?['available_at'=>now()->addMinutes(5),'error'=>empty(app(SalonStore::class)->read()['settings']['waitlistEnabled'])?'A várólista ki van kapcsolva. A küldés szünetel.':'A várólistás e-mail a központi levelezés beállítására vár.']:[]);$counts[$status]++;continue;}
                 if (($p['kind'] ?? '') === 'platform_message') {
                     if (!app(Newsletters::class)->ready()) { $this->finish($job->id, 'blocked', ['error' => 'Hiányzó központi SMTP-kapcsolat.', 'available_at' => now()->addMinutes(5)]); $counts['blocked']++; continue; }
                     $url = rtrim(config('app.url'), '/') . ($p['platformRecipient'] ? '/foadmin' : ($p['recipientType'] === 'guest' ? '/uzenetek' : '/')) . '?provider=' . ($p['recipientType'] === 'provider' ? $p['recipientId'] : 1) . '&platformMessages=1';
@@ -151,6 +153,7 @@ class Notifications
                 if(($p['kind']??'')==='provider_reset'){$status=ProviderPasswords::deliver($p['tokenId']);$this->finish($job->id,$status,$status==='blocked'?['error'=>'Hiányzó központi SMTP-kapcsolat.','available_at'=>now()->addMinutes(5)]:[]);$counts[$status]++;continue;}
                 if(($p['kind']??'')==='guest_auth'){$status=GuestPasswords::deliver($p['tokenId']);$this->finish($job->id,$status,$status==='blocked'?['error'=>'Hiányzó központi SMTP-kapcsolat.','available_at'=>now()->addMinutes(5)]:[]);$counts[$status]++;continue;}
                 $s = app(SalonStore::class)->read();
+                if(($p['kind']??'')==='guest_invite'){$invite=DB::table('guest_invitations')->find($p['invitationId']);$data=$invite?json_decode(Crypt::decryptString($invite->payload),true):[];if(!$invite||(!empty($p['tokenHash'])&&!hash_equals($invite->token_hash,$p['tokenHash']))||(!empty($data['manual'])&&empty($p['tokenHash']))){$this->finish($job->id,'skipped');$counts['skipped']++;continue;}}
                 if(is_array($p)&&SmsWallet::isSms($p)){
                     $item=SmsWallet::item($job->id);
                     if(!$item||$item->status!=='reserved'){$this->finish($job->id,'waiting_balance',['error'=>'Az SMS a teljes csoport fedezetére vár.']);$counts['blocked']++;continue;}
@@ -175,7 +178,7 @@ class Notifications
                     if (!$message) { $this->finish($job->id, 'skipped'); $counts['skipped']++; continue; }
                     if (!$this->connections->mailReady()) { $this->finish($job->id, 'blocked', ['error' => 'Hiányzó küldőkapcsolat.', 'available_at' => now()->addMinutes(5)]); $counts['blocked']++; continue; }
                     $delivered=$this->sendMail($this->connections->all(), $p['recipient'], 'Új belső üzenet — Ráérő',
-                        'Új üzeneted érkezett. Beszélgetés: ' . rtrim(config('app.url'), '/') . ($p['guest'] ? '/uzenetek' : '/') . '?provider=' . app(Tenant::class)->id . '&messages=1');
+                        !empty($message['emailCopy'])?($s['settings']['name']." üzenete:\n\n".$message['text']."\n\nAz időpontoddal kapcsolatos kérdésben keresd közvetlenül a szolgáltatót."):'Új üzeneted érkezett. Beszélgetés: ' . rtrim(config('app.url'), '/') . ($p['guest'] ? '/uzenetek' : '/') . '?provider=' . app(Tenant::class)->id . '&messages=1');
                     if(!$delivered){$this->finish($job->id,'skipped');$counts['skipped']++;continue;}
                     $this->finish($job->id, 'sent', ['attempts' => $job->attempts + 1]); $counts['sent']++; continue;
                 }
@@ -223,6 +226,7 @@ class Notifications
                     "rejected" => "Elutasítva",
                     "no_show" => "Nem jelent meg",
                 ];
+                if(!empty($b['awaitingPayment']))$statuses['pending']='Előrefizetésre vár';
                 $subject =
                     ($labels[$p["event"]] ?? "Foglalás frissítve") .
                     " — " .
@@ -242,6 +246,7 @@ class Notifications
                     ) .
                     "\n" .
                     ($statuses[$b["status"]] ?? $b["status"]);
+                if(!empty($b['awaitingPayment'])){$info=BookingPrepayments::info($s,$b);$text.="\nA foglaláshoz előre fizetendő: ".number_format($info['requiredDue'],0,',',' ')." Ft. A foglalás a befizetés igazolásáig függőben marad. A fizetési adatokat a foglalás kezelési hivatkozásán találod.";}
                 if($p['event']==='group_missed')$text.=($b['cancellationReason']??'')==='group_minimum'?"\nA csoportos óra elmarad, mert a minimumlétszám a határidőig nem teljesült.":"\nA szolgáltató a csoportos órát elmaradtnak jelölte.";
                 if ($p["audience"] === "guest") {
                     $text .=
@@ -288,9 +293,12 @@ class Notifications
                 ]);
                 $counts["sent"]++;
             } catch (SmsDeliveryException $e) {
+                SystemIssues::capture($e,'sms',(int)$job->provider_id);
                 $attempts=$job->attempts+1;$status=$e->uncertain?'unknown':($e->retryable&&$attempts<5?'pending':'failed');
                 $this->finish($job->id,$status,['attempts'=>$attempts,'error'=>$e->getMessage(),'available_at'=>now()->addMinutes(5*$attempts)]);$counts['failed']++;
             } catch (\Throwable $e) {
+                SystemIssues::capture($e,'notification',(int)$job->provider_id);
+                if(in_array($p['kind']??'',['waitlist_verify','waitlist_available'],true)){DB::table('waitlist_entries')->where('id',$p['entryId'])->whereIn('status',['pending','queued'])->update(['status'=>'unknown','updated_at'=>now()]);$this->finish($job->id,'unknown',['error'=>'A várólistás e-mail eredménye bizonytalan. Ellenőrizd a levelezőszolgáltatónál; automatikus ismétlés nincs.']);$counts['failed']++;continue;}
                 // Do not store SMTP/API responses: they can include credentials or personal data.
                 if(is_array($p)&&SmsWallet::isSms($p)){SmsWallet::finish($job->id,'unknown',$smsReference);$this->finish($job->id,'unknown',['error'=>'Az SMS eredménye nem igazolható. Ellenőrizd a BulkGate előzményét; automatikus újraküldés nincs.']);$counts['failed']++;continue;}
                 if(!empty($smsReference)){$this->finish($job->id,'unknown',['error'=>'A BulkGate átvette az SMS-t, de a helyi mentés megszakadt. Ellenőrizd az üzenetelőzményt.']);$counts['failed']++;continue;}

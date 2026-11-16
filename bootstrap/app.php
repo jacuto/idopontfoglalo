@@ -19,12 +19,13 @@ return Application::configure(basePath: dirname(__DIR__))
                 "api/bookings",
                 "api/manage",
                 "api/manage/checkout",
-                "api/stripe/webhook", "api/simplepay/ipn", "api/marketing/webhook/*",
+                "api/stripe/webhook", "api/simplepay/ipn", "api/simplepay/szep-ipn", "api/barion/callback", "api/marketing/webhook/*",
                 "api/platform-stripe/webhook",
             ],
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->report(function(\Throwable $e){if($e instanceof \InvalidArgumentException||$e instanceof \Illuminate\Validation\ValidationException||($e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface&&$e->getStatusCode()<500))return;\App\Services\SystemIssues::capture($e,'application',app(\App\Services\Tenant::class)->id);});
         $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e, Request $r) {
             if($e->getStatusCode()!==429)return null;$seconds=max(1,(int)($e->getHeaders()['Retry-After']??60));
             return response()->json(['error'=>'Túl sok próbálkozás. Próbáld újra '.$seconds.' másodperc múlva.','retryAfter'=>$seconds],429,array_replace($e->getHeaders(),['Retry-After'=>(string)$seconds]));

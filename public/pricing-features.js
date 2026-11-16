@@ -18,6 +18,8 @@ const pricingFeatureGroups=[
   'Napi, heti és havi naptárnézet, gördülő hét nappal',
   'Gyors időpontfelvitel, meglévő vendég keresése és alapértelmezett szolgáltatás',
   'Ismétlődő időpontok napi, heti, kétheti és havi gyakorisággal',
+  'Szolgáltatói teendők napi, heti és havi ismétléssel, foglalásblokkolás nélkül',
+  'Kapcsolható várólista e-mailes megerősítéssel és szabadidőpont-értesítéssel',
   'Ismétlődő sorozat kezdőnappal, végdátummal, darabszámmal vagy folyamatosan',
   'Jóváhagyás, elutasítás, lemondás és az időpontok áthelyezése',
   'Megjelent és nem jelent meg állapot, opcionális meg nem jelenési díjjal',
@@ -67,6 +69,9 @@ const pricingFeatureGroups=[
   'Bankkártyás foglalásfizetés saját Stripe- vagy SimplePay-kapcsolattal',
   'Brevo- vagy Mailchimp-hírlevelek saját fiókkal, hozzájárulással és leiratkozással',
   'Előre feltölthető SMS-egyenleg, csoportos fedezetellenőrzéssel',
+  'Szolgáltatásonként kötelező teljes előrefizetés és fix vagy százalékos előleg, saját fizetési fiókba',
+  'Saját bankszámlára utalás adatai és részösszegű befizetés rögzítése',
+  'Előfizetés megújulásának önálló leállítása és visszakapcsolása',
   'Billingo- és Számlázz.hu-kapcsolat kézi számlázással',
   'Automatikus számlakiállítás teljes befizetés után',
   'A vendég mentett számlázási adatainak használata a számlázásnál'
@@ -88,6 +93,7 @@ const pricingFeatureGroups=[
   'Szolgáltatói próbaidő, előfizetések és naptárkeretek kezelése',
   'Szolgáltatóknak kiállított előfizetési számlák és befizetések kezelése',
   'Központi Google-, Facebook-, Apple-, SMTP- és SMS-kapcsolatok',
+  'Összevont üzemeltetői hibanapló, korlátozott megőrzéssel',
   'Automatikus levelek HTML-sablonjai és sablonelőnézet',
   'Üzemeltetői hírlevélkampányok, feliratkozási és leiratkozási lehetőséggel',
   'Közvetlen üzemeltetői levelezés és saját számlázási, fizetési kapcsolatok'

@@ -181,3 +181,7 @@ Artisan::command('raero:recurring',function(){$this->info((string)\App\Services\
 
 Artisan::command('raero:auto-invoices {--limit=10}',function(){$this->info(json_encode(app(\App\Services\AutomaticInvoices::class)->run(min(100,max(1,(int)$this->option('limit')))),JSON_UNESCAPED_UNICODE));})->purpose('Automatikus számlázás teljesen rendezett foglalásokról');
 \Illuminate\Support\Facades\Schedule::command('raero:auto-invoices')->everyFiveMinutes()->withoutOverlapping();
+
+Artisan::command('raero:waitlist {--limit=10}',function(){$this->info(json_encode(\App\Services\Waitlist::run((int)$this->option('limit'))));});
+\Illuminate\Support\Facades\Schedule::command('raero:waitlist')->everyMinute()->withoutOverlapping();
+\Illuminate\Support\Facades\Schedule::call(function(){\App\Services\SystemIssues::prune();DB::table('waitlist_entries')->whereIn('status',['expired','cancelled','notified'])->where('updated_at','<',now()->subDays(90))->delete();})->daily();

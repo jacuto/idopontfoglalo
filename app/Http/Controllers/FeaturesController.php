@@ -25,7 +25,7 @@ final class FeaturesController
                 'email' => 'nullable|email|max:200', 'website' => 'nullable|url:http,https|max:1000',
                 'mapUrl' => 'nullable|url:http,https|max:1000', 'facebook' => 'nullable|url:http,https|max:1000', 'instagram' => 'nullable|url:http,https|max:1000',
                 'logo' => ['nullable','string','max:1000',self::publicImageRule()], 'cover' => ['nullable','string','max:1000',self::publicImageRule()], 'photos' => 'sometimes|array|max:12', 'photos.*' => ['string','max:1000',self::publicImageRule()],
-                'hours' => 'nullable|string|max:1500', 'terms' => 'nullable|string|max:5000',
+                'acceptedPayments'=>'sometimes|array|max:6','acceptedPayments.*'=>'in:cash,card,transfer,szep,otp_szep,other','hours' => 'nullable|string|max:1500', 'terms' => 'nullable|string|max:5000',
             ]);
             $data=\App\Services\Contact::apply($data);
             foreach(['description','terms'] as $key)if(isset($data[$key]))$data[$key]=\App\Services\SafeHtml::clean($data[$key]);
@@ -102,7 +102,7 @@ final class FeaturesController
         $b['id']='preview';$b['start']=$data['start']??now()->toISOString();
         $b['pricing']=app(Offers::class)->quote($s,$b,$data['coupon']??null);
         app(Offers::class)->reservePass($s,$b,$data['passId']??null,!$b['public']);
-        return response()->json($b['pricing']);
+        return response()->json(array_replace($b['pricing'],['prepayment'=>['enabled'=>\App\Services\BookingPrepayments::enabled($s),'requiredAmount'=>\App\Services\BookingPrepayments::enabled($s)?\App\Services\BookingPrepayments::target($s,$b):0]]));
     }
     private static function publicImageRule():\Closure{return static function($attribute,$value,$fail){if(!\App\Services\ProviderDiscovery::image($value)&&!(filter_var($value,FILTER_VALIDATE_URL)&&parse_url($value,PHP_URL_SCHEME)==='http'))$fail('Érvényes képcímet adj meg.');};}
 }

@@ -66,6 +66,16 @@ Route::get('/hirlevel/leiratkozas/{id}', [\App\Http\Controllers\NewsletterContro
 Route::match(['GET','POST'], '/api/platform/newsletters/{id?}/{action?}', [\App\Http\Controllers\NewsletterController::class,'handle'])->whereNumber('id')->whereIn('action',['test','schedule']);
 Route::match(['GET','POST'], '/api/platform-messages', [\App\Http\Controllers\PlatformMessagesController::class,'handle']);
 Route::patch('/api/platform-messages/read', [\App\Http\Controllers\PlatformMessagesController::class,'read']);
+Route::post('/api/waitlist/join',[\App\Http\Controllers\WaitlistController::class,'join'])->middleware('throttle:3,60');
+Route::match(['GET','POST'],'/api/waitlist/token/{token}',[\App\Http\Controllers\WaitlistController::class,'token'])->where('token','[a-f0-9]{64}')->middleware('throttle:30,1');
+Route::match(['GET','DELETE'],'/api/waitlist/{id?}',[\App\Http\Controllers\WaitlistController::class,'manage'])->whereUuid('id');
+Route::view('/varolista/{token}','app')->where('token','[a-f0-9]{64}');
+Route::match(['GET','POST','PUT','PATCH','DELETE'],'/api/provider-reminders/{id?}',[\App\Http\Controllers\ProviderToolsController::class,'reminders'])->whereUuid('id');
+Route::post('/api/clients/{id}/invite',[\App\Http\Controllers\ProviderToolsController::class,'invite'])->middleware('throttle:10,1');
+Route::match(['GET','PATCH'],'/api/platform/issues',[\App\Http\Controllers\ProviderToolsController::class,'issues']);
+Route::post('/api/client-issue',[\App\Http\Controllers\ProviderToolsController::class,'clientIssue'])->middleware('throttle:5,1');
+Route::post('/api/sms-wallet/transfer',[\App\Http\Controllers\SmsWalletController::class,'handle']);
+Route::post('/api/platform/sms-wallet/credit',[\App\Http\Controllers\SmsWalletController::class,'credit']);
 Route::match(['GET','POST'],'/api/sms-wallet',[\App\Http\Controllers\SmsWalletController::class,'handle']);
 Route::post('/api/sms-wallet/deliveries/{id}/resolve',[\App\Http\Controllers\SmsWalletController::class,'resolve'])->whereNumber('id');
 Route::match(['GET','POST'],'/api/platform/sms-wallet',[\App\Http\Controllers\SmsWalletController::class,'operator']);
@@ -77,6 +87,9 @@ foreach(['/api/marketing','/api/platform/marketing'] as $prefix){
 Route::match(['GET','PUT'],'/api/guest/marketing-consent',[\App\Http\Controllers\MarketingController::class,'guestConsent']);
 Route::match(['GET','POST'],'/api/marketing/webhook/{providerId}/{engine}/{token}',fn(\Illuminate\Http\Request $r,int $providerId,string $engine,string $token)=>app(\App\Http\Controllers\MarketingController::class)->webhook($r,$providerId,$engine,$token))->whereNumber('providerId')->whereIn('engine',['brevo','mailchimp'])->where('token','[a-f0-9]{64}');
 Route::any("/api/platform/{path}", [\App\Http\Controllers\PlatformController::class, "handle"])->where("path", ".*");
+Route::post('/api/barion/callback',fn(\Illuminate\Http\Request $r)=>app(\App\Services\Barion::class)->callback($r))->middleware('throttle:60,1');
+Route::post('/api/simplepay/szep-ipn',fn(\Illuminate\Http\Request $r)=>app(\App\Services\SimplePay::class)->ipn($r,true));
+Route::get('/simplepay/szep-visszateres',fn(\Illuminate\Http\Request $r)=>app(\App\Services\SimplePay::class)->returned($r,true));
 Route::post('/api/simplepay/ipn',fn(\Illuminate\Http\Request $r)=>app(\App\Services\SimplePay::class)->ipn($r));
 Route::get('/simplepay/visszateres',fn(\Illuminate\Http\Request $r)=>app(\App\Services\SimplePay::class)->returned($r));
 Route::post(
@@ -109,6 +122,6 @@ Route::view("/modositas", "app");
 foreach(['/szolgaltatok','/szolgaltato','/belepes','/arak','/kapcsolat'] as $page)Route::view($page,'app');
 
 foreach(['adatvedelem'=>'privacy','aszf'=>'terms','adattorles'=>'deletion','sugo'=>'help'] as $slug=>$document)Route::get('/'.$slug,fn()=>app(\App\Services\PublicDocuments::class)->page($document));
-Route::view('/foadmin/{section}','app')->where('section','sms-egyenlegek|kapcsolatok|szamlak|szamla-rogzitese|szamla-egyeztetes|levelek|jogosultsagok|uzenetek|hirlevelek|jogi-oldalak|elofizetes|szolgaltatok|befizetesek|uzemelteto');
+Route::view('/foadmin/{section}','app')->where('section','hibanaplo|sms-egyenlegek|kapcsolatok|szamlak|szamla-rogzitese|szamla-egyeztetes|levelek|jogosultsagok|uzenetek|hirlevelek|jogi-oldalak|elofizetes|szolgaltatok|befizetesek|uzemelteto');
 
 Route::get('/gyik',fn()=>app(\App\Services\PublicDocuments::class)->page('help'));

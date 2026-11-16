@@ -33,11 +33,12 @@ final class Subscriptions
             $id = 'trial-' . $i;
             $entries[$id] ??= ['id'=>$id, 'kind'=>'trial', 'amount'=>0, 'currency'=>'HUF', 'status'=>'trial', 'from'=>$from->toISOString(), 'to'=>$to->toISOString(), 'dueAt'=>null, 'paymentId'=>null, 'noInvoice'=>true];
         }
+        $billingAnchor=Time::parse($sub['billingRestartAt']??$sub['trialEndsAt']);
         // Generate elapsed monthly charges; repeated reads and cron runs cannot duplicate a period.
         for ($i = 0; $i < 1200; $i++) {
-            $from = $end->addMonthsNoOverflow($i);
-            if ($from->isFuture()) break;
-            $to = $end->addMonthsNoOverflow($i + 1);
+            $from = $billingAnchor->addMonthsNoOverflow($i);
+            if ($from->isFuture()||(!empty($sub['cancelAt'])&&$from->gte(Time::parse($sub['cancelAt'])))) break;
+            $to = $billingAnchor->addMonthsNoOverflow($i + 1);
             $id = 'month-' . $from->format('Y-m-d-His');
             if(PlatformAccess::exempt($sub,$from,$to)&&!isset($entries[$id]))continue;
             $entries[$id] ??= ['id'=>$id, 'kind'=>'monthly', 'amount'=>self::monthlyAmount($state,$from->toISOString()), 'currency'=>'HUF', 'status'=>'pending', 'from'=>$from->toISOString(), 'to'=>$to->toISOString(), 'dueAt'=>$from->addDays(21)->toISOString(), 'paymentId'=>null, 'noInvoice'=>false];
@@ -47,6 +48,7 @@ final class Subscriptions
                 $entries[$id]['legacyCredit'] = true;
             }
         }
+        foreach($entries as &$entry)if(!empty($sub['cancelAt'])&&$entry['kind']==='monthly'&&!in_array($entry['status'],['paid','waived'],true)&&Time::parse($entry['from'])->gte(Time::parse($sub['cancelAt'])))$entry=array_replace($entry,['status'=>'waived','waivedReason'=>'subscription_cancelled']);unset($entry);
         foreach($entries as &$entry) foreach($sub['coverage']??[] as $credit) {
             if($entry['kind']==='monthly' && Time::parse($credit['from'])->lte(Time::parse($entry['from'])) && Time::parse($credit['to'])->gte(Time::parse($entry['to']))) $entry=array_replace($entry,['status'=>'paid','paymentId'=>$credit['paymentId'],'paidAt'=>$credit['paidAt'],'method'=>$credit['method'],'reference'=>$credit['reference']]);
         }
@@ -66,12 +68,14 @@ final class Subscriptions
         elseif (collect($sub['charges'])->contains(fn($e)=>in_array($e['status'],['pending','overdue'],true))) $sub['status']='past_due';
         elseif (!empty($sub['paidUntil']) && Time::parse($sub['paidUntil'])->isFuture()) $sub['status']='active';
         elseif(in_array($sub['status']??'', ['free','suspended'],true))$sub['status']='active';
+        if(!empty($sub['cancelAt'])&&Time::parse($sub['cancelAt'])->lte(now())){$sub['status']='canceled';$sub['calendarBlocked']=true;}
     }
 
     public static function guard(array $state, bool $provider = true): void
     {
         if(PlatformAccess::mode($state)==='suspended')abort(423,$provider?'A főadmin szünetelteti a hozzáférést. Az Előfizetés és az üzenetek elérhetők.':'A szolgáltató online foglalása jelenleg szünetel.');
         if(PlatformAccess::mode($state)==='free')return;
+        if(!empty($state['subscription']['cancelAt'])&&Time::parse($state['subscription']['cancelAt'])->lte(now()))abort(423,'Az előfizetés a lemondás miatt véget ért. Az Előfizetés menüben újraindítható.');
         if (!empty($state['subscription']['calendarBlocked'])) abort(423, $provider ? 'A naptár zárolva van, mert egy havi díj 21 napos fizetési határideje lejárt. Nyisd meg az Előfizetés menüt, és rendezd a függő tételt.' : 'A szolgáltató online foglalása jelenleg szünetel. Időpontért keresd közvetlenül a szolgáltatót.');
     }
 

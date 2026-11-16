@@ -13,7 +13,7 @@ final class Connections
         "mail_name",
         "billingo_key",
         "billingo_block",
-        "szamlazz_key", "simplepay_merchant", "simplepay_secret", "simplepay_environment",
+        "szamlazz_key", "simplepay_merchant", "simplepay_secret", "simplepay_environment", "simplepay_szep_merchant", "simplepay_szep_secret", "simplepay_szep_environment", "barion_pos_key", "barion_payee", "barion_environment",
         "stripe_key",
         "stripe_webhook_secret",
         "stripe_price_id",
@@ -113,7 +113,7 @@ final class Connections
                 "smtp_username",
                 "mail_from",
                 "mail_name",
-                "billingo_block", "simplepay_merchant", "simplepay_environment",
+                "billingo_block", "simplepay_merchant", "simplepay_environment", "simplepay_szep_merchant", "simplepay_szep_environment", "barion_payee", "barion_environment",
                 "stripe_price_id",
                 "apple_client_id", "apple_team_id", "apple_key_id", "admin_apple_ids",
                 "google_client_id",
@@ -130,6 +130,7 @@ final class Connections
         foreach (self::FIELDS as $key) {
             $safe[$key . "_configured"] = !empty($v[$key]);
         }
+        $safe['prepayment_enabled']=app(PlatformConnections::class)->enabled('prepayment');
         return array_filter($safe,fn($key)=>!SharedConnections::privateForProvider($key),ARRAY_FILTER_USE_KEY);
     }
     public function mailReady(): bool
