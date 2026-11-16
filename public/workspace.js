@@ -183,17 +183,19 @@ function calendarPage() {
     visible = filtered.filter((b) =>
       dayKeys.includes(datekey(new Date(b.start))),
     );
-  const starts = visible.map((b) => {
+  const calendarTasks=calendarReminderBookings(days);
+  const timedItems=[...visible,...calendarTasks];
+  const starts = timedItems.map((b) => {
     const d = new Date(b.start);
     return d.getHours() * 60 + d.getMinutes();
   });
-  const ends = visible.map(
+  const ends = timedItems.map(
     (b, i) =>
-      starts[i] +
+      Math.min(b._reminder?1440:Infinity,starts[i] +
       (
         b.serviceSnapshot ||
         state.services.filter((s) => b.services.includes(s.id))
-      ).reduce((n, s) => n + s.duration, 0),
+      ).reduce((n, s) => n + s.duration, 0)),
   );
   const open = Math.min(
       timeMinutes(state.settings.openingTime || "08:00"),
@@ -212,7 +214,7 @@ function calendarPage() {
   $("#calendar-body").innerHTML =
     `<div class="calendar-scroll ${calendarDetailed ? "calendar-detailed" : "calendar-fit"} ${scale < 0.42 ? "calendar-dense" : ""}"><div class="timeline" style="--cols:${days.length};--track-height:${height}px"><div class="timeline-heading"></div>${days.map((d) => `<div data-date="${datekey(d)}" class="timeline-heading ${datekey(d) === today ? "today" : ""}">${d.calendarStaff?esc(state.staff.find(p=>p.id===d.calendarStaff)?.name||''):d.toLocaleDateString(window.raeroLocale?.()||"hu-HU", { weekday: "short" })}<strong>${d.getDate()}</strong><button class="day-hours" aria-label="${datekey(d)} időbeosztása" onclick="availabilityDialog('${datekey(d)}',true)">⚙</button></div>`).join("")}<div class="time-rail">${ticks.map((m) => `<span data-minute="${m}" class="${m % 60 ? "half-hour" : "whole-hour"}" style="top:${(m - open) * scale}px">${minutesTime(m)}</span>`).join("")}</div>${days
       .map((d) => {
-        const bookings = filtered
+        const bookings = [...filtered,...calendarTasks]
           .filter((b) => datekey(new Date(b.start)) === datekey(d)&&(!d.calendarStaff||b.staff===d.calendarStaff))
           .sort((a, b) => a.start.localeCompare(b.start));
         let ends = [];
@@ -225,11 +227,11 @@ function calendarPage() {
             ).reduce((n, s) => n + s.duration, 0);
           let lane = ends.findIndex((end) => end <= start);
           if (lane < 0) lane = ends.length;
-          ends[lane] = start + duration;
+          ends[lane] = start + Math.max(duration,(b._reminder?28:24)/scale);
           return { b, start, duration, lane };
         });
         const lanes = Math.max(1, ends.length);
-        return `<div class="day-track" data-date="${datekey(d)}">${ticks.map((m, i) => `<button data-minute="${m}" class="time-slot ${calendarSlotBlocked(datekey(d), m,d.calendarStaff) ? "unavailable" : ""} ${m % 60 ? "" : "hour-start"} ${Math.floor(m / 60) % 2 ? "hour-shade" : ""}" ${calendarSlotBlocked(datekey(d), m,d.calendarStaff) ? 'disabled title="Nem foglalható idő"' : ""} aria-label="Időpont felvétele: ${datekey(d)} ${minutesTime(m)}" style="top:${(m - open) * scale}px;height:${((ticks[i + 1] ?? close) - m) * scale}px" onclick="bookingForm('${datekey(d)}T${minutesTime(m)}','${esc(d.calendarStaff||'')}')"></button>`).join("")}${calendarBlockedBands(datekey(d), open, close, scale,d.calendarStaff)}${placed.map(({ b, start, duration, lane }) => `<button data-minute="${ticks.filter(m => m <= start).at(-1) ?? open}" class="calendar-event ${b.status === "pending" ? "pending" : b.status==='no_show'?'no-show':''}" style="top:${Math.max(0, start - open) * scale}px;height:${Math.max(24, Math.min(duration, close - start) * scale)}px;left:calc(${(lane / lanes) * 100}% + 3px);width:calc(${100 / lanes}% - 6px)" title="${esc(b.name + " · " + serviceNames(b))}" onclick="bookingDetails('${b.id}')"><strong>${new Date(b.start).toLocaleTimeString(window.raeroLocale?.()||"hu-HU", { hour: "2-digit", minute: "2-digit" })} · ${esc(b.name)}</strong><span>${esc(serviceNames(b))}</span>${state.settings.businessMode !== "solo" ? `<small>${esc(state.staff.find((p) => p.id === b.staff)?.name || "")}</small>` : ""}</button>`).join("")}</div>`;
+        return `<div class="day-track" data-date="${datekey(d)}">${ticks.map((m, i) => `<button data-minute="${m}" class="time-slot ${calendarSlotBlocked(datekey(d), m,d.calendarStaff) ? "unavailable" : ""} ${m % 60 ? "" : "hour-start"} ${Math.floor(m / 60) % 2 ? "hour-shade" : ""}" ${calendarSlotBlocked(datekey(d), m,d.calendarStaff) ? 'disabled title="Nem foglalható idő"' : ""} aria-label="Időpont felvétele: ${datekey(d)} ${minutesTime(m)}" style="top:${(m - open) * scale}px;height:${((ticks[i + 1] ?? close) - m) * scale}px" onclick="bookingForm('${datekey(d)}T${minutesTime(m)}','${esc(d.calendarStaff||'')}')"></button>`).join("")}${calendarBlockedBands(datekey(d), open, close, scale,d.calendarStaff)}${placed.map(({ b, start, duration, lane }) => b._reminder ? calendarReminderEvent(b._reminder,start,duration,lane,lanes,open,close,scale) : `<button data-minute="${ticks.filter(m => m <= start).at(-1) ?? open}" class="calendar-event ${b.status === "pending" ? "pending" : b.status==='no_show'?'no-show':''}" style="top:${Math.max(0, start - open) * scale}px;height:${Math.max(24, Math.min(duration, close - start) * scale)}px;left:calc(${(lane / lanes) * 100}% + 3px);width:calc(${100 / lanes}% - 6px)" title="${esc(b.name + " · " + serviceNames(b))}" onclick="bookingDetails('${b.id}')"><strong>${new Date(b.start).toLocaleTimeString(window.raeroLocale?.()||"hu-HU", { hour: "2-digit", minute: "2-digit" })} · ${esc(b.name)}</strong><span>${esc(serviceNames(b))}</span>${state.settings.businessMode !== "solo" ? `<small>${esc(state.staff.find((p) => p.id === b.staff)?.name || "")}</small>` : ""}</button>`).join("")}</div>`;
       })
       .join("")}</div></div>`;
   bindCalendarSelection();

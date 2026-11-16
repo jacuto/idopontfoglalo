@@ -5,8 +5,9 @@ namespace App\Services;
 final class BookingPrepayments
 {
  public static function enabled(array $s):bool{return !empty($s['settings']['prepaymentEnabled'])&&app(PlatformConnections::class)->enabled('prepayment');}
+ public static function allows(array $s,string $method):bool{return in_array($method,$s['settings']['prepaymentMethods']??['card','transfer','szep'],true);}
  public static function bankReady(array $s):bool{return trim($s['settings']['prepaymentAccount']??'')!==''&&trim($s['settings']['prepaymentAccountName']??'')!=='';}
- public static function ready(array $s):bool{return Payments::cardReady($s)||Payments::szepReady()||self::bankReady($s);}
+ public static function ready(array $s):bool{return (self::allows($s,'card')&&Payments::cardReady($s))||(self::allows($s,'szep')&&Payments::szepReady())||(self::allows($s,'transfer')&&self::bankReady($s));}
  public static function policy(array $settings,array $service):array{
   $mode=$service['prepaymentPolicy']??'inherit';
   if($mode==='inherit')return ['mode'=>$settings['prepaymentMode']??'optional','type'=>$settings['depositType']??'percent','value'=>(int)($settings['depositValue']??30)];
@@ -29,7 +30,7 @@ final class BookingPrepayments
  public static function info(array $s,array $b):array{
   $settings=$s['settings'];$total=(int)Offers::total($b);$paid=(int)collect($s['payments'])->where('bookingId',$b['id'])->where('status','paid')->sum(fn($p)=>$p['amount']-($p['refundedAmount']??0));
   $target=(int)($b['paymentRequirement']['amount']??self::target($s,$b));$enabled=self::enabled($s);$due=max(0,$target-$paid);
-  return ['enabled'=>$enabled,'mode'=>$target>0&&$target<$total?'deposit':'full','required'=>!empty($b['paymentRequirement'])&&$enabled,'requiredAmount'=>$target,'requiredDue'=>$enabled?$due:0,'awaitingPayment'=>!empty($b['awaitingPayment'])&&$enabled,'balance'=>max(0,$total-$paid),'deposit'=>$due,'paid'=>$paid,'bankName'=>$settings['prepaymentBank']??'','accountName'=>$settings['prepaymentAccountName']??'','account'=>self::bankReady($s)?$settings['prepaymentAccount']:'','reference'=>'RAERO-'.app(Tenant::class)->id.'-'.substr(str_replace('-','',$b['id']),0,12),'terms'=>$settings['prepaymentTerms']??'','cardReady'=>$enabled&&Payments::cardReady($s),'szepReady'=>$enabled&&Payments::szepReady()];
+  return ['enabled'=>$enabled,'mode'=>$target>0&&$target<$total?'deposit':'full','required'=>!empty($b['paymentRequirement'])&&$enabled,'requiredAmount'=>$target,'requiredDue'=>$enabled?$due:0,'awaitingPayment'=>!empty($b['awaitingPayment'])&&$enabled,'balance'=>max(0,$total-$paid),'deposit'=>$due,'paid'=>$paid,'bankName'=>$settings['prepaymentBank']??'','accountName'=>$settings['prepaymentAccountName']??'','account'=>self::allows($s,'transfer')&&self::bankReady($s)?$settings['prepaymentAccount']:'','reference'=>'RAERO-'.app(Tenant::class)->id.'-'.substr(str_replace('-','',$b['id']),0,12),'terms'=>$settings['prepaymentTerms']??'','cardReady'=>$enabled&&self::allows($s,'card')&&Payments::cardReady($s),'szepReady'=>$enabled&&self::allows($s,'szep')&&Payments::szepReady()];
  }
  public static function amount(array $s,array $b,string $mode='full'):int{
   abort_unless(in_array($mode,['full','deposit'],true),422);$info=self::info($s,$b);abort_unless($info['enabled'],422,'Az előrefizetés nincs bekapcsolva.');
@@ -38,7 +39,7 @@ final class BookingPrepayments
  public static function validateConfig(array $s):void{
   $settings=$s['settings'];self::validateDeposit($settings);
   foreach($s['services'] as $service)self::validateDeposit($service);
-  if(self::enabled($s))abort_unless(self::ready($s),422,'Az előrefizetéshez előbb állíts be bankkártyás kapcsolatot, vagy add meg a kedvezményezett nevét és bankszámlaszámát.');
+  if(self::enabled($s))abort_unless(self::ready($s),422,'Az előrefizetéshez válassz legalább egy fizetési módot, és állítsd be a hozzá tartozó kapcsolatot vagy átutalási számlaadatokat.');
  }
  private static function validateDeposit(array $v):void{if(($v['depositType']??'percent')==='percent'&&(int)($v['depositValue']??30)>100)throw new \InvalidArgumentException('A százalékos előleg legfeljebb 100% lehet.');}
  public static function reconcile(array &$s):void{

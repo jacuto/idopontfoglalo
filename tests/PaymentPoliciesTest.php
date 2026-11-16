@@ -50,4 +50,11 @@ final class PaymentPoliciesTest extends TestCase {
   }
  }
 
+ public function test_prepayment_methods_are_filtered_and_disallowed_card_requests_cannot_start_a_payment():void{
+  $this->configure(['prepaymentMethods'=>['transfer']]);app(Connections::class)->save(['stripe_key'=>'fake','stripe_webhook_secret'=>'fake']);$b=$this->postJson('/api/bookings',$this->data())->assertCreated()->json();$this->getJson('/api/manage?token='.$b['token'])->assertJsonPath('prepayment.cardReady',false)->assertJsonPath('prepayment.szepReady',false)->assertJsonPath('prepayment.account','12345678-12345678');
+  foreach(['card','szep'] as $rail)$this->postJson('/api/manage/checkout',['token'=>$b['token'],'rail'=>$rail])->assertUnprocessable();Http::assertNothingSent();
+  $this->putJson('/api/config',$this->config(['prepaymentMethods'=>[]]))->assertUnprocessable();$this->putJson('/api/config',$this->config(['prepaymentMethods'=>['szep']]))->assertUnprocessable();$this->putJson('/api/config',$this->config(['prepaymentMethods'=>['cash']]))->assertUnprocessable();
+  $this->putJson('/api/config',$this->config(['prepaymentMethods'=>['card']]))->assertOk();$this->getJson('/api/manage?token='.$b['token'])->assertJsonPath('prepayment.cardReady',true)->assertJsonPath('prepayment.account','');
+ }
+
 }

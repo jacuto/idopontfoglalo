@@ -55,3 +55,11 @@ php artisan raero:check
 ```
 
 A meglévő percenkénti ütemező szükséges az értesítésekhez és a várólistához. A közvetlen banki SMS-feltöltés jóváírása szándékosan kézi, nem ütemező feladata. Böngészőben Ctrl+F5.
+
+## November 16. kiegészítés
+
+Az emlékeztetők a napi és heti naptár idővonalán is láthatók, eltérő, szaggatott kerettel. Párhuzamos foglalás mellett külön vizuális sávot kapnak; a nyitvatartás előtti teendőhöz a látható időskála kibővül. Kattintással szerkeszthetők vagy elvégzettnek jelölhetők. A havi nézetben a megfelelő napon látszanak; a szabad időpontokat nem csökkentik.
+
+Az Integrációk → Online fizetés → Előrefizetés beállításai résznél külön kiválasztható az előrefizetéshez felajánlott bankkártya, átutalás és OTP SZÉP-kártya. A helyszíni fizetési módok tájékoztató listájától független. A ki nem választott módot a szerver közvetlen fizetésindítási kérelemnél is elutasítja; megfelelően beállított, kijelölt fizetési mód nélkül az előrefizetés nem kapcsolható be. A korábbi beállításoknál az eddigi, konfigurált módok maradnak elérhetők.
+
+A Használt funkciók opciókártyáin a hosszú várólista-leírás több sorban, levágás nélkül jelenik meg mobilon is.

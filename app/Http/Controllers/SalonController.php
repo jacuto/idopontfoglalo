@@ -466,7 +466,7 @@ class SalonController
                         "sometimes|in:none,billingo,szamlazz",
                     "settings.autoInvoice" => "sometimes|boolean",
                     "settings.bookingHorizonMode"=>"sometimes|in:none,date,months","settings.bookingHorizonDate"=>"nullable|date_format:Y-m-d","settings.bookingHorizonMonths"=>"sometimes|integer|between:1,36",
-                    "settings.waitlistEnabled"=>"sometimes|boolean","settings.prepaymentEnabled"=>"sometimes|boolean", "settings.prepaymentMode"=>"sometimes|in:optional,full,deposit", "settings.depositType"=>"sometimes|in:percent,fixed", "settings.depositValue"=>"sometimes|integer|min:1|max:1000000", "settings.prepaymentBank"=>"nullable|string|max:100", "settings.prepaymentAccountName"=>"nullable|string|max:150", "settings.prepaymentAccount"=>"nullable|string|max:100", "settings.prepaymentTerms"=>"nullable|string|max:1500",
+                    "settings.waitlistEnabled"=>"sometimes|boolean","settings.prepaymentEnabled"=>"sometimes|boolean","settings.prepaymentMethods"=>"sometimes|array|max:3","settings.prepaymentMethods.*"=>"in:card,transfer,szep|distinct", "settings.prepaymentMode"=>"sometimes|in:optional,full,deposit", "settings.depositType"=>"sometimes|in:percent,fixed", "settings.depositValue"=>"sometimes|integer|min:1|max:1000000", "settings.prepaymentBank"=>"nullable|string|max:100", "settings.prepaymentAccountName"=>"nullable|string|max:150", "settings.prepaymentAccount"=>"nullable|string|max:100", "settings.prepaymentTerms"=>"nullable|string|max:1500",
                     "settings.invoiceVat" => "sometimes|in:AAM,27%,18%,5%,0%",
                     "settings.googleAnalyticsId" => [
                         "nullable",
