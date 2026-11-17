@@ -50,7 +50,7 @@ final class SocialAvatar
             $image = @getimagesizefromstring($bytes);
             $extension = [IMAGETYPE_JPEG => 'jpg', IMAGETYPE_PNG => 'png', IMAGETYPE_WEBP => 'webp'][$image[2] ?? 0] ?? null;
             if (!$extension || $image[0] > 4096 || $image[1] > 4096) return null;
-        return $bytes;
+        return ImageUploads::process($bytes,'avatar');
     }
     private function allowed(string $url, string $provider): bool
     {

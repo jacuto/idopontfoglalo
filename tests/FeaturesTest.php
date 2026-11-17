@@ -152,7 +152,7 @@ class FeaturesTest extends TestCase {
  public function test_avatar_upload_rejects_scripts_and_other_people_cannot_read():void {
   Storage::fake('local');$this->guest();
   $this->post('/api/guest/avatar',['image'=>UploadedFile::fake()->createWithContent('attack.svg','<svg xmlns="http://www.w3.org/2000/svg"></svg>')],['Accept'=>'application/json'])->assertUnprocessable();
-  $png=base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a6v8AAAAASUVORK5CYII=');
+  $png=base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGMwTpsJAAICATNWh+JUAAAAAElFTkSuQmCC');
   $this->post('/api/guest/avatar',['image'=>UploadedFile::fake()->createWithContent('avatar.png',$png)],['Accept'=>'application/json'])->assertOk();
   $path=DB::table('guest_accounts')->where('id',10)->value('avatar');Storage::disk('local')->assertExists($path);
   $this->get('/api/guest/avatar/10')->assertOk();
@@ -391,7 +391,7 @@ class FeaturesTest extends TestCase {
  public function test_social_login_imports_google_and_facebook_photos_privately():void {
   Storage::fake('local');
   app(\App\Services\Connections::class)->save(['google_client_id'=>'client','google_client_secret'=>'secret','facebook_client_id'=>'client','facebook_client_secret'=>'secret']);
-  $png=base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aY1cAAAAASUVORK5CYII=');
+  $png=base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGMwTpsJAAICATNWh+JUAAAAAElFTkSuQmCC');
   \Illuminate\Support\Facades\Http::preventStrayRequests();
   \Illuminate\Support\Facades\Http::fake([
    'oauth2.googleapis.com/*'=>\Illuminate\Support\Facades\Http::response(['access_token'=>'token']),
@@ -407,7 +407,7 @@ class FeaturesTest extends TestCase {
    $guest=$this->getJson('/api/guest')->assertOk()->json();
    $this->assertSame('/api/guest/avatar/'.$guest['id'],$guest['avatar']);
    $path=DB::table('guest_accounts')->where('id',$guest['id'])->value('avatar');Storage::disk('local')->assertExists($path);
-   $this->assertSame($png,Storage::disk('local')->get($path));$this->get($guest['avatar'])->assertOk();
+   $this->assertSame(IMAGETYPE_WEBP,getimagesizefromstring(Storage::disk('local')->get($path))[2]);$this->get($guest['avatar'])->assertOk();
   }
   $this->withSession(['guest_id'=>null]);$this->get($guest['avatar'])->assertNotFound();
  }

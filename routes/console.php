@@ -115,6 +115,7 @@ Artisan::command(
 )->purpose("Adatbázis előkészítése és adminjelszó biztonságos beállítása");
 Artisan::command("raero:check", function () {
     $state = app(SalonStore::class)->read();
+    if(!extension_loaded("gd")||!function_exists("imagewebp"))$this->warn("Képfeltöltéshez PHP GD és WebP támogatás szükséges. A tárhely PHP-bővítményei között engedélyezd a GD modult.");
     $this->info(
         "Adatbázis elérhető. Szolgáltatások: " . count($state["services"]),
     );

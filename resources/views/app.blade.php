@@ -7,6 +7,7 @@
     <title>Ráérő — időpontok egyszerűen</title>
     <link rel="stylesheet" href="/style.css?v={{ filemtime(public_path('style.css')) }}" />
     <link rel="stylesheet" href="/showcase.css?v={{ filemtime(public_path('showcase.css')) }}" />
+  <link rel="stylesheet" href="/workspace-polish.css?v={{ filemtime(public_path('workspace-polish.css')) }}">
   <link rel="stylesheet" href="/launch-tools.css?v={{ filemtime(public_path('launch-tools.css')) }}">
 </head>
   <body>
@@ -41,6 +42,8 @@
 <script src="/commerce.js?v={{ filemtime(public_path('commerce.js')) }}" defer></script>
 <script src="/launch-tools.js?v={{ filemtime(public_path('launch-tools.js')) }}" defer></script>
 <script src="/booking-payments.js?v={{ filemtime(public_path('booking-payments.js')) }}" defer></script>
+<script src="/workspace-lists.js?v={{ filemtime(public_path('workspace-lists.js')) }}" defer></script>
+<script src="/workspace-polish.js?v={{ filemtime(public_path('workspace-polish.js')) }}" defer></script>
 <script src="/boot.js?v={{ filemtime(public_path('boot.js')) }}" defer></script>
   </body>
 </html>

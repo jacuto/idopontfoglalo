@@ -51,9 +51,9 @@ final class GuestFeaturesController
     public function avatar(Request $r)
     {
         $id = $r->session()->get('guest_id'); abort_unless($id, 401);
-        $data = $r->validate(['image' => 'required|file|mimes:jpg,jpeg,png,webp|max:2048|dimensions:max_width=4096,max_height=4096']);
+        $data = $r->validate(['image' => 'required|file|mimes:jpg,jpeg,png,webp|max:5120|dimensions:max_width=6000,max_height=6000']);
         $account = DB::table('guest_accounts')->find($id); abort_unless($account, 401);
-        $path = $data['image']->store('avatars', 'local');
+        $path = \App\Services\ImageUploads::store($data['image'],'avatar','avatars');
         try { DB::table('guest_accounts')->where('id', $id)->update(['avatar' => $path, 'updated_at' => now()]); }
         catch (\Throwable $e) { Storage::disk('local')->delete($path); throw $e; }
         if ($account->avatar) Storage::disk('local')->delete($account->avatar);

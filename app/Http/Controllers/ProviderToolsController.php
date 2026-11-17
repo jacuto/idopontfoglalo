@@ -8,7 +8,7 @@ use Carbon\CarbonImmutable as Date;
 final class ProviderToolsController {
  private function provider(Request $r):int{abort_unless($r->session()->get('admin')===true&&(int)$r->session()->get('provider_id',1)===app(Tenant::class)->id,403);return app(Tenant::class)->id;}
  public function reminders(Request $r,?string $id=null){
-  $provider=$this->provider($r);$q=DB::table('provider_reminders')->where('provider_id',$provider);if(StaffAccess::editor($r))$q->where('staff_id',$r->attributes->get('provider_member')->staff_id);
+  $provider=$this->provider($r);$enabled=app(SalonStore::class)->read()['settings']['providerRemindersEnabled']??true;if(!$enabled&&$r->isMethod('GET'))return response()->json(['reminders'=>[],'occurrences'=>[]]);abort_unless($enabled,422,'A saját emlékeztetők használata ki van kapcsolva.');$q=DB::table('provider_reminders')->where('provider_id',$provider);if(StaffAccess::editor($r))$q->where('staff_id',$r->attributes->get('provider_member')->staff_id);
   if($r->isMethod('GET')){$v=$r->validate(['from'=>'required|date_format:Y-m-d','to'=>'required|date_format:Y-m-d|after_or_equal:from']);abort_if(Date::parse($v['from'])->diffInDays(Date::parse($v['to']))>62,422,'Legfeljebb 62 nap kérhető le.');$rows=$q->get();return response()->json(['reminders'=>$rows,'occurrences'=>$rows->flatMap(fn($row)=>ProviderReminders::occurrences($row,$v['from'],$v['to']))->values()]);}
   $row=$id?(clone $q)->where('id',$id)->first():null;if($id)abort_unless($row,404);
   if($r->isMethod('DELETE')){DB::transaction(function()use($row,$q){DB::table('reminder_completions')->where('reminder_id',$row->id)->delete();$q->where('id',$row->id)->delete();});return response()->json(['ok'=>true]);}

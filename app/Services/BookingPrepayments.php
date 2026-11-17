@@ -5,7 +5,7 @@ namespace App\Services;
 final class BookingPrepayments
 {
  public static function enabled(array $s):bool{return !empty($s['settings']['prepaymentEnabled'])&&app(PlatformConnections::class)->enabled('prepayment');}
- public static function allows(array $s,string $method):bool{return in_array($method,$s['settings']['prepaymentMethods']??['card','transfer','szep'],true);}
+ public static function allows(array $s,string $method):bool{return in_array($method,$s['settings']['prepaymentMethods']??['card','transfer'],true);}
  public static function bankReady(array $s):bool{return trim($s['settings']['prepaymentAccount']??'')!==''&&trim($s['settings']['prepaymentAccountName']??'')!=='';}
  public static function ready(array $s):bool{return (self::allows($s,'card')&&Payments::cardReady($s))||(self::allows($s,'szep')&&Payments::szepReady())||(self::allows($s,'transfer')&&self::bankReady($s));}
  public static function policy(array $settings,array $service):array{

@@ -42,8 +42,8 @@ function render() {
     reports: "Statisztika",
     messages: "Üzenetek",
 
-    settings: "Beállítások",
     billing: "Előfizetés",
+    settings: "Beállítások",
   };
   const icons = {
     calendar: "▦",
@@ -592,7 +592,7 @@ function settingsPage() {
       v = Object.fromEntries(f);
     for (const k of [
       "confirmation",
-      "guestInvitationSmsEnabled", "waitlistEnabled", "autoInvoice", "skipUnnamedWarning", "reviewRequestsEnabled", "advancedBookingEnabled", "servicePhasesEnabled", "couponsEnabled", "passesEnabled",
+      "guestInvitationSmsEnabled", "waitlistEnabled", "providerRemindersEnabled", "autoInvoice", "skipUnnamedWarning", "reviewRequestsEnabled", "advancedBookingEnabled", "servicePhasesEnabled", "couponsEnabled", "passesEnabled",
     ])
       v[k] = e.target.elements[k] ? f.has(k) : !!state.settings[k];
     v.notificationRules=notificationChoices(state.settings);

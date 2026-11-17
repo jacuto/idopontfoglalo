@@ -25,7 +25,7 @@ final class Settings
             "billingCity" => "",
             "billingAddress" => "",
             "invoiceProvider" => "none", "paymentProvider"=>"stripe", "szamlazzPrefix"=>"", "szamlazzBank"=>"", "szamlazzAccount"=>"", "szamlazzSendEmail"=>false,
-            "autoInvoice" => false, "waitlistEnabled"=>false,"prepaymentEnabled"=>false,"prepaymentMethods"=>["card","transfer","szep"],"bookingHorizonMode"=>"none","bookingHorizonMonths"=>3,"bookingHorizonDate"=>null,"prepaymentMode"=>"optional","depositType"=>"percent","depositValue"=>30,"prepaymentBank"=>"","prepaymentAccountName"=>"","prepaymentAccount"=>"","prepaymentTerms"=>"",
+            "autoInvoice" => false, "waitlistEnabled"=>false,"providerRemindersEnabled"=>true,"prepaymentEnabled"=>false,"prepaymentMethods"=>["card","transfer"],"bookingHorizonMode"=>"none","bookingHorizonMonths"=>3,"bookingHorizonDate"=>null,"prepaymentMode"=>"optional","depositType"=>"percent","depositValue"=>30,"prepaymentBank"=>"","prepaymentAccountName"=>"","prepaymentAccount"=>"","prepaymentTerms"=>"",
             "invoiceVat" => "AAM",
             "embedOrigins" => [],
             "googleAnalyticsId" => "",
