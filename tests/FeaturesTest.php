@@ -257,14 +257,14 @@ class FeaturesTest extends TestCase {
  private function clock(string $date):void {\Carbon\Carbon::setTestNow($date);\Carbon\CarbonImmutable::setTestNow($date);}
  public function test_registered_contacts_are_guest_owned_across_all_provider_write_routes():void {
   $this->guest();$a=$this->postJson('/api/bookings',$this->booking())->assertCreated()->json();$this->postJson('/api/bookings?provider=2',$this->booking())->assertCreated();
-  $this->patchJson('/api/guest/profile',['email'=>'new@example.com','phone'=>'+36 20 222 3333'])->assertOk();
-  $this->provider();$this->getJson('/api/state')->assertJsonPath('clients.0.email','new@example.com')->assertJsonPath('clients.0.phone','06202223333');
+  $this->patchJson('/api/guest/profile',['email'=>'guest@example.com','phone'=>'+36 20 222 3333'])->assertOk();
+  $this->provider();$this->getJson('/api/state')->assertJsonPath('clients.0.email','guest@example.com')->assertJsonPath('clients.0.phone','06202223333');
   $change=['name'=>'Vendég','email'=>'attacker@example.com','phone'=>'999'];
   $this->patchJson('/api/clients/'.$a['clientId'],$change)->assertUnprocessable();
   $this->putJson('/api/config',['clients'=>[['id'=>$a['clientId']]+$change]])->assertUnprocessable();
   $this->postJson('/api/imports/clients',['records'=>[['id'=>$a['clientId']]+$change]])->assertUnprocessable();
   $this->getJson('/api/state')->assertJsonPath('bookings.0.email','guest@example.com');
-  $this->provider(2);$this->getJson('/api/state')->assertJsonPath('clients.0.email','new@example.com');
+  $this->provider(2);$this->getJson('/api/state')->assertJsonPath('clients.0.email','guest@example.com');
   $this->assertSame('guest@example.com',DB::table('guest_accounts')->where('id',10)->value('email'));
  }
  public function test_removing_client_only_hides_current_provider_relationship_and_keeps_history():void {
@@ -370,10 +370,10 @@ class FeaturesTest extends TestCase {
    $r=$this->get('/auth/'.$social.'?provider=2&returnTo=booking');parse_str(parse_url($r->headers->get('Location'),PHP_URL_QUERY),$q);
    $this->get('/auth/'.$social.'/callback?state='.$q['state'].'&code=code')->assertRedirect('/foglalas?provider=2#public-form');
    $this->getJson('/api/guest?provider=2')->assertOk()->assertJsonPath('name','Közösségi Vendég')->assertJsonPath('email','social@example.com')->assertJsonPath('phone','');
-   $this->patchJson('/api/guest/profile?provider=2',['email'=>'contact@example.com','phone'=>'+36 30 111 2222'])->assertOk();
+   $this->patchJson('/api/guest/profile?provider=2',['email'=>'social@example.com','phone'=>'+36 30 111 2222'])->assertOk();
    $r=$this->get('/auth/'.$social.'?provider=2&returnTo=https://example.org');parse_str(parse_url($r->headers->get('Location'),PHP_URL_QUERY),$q);
    $this->get('/auth/'.$social.'/callback?state='.$q['state'].'&code=code')->assertRedirect('/fiokom?provider=2');
-   $this->getJson('/api/guest?provider=2')->assertJsonPath('phone','06301112222')->assertJsonPath('email','contact@example.com');
+   $this->getJson('/api/guest?provider=2')->assertJsonPath('phone','06301112222')->assertJsonPath('email','social@example.com');
    $this->getJson('/api/state?provider=2')->assertUnauthorized();
   }
  }

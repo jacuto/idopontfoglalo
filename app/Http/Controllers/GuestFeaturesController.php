@@ -14,6 +14,9 @@ final class GuestFeaturesController
         $id=(int)$r->session()->get('guest_id',0);abort_unless($id&&DB::table('guest_accounts')->where('id',$id)->exists(),401);
         $v=$r->validate(['email'=>'present|nullable|email|max:200','phone'=>'present|nullable|string|max:40','name'=>'sometimes|required|string|max:150']);
         $v=\App\Services\Contact::apply($v);
+        $guest=DB::table('guest_accounts')->where('id',$id)->first();
+        $email=(string)($guest->contact_email??$guest->email??'');
+        abort_unless((string)($v['email']??'')===$email,422,'Az e-mail-cím a vendégfiókhoz tartozik, itt nem módosítható.');
         if(isset($v['name']))DB::table('guest_accounts')->where('id',$id)->update(['profile_name'=>$v['name']]);
         DB::table('guest_accounts')->where('id',$id)->update(['contact_email'=>$v['email']??'','phone'=>$v['phone']??'','updated_at'=>now()]);
         return response()->json(['ok'=>true]);

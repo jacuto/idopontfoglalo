@@ -291,7 +291,7 @@ function clientRows(query) {
 function clientForm(id) {
   const c = state.clients.find((c) => c.id === id) || {};
   showModal(
-    `<h2>${id ? "Vendég szerkesztése" : "Új vendég"}</h2><form id="client-form"><label>Név</label><input name="name" value="${esc(c.name || "")}" required><label>Telefonszám</label><input name="phone" value="${esc(c.phone || "")}" type="tel" ${c.guestId?'readonly aria-readonly="true"':''}><label>E-mail</label><input name="email" value="${esc(c.email || "")}" type="email" ${c.guestId?'readonly aria-readonly="true"':''}>${c.guestId?'<p class="hint">Ez regisztrált vendég. Emailjét és telefonszámát a saját vendégfiókjában módosíthatja.</p>':''}<div id="form-error" class="error"></div><div class="buttons"><button type="button" onclick="$('#modal').close()">Mégse</button><button class="primary">Mentés</button></div></form>`,
+    `<h2>${id ? "Vendég szerkesztése" : "Új vendég"}</h2><form id="client-form"><label>Név</label><input name="name" value="${esc(c.name || "")}" required><label>Telefonszám</label><input name="phone" value="${esc(c.phone || "")}" type="tel" ${c.guestId?'readonly aria-readonly="true"':''}><label>E-mail</label><input name="email" value="${esc(c.email || "")}" type="email" ${c.guestId?'readonly aria-readonly="true"':''}>${c.guestId?'<p class="hint">Ez regisztrált vendég. Telefonszámát a saját vendégfiókjában módosíthatja; az e-mail-cím a fiókhoz tartozik.</p>':''}<div id="form-error" class="error"></div><div class="buttons"><button type="button" onclick="$('#modal').close()">Mégse</button><button class="primary">Mentés</button></div></form>`,
   );
   $("#client-form").onsubmit = async (e) => {
     e.preventDefault();
@@ -523,7 +523,7 @@ function importPicker(kind) {
 }
 function activityPage() {
   $("#content").innerHTML =
-    `<div class="toolbar"><p>Foglalások és változások</p><button onclick="exportData('bookings')">↓ Exportálás</button><button onclick="importPicker('bookings')">↑ Importálás</button><button onclick="refresh()">Frissítés</button></div><div class="card table-scroll"><table><thead><tr><th>Vendég</th><th>Időpont</th><th>Szolgáltatás</th><th>Állapot</th><th></th></tr></thead><tbody>${
+    `<div class="toolbar activity-toolbar"><button onclick="exportData('bookings')">↓ Exportálás</button><button onclick="importPicker('bookings')">↑ Importálás</button><button onclick="refresh()">Frissítés</button></div><div class="card table-scroll"><table><thead><tr><th>Vendég</th><th>Időpont</th><th>Szolgáltatás</th><th>Állapot</th><th></th></tr></thead><tbody>${
       [...state.bookings]
         .sort(
           (a, b) =>
@@ -531,7 +531,7 @@ function activityPage() {
         )
         .map(
           (b) =>
-            `<tr><td><a href="#foglalas-${esc(b.id)}" onclick="event.preventDefault();bookingDetails('${b.id}')"><strong>${esc(b.name)}</strong></a></td><td>${new Date(b.start).toLocaleString(window.raeroLocale?.()||"hu-HU")}</td><td>${(b.serviceSnapshot || []).map(s => `<a class="text-link" href="#szolgaltatas-${esc(s.id)}" onclick="event.preventDefault();serviceDetail('${esc(s.id)}')">${esc(s.name)}</a>`).join(" + ")}</td><td><span class="status ${b.status}">${esc(bookingStatusLabel(b))}</span></td><td><div class="table-actions"><button onclick="bookingMessage('${b.id}')">Üzenet</button>${phoneAction(bookingContact(b).phone, "Hívás")}</div></td></tr>`,
+            `<tr><td><a href="#foglalas-${esc(b.id)}" onclick="event.preventDefault();bookingDetails('${b.id}')"><strong>${esc(b.name)}</strong></a></td><td>${new Date(b.start).toLocaleString(window.raeroLocale?.()||"hu-HU")}</td><td>${(b.serviceSnapshot || []).map(s => `<a class="text-link" href="#szolgaltatas-${esc(s.id)}" onclick="event.preventDefault();serviceDetail('${esc(s.id)}')">${esc(s.name)}</a>`).join(" + ")}</td><td><span class="status ${b.status}">${esc(bookingStatusLabel(b))}</span></td><td><div class="table-actions"><button onclick="bookingMessage('${b.id}')">Üzenet</button>${bookingContact(b).phone?phoneAction(bookingContact(b).phone, "Hívás"):""}</div></td></tr>`,
         )
         .join("") || '<tr><td colspan="5">Még nincs foglalás.</td></tr>'
     }</tbody></table></div>`;
@@ -705,7 +705,7 @@ function paymentsPage() {
     (a, b) => new Date(b.paidAt) - new Date(a.paidAt),
   );
   $("#content").innerHTML =
-    `<div class="toolbar"><p>A ténylegesen beérkezett összegek nyilvántartása.</p><button class="primary" onclick="paymentForm()">＋ Befizetés rögzítése</button></div><div class="card table-scroll"><table><thead><tr><th>Vendég / időpont</th><th>Befizetés</th><th>Összeg</th><th>Fizetés</th><th>Számla</th><th></th></tr></thead><tbody>${
+    `<div class="toolbar"><p>A ténylegesen beérkezett összegek nyilvántartása.</p><button class="primary" onclick="paymentForm()">＋ Befizetés rögzítése</button></div><div class="card table-scroll"><table><thead><tr><th>Vendég / időpont</th><th>Befizetés</th><th>Összeg</th><th>Fizetés</th><th>Számla / műveletek</th></tr></thead><tbody>${
       payments
         .map((p) => {
           const b = state.bookings.find((b) => b.id === p.bookingId),
@@ -714,10 +714,10 @@ function paymentsPage() {
                 (i.paymentId === p.id || i.bookingId === p.bookingId) &&
                 ["issued", "issuing", "unknown"].includes(i.status),
             );
-          return `<tr><td><strong>${esc(b?.name || "Ismeretlen")}</strong><small>${b ? new Date(b.start).toLocaleString(window.raeroLocale?.()||"hu-HU") : ""}</small></td><td>${new Date(p.paidAt).toLocaleDateString(window.raeroLocale?.()||"hu-HU")}</td><td><strong>${money(paymentNet(p))}</strong>${p.refundedAmount ? `<small>Visszatérítve: ${money(p.refundedAmount)}</small>` : ""}</td><td>${{ cash: "Készpénz", card: "Bankkártya", szep: "SZÉP-kártya", transfer: "Átutalás" }[p.method]}<small>${p.status === "void" ? "Érvénytelenítve" : p.status === "refunded" ? "Visszatérítve" : p.source === "stripe" ? "Stripe által igazolva" : p.source === "simplepay" ? "SimplePay által igazolva" : p.source === "barion" ? "Barion által igazolva" : "Kézzel rögzítve"}</small></td><td>${invoice ? esc(invoice.number || { issuing: "Folyamatban", unknown: "Ellenőrzendő" }[invoice.status]) + (invoice.status === "unknown" ? `<button onclick="invoiceReconcileForm('${invoice.id}')">Egyeztetés</button>` : "") : p.status === "paid" ? `<button onclick="invoiceForm('${p.id}')">Számla készítése</button>` : "—"}</td><td>${["manual","sample"].includes(p.source) && p.status === "paid" && !invoice && !p.refundedAmount ? `<div class="payment-edit-actions"><button onclick="editPaymentRecord('${p.id}')">Szerkesztés</button><button class="danger" onclick="deletePaymentRecord('${p.id}')" aria-label="Befizetés törlése" title="Befizetés törlése">${trashIcon()}</button></div>` : ""}</td></tr>`;
+          return `<tr><td><strong>${esc(b?.name || "Ismeretlen")}</strong><small>${b ? new Date(b.start).toLocaleString(window.raeroLocale?.()||"hu-HU") : ""}</small></td><td>${new Date(p.paidAt).toLocaleDateString(window.raeroLocale?.()||"hu-HU")}</td><td><strong>${money(paymentNet(p))}</strong>${p.refundedAmount ? `<small>Visszatérítve: ${money(p.refundedAmount)}</small>` : ""}</td><td>${{ cash: "Készpénz", card: "Bankkártya", szep: "SZÉP-kártya", transfer: "Átutalás" }[p.method]}<small>${p.status === "void" ? "Érvénytelenítve" : p.status === "refunded" ? "Visszatérítve" : p.source === "stripe" ? "Stripe által igazolva" : p.source === "simplepay" ? "SimplePay által igazolva" : p.source === "barion" ? "Barion által igazolva" : "Kézzel rögzítve"}</small></td><td class="payment-actions-cell"><div class="payment-row-actions">${invoice ? esc(invoice.number || { issuing: "Folyamatban", unknown: "Ellenőrzendő" }[invoice.status]) + (invoice.status === "unknown" ? `<button onclick="invoiceReconcileForm('${invoice.id}')">Egyeztetés</button>` : "") : p.status === "paid" ? `<button onclick="invoiceForm('${p.id}')">Számla készítése</button>` : "—"}${["manual","sample"].includes(p.source) && p.status === "paid" && !invoice && !p.refundedAmount ? `<div class="payment-edit-actions"><button onclick="editPaymentRecord('${p.id}')">Szerkesztés</button><button class="danger" onclick="deletePaymentRecord('${p.id}')" aria-label="Befizetés törlése" title="Befizetés törlése">${trashIcon()}</button></div>` : ""}</div></td></tr>`;
         })
         .join("") ||
-      '<tr><td colspan="6">Még nincs rögzített befizetés.</td></tr>'
+      '<tr><td colspan="5">Még nincs rögzített befizetés.</td></tr>'
     }</tbody></table></div><div class="notice">Kézi rögzítéskor a beérkezést te igazolod. Az online befizetést csak hiteles Stripe/SimplePay szerverértesítés írja jóvá. A számlázás külön művelet.</div>`;
 }
 function paymentForm(bookingId) {
