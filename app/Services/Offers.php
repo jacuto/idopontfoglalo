@@ -39,6 +39,7 @@ final class Offers
                 $owner = !empty($b['guestId']) && (int) ($client['guestId'] ?? 0) === (int) $b['guestId'];
             }
             abort_unless($owner, 404);
+            if(!empty($pass['revokedAt']))throw new InvalidArgumentException('Ez a bérlet visszavont.');
             if($pass['remaining']<1)throw new InvalidArgumentException('A bérlet alkalmai elfogytak.');
             PassValidity::recalculate($pass,$s,$b);PassValidity::check($pass,$b);
             if (!empty($pass['services']) && array_diff($b['services'], $pass['services'])) throw new InvalidArgumentException('A bérlet nem érvényes ezekre a szolgáltatásokra.');
@@ -62,7 +63,8 @@ final class Offers
             PassValidity::recalculate($pass,$s,$next);
             if($next['start']!==$old['start'] && !in_array($next['status'],['cancelled','rejected'],true))PassValidity::check($pass,$next);
             $current = $pass['reservations'][$old['id']] ?? 'reserved';
-            if($restoring&&$current==='released'){if($pass['remaining']<1)throw new InvalidArgumentException('A bérlet alkalmai időközben elfogytak.');PassValidity::check($pass,$next);$pass['remaining']--;$pass['reservations'][$old['id']]='reserved';}
+            if($restoring&&$current==='released'){if(!empty($pass['revokedAt']))throw new InvalidArgumentException('Ez a bérlet visszavont.');
+            if($pass['remaining']<1)throw new InvalidArgumentException('A bérlet alkalmai időközben elfogytak.');PassValidity::check($pass,$next);$pass['remaining']--;$pass['reservations'][$old['id']]='reserved';}
             if (in_array($next['status'], ['cancelled', 'rejected'], true) && $current === 'reserved') {
                 $pass['remaining']++;
                 $pass['reservations'][$old['id']] = 'released';

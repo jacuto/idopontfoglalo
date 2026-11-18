@@ -151,7 +151,7 @@ class SalonController
                 ]);
             }
             if ($path === "/api/quote" && $method === "POST") return app(FeaturesController::class)->quote($request);
-            if (preg_match('#^/api/(profile|coupons|passes|client-passes)(/|$)#', $path) || $path === '/api/clients/search' || preg_match('#^/api/clients/[^/]+/detail$#', $path) || preg_match('#^/api/bookings/[^/]+/review$#', $path)) return app(FeaturesController::class)->handle($request);
+            if (preg_match('#^/api/(profile|coupons|passes|client-passes)(/|$)#', $path) || $path === '/api/catalog-insights' || $path === '/api/clients/search' || preg_match('#^/api/clients/[^/]+/detail$#', $path) || preg_match('#^/api/bookings/[^/]+/review$#', $path)) return app(FeaturesController::class)->handle($request);
             if (
                 preg_match(
                     "#^/api/(clients|staff|imports|payments|connections|deliveries|invoices|checkout|subscription)(/|$)#",
@@ -159,6 +159,10 @@ class SalonController
                 )
             ) {
                 return app(WorkspaceController::class)->handle($request);
+            }
+            if ($method==='DELETE'&&preg_match('#^/api/services/([a-zA-Z0-9_-]+)$#',$path,$match)) {
+                $this->store->mutate(function(&$s)use($match){foreach($s['services'] as &$service)if($service['id']===$match[1]){$service['archived']=true;if(($s['settings']['defaultServiceId']??'')===$service['id'])$s['settings']['defaultServiceId']=null;return;}abort(404);});
+                \Illuminate\Support\Facades\Cache::forget(\App\Http\Controllers\ProviderDirectoryController::CACHE_KEY);return response()->json(['ok'=>true]);
             }
             if ($path === "/api/state" && $method === "GET") {
                 $state=$this->store->read();$state['messages']=array_values(array_filter($state['messages'],fn($m)=>empty($m['providerDeletedAt'])));$state['paymentDues']=\App\Services\PaymentDues::rows($state);$state['clients']=array_values(array_filter($state['clients'],fn($c)=>\App\Services\Clients::visible($c)));

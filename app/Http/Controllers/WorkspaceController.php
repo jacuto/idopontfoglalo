@@ -354,6 +354,11 @@ class WorkspaceController
             });
             return response()->json($result);
         }
+        if(preg_match('#^/api/payments/([a-zA-Z0-9_-]+)$#',$path,$match)&&in_array($method,['PATCH','DELETE'],true)){
+            $v=$request->validate(['version'=>'required|integer|min:0','amount'=>($method==='PATCH'?'required':'sometimes').'|integer|min:1|max:100000000','method'=>($method==='PATCH'?'required':'sometimes').'|in:cash,card,transfer','paidAt'=>($method==='PATCH'?'required':'sometimes').'|date','note'=>'nullable|string|max:300']);
+            $actor='provider:'.app(\App\Services\Tenant::class)->id.':'.($request->session()->get('provider_member_id')??'owner');
+            return response()->json($this->store->mutate(fn(&$s)=>\App\Services\RecordCorrections::payment($s,$match[1],$v,$method==='DELETE',$actor)));
+        }
         if ($path === "/api/payments" && $method === "POST") {
             $v = $request->validate([
                 "bookingId" => "required|string",
@@ -394,18 +399,7 @@ class WorkspaceController
         ) {
             return response()->json(
                 $this->store->mutate(function (&$s) use ($m) {
-                    foreach ($s["payments"] as &$p) {
-                        if ($p["id"] === $m[1]) {
-                            if ($p["source"] !== "manual") {
-                                throw new InvalidArgumentException(
-                                    "Stripe-befizetést a Stripe felületén kell visszatéríteni.",
-                                );
-                            }
-                            $p["status"] = "void";
-                            return ["ok" => true];
-                        }
-                    }
-                    abort(404);
+                    \App\Services\RecordCorrections::payment($s,$m[1],[],true,'provider:'.app(\App\Services\Tenant::class)->id.':owner');return ['ok'=>true];
                 }),
             );
         }

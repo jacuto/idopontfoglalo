@@ -22,6 +22,7 @@ final class PassValidity
         $pass['startsAt']=$start->toISOString();$pass['expiresAt']=$end->toISOString();
     }
     public static function check(array $pass,array $booking):void {
+        if(!empty($pass['revokedAt']))throw new InvalidArgumentException('Ez a bérlet visszavont.');
         $date=Date::parse($booking['start']);
         if((!empty($pass['startsAt'])&&$date->lt(Date::parse($pass['startsAt'])))||(!empty($pass['expiresAt'])&&(Date::now()->gt(Date::parse($pass['expiresAt']))||$date->gt(Date::parse($pass['expiresAt'])))))throw new InvalidArgumentException('Ez az időpont a bérlet érvényességén kívül van.');
     }

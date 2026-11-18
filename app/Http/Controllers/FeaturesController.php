@@ -17,6 +17,12 @@ final class FeaturesController
         }
         if (preg_match('#^api/clients/([a-zA-Z0-9_-]+)/detail$#', $path, $m) && $method === 'GET') return response()->json(Clients::detail($this->store->read(), $m[1]));
         if (preg_match('#^api/bookings/([a-zA-Z0-9_-]+)/review$#', $path, $m) && $method === 'POST') return $this->review($r, $m[1], 'provider');
+        if ($path === 'api/catalog-insights' && $method === 'GET')return response()->json(\App\Services\CatalogInsights::build($this->store->read()))->header('Cache-Control','no-store');
+        if (preg_match('#^api/client-passes/([a-zA-Z0-9_-]+)$#',$path,$match)&&in_array($method,['PATCH','DELETE'],true)) {
+            $v=$r->validate(['version'=>'required|integer|min:0','remaining'=>($method==='PATCH'?'required':'sometimes').'|integer|min:0|max:1000','expiresAt'=>'nullable|date']);
+            $actor='provider:'.app(Tenant::class)->id.':'.($r->session()->get('provider_member_id')??'owner');
+            return response()->json($this->store->mutate(fn(&$s)=>\App\Services\RecordCorrections::issuedPass($s,$match[1],$v,$method==='DELETE',$actor)));
+        }
         if ($path === 'api/profile' && $method === 'PUT') {
             $data = $r->validate([
                 'intro' => 'nullable|string|max:500', 'description' => 'nullable|string|max:12000',
@@ -79,7 +85,7 @@ final class FeaturesController
             return response()->json($this->store->mutate(function (&$s) use ($data) {
                 abort_unless(collect($s['clients'])->firstWhere('id', $data['clientId']), 404);
                 $p = collect($s['passes'])->firstWhere('id', $data['passId']); abort_unless($p && $p['active'] && empty($p['deletedAt']), 404);
-                $assigned = ['id' => (string) Str::uuid(), 'clientId' => $data['clientId'], 'name' => $p['name'], 'services' => $p['services'], 'remaining' => $p['visits'], 'price' => $p['price'], 'terms' => $p['terms'] ?? '', 'validityMode'=>$p['validityMode']??'assigned','days'=>$p['days'],'validFrom'=>$p['validFrom']??null,'validUntil'=>$p['validUntil']??null,'startsAt'=>null,'expiresAt'=>null,'reservations' => []];
+                $assigned = ['id' => (string) Str::uuid(), 'passTypeId'=>$p['id'],'initialVisits'=>$p['visits'],'assignedAt'=>now()->toISOString(),'version'=>0, 'clientId' => $data['clientId'], 'name' => $p['name'], 'services' => $p['services'], 'remaining' => $p['visits'], 'price' => $p['price'], 'terms' => $p['terms'] ?? '', 'validityMode'=>$p['validityMode']??'assigned','days'=>$p['days'],'validFrom'=>$p['validFrom']??null,'validUntil'=>$p['validUntil']??null,'startsAt'=>null,'expiresAt'=>null,'reservations' => []];
                 \App\Services\PassValidity::assigned($assigned);
                 $s['clientPasses'][] = $assigned; return $assigned;
             }), 201);
@@ -102,7 +108,7 @@ final class FeaturesController
         }
         $passes=[];
         if($guest)foreach($s['clientPasses'] as $pass){
-            if(!in_array($pass['clientId'],$clientIds,true)||$pass['remaining']<1||(!empty($pass['services'])&&array_diff($ids,$pass['services'])))continue;
+            if(!empty($pass['revokedAt'])||!in_array($pass['clientId'],$clientIds,true)||$pass['remaining']<1||(!empty($pass['services'])&&array_diff($ids,$pass['services'])))continue;
             try{\App\Services\PassValidity::recalculate($pass,$s,$b);\App\Services\PassValidity::check($pass,$b);}catch(InvalidArgumentException){continue;}
             $passes[]=array_intersect_key($pass,array_flip(['id','name','remaining','expiresAt']));
         }

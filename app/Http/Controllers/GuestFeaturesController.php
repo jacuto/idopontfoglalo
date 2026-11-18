@@ -32,7 +32,7 @@ final class GuestFeaturesController
     {
         $id=(int)$r->session()->get('guest_id',0);abort_unless($id,401);$s=app(SalonStore::class)->read();
         $clients=collect($s['clients'])->filter(fn($c)=>(int)($c['guestId']??0)===$id)->pluck('id')->all();
-        return response()->json(array_values(array_filter($s['clientPasses'],fn($p)=>in_array($p['clientId'],$clients,true))));
+        return response()->json(array_values(array_filter($s['clientPasses'],fn($p)=>empty($p['revokedAt'])&&in_array($p['clientId'],$clients,true))));
     }
     public function claim(Request $r)
     {

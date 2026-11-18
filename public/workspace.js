@@ -701,7 +701,7 @@ async function retryDelivery(id,unknown=false) {
   deliveryRows();
 }
 function paymentsPage() {
-  const payments = [...(state.payments || [])].sort(
+  const payments = (state.payments || []).filter(p=>!p.deletedAt).sort(
     (a, b) => new Date(b.paidAt) - new Date(a.paidAt),
   );
   $("#content").innerHTML =
@@ -714,7 +714,7 @@ function paymentsPage() {
                 (i.paymentId === p.id || i.bookingId === p.bookingId) &&
                 ["issued", "issuing", "unknown"].includes(i.status),
             );
-          return `<tr><td><strong>${esc(b?.name || "Ismeretlen")}</strong><small>${b ? new Date(b.start).toLocaleString(window.raeroLocale?.()||"hu-HU") : ""}</small></td><td>${new Date(p.paidAt).toLocaleDateString(window.raeroLocale?.()||"hu-HU")}</td><td><strong>${money(paymentNet(p))}</strong>${p.refundedAmount ? `<small>Visszatérítve: ${money(p.refundedAmount)}</small>` : ""}</td><td>${{ cash: "Készpénz", card: "Bankkártya", szep: "SZÉP-kártya", transfer: "Átutalás" }[p.method]}<small>${p.status === "void" ? "Érvénytelenítve" : p.status === "refunded" ? "Visszatérítve" : p.source === "stripe" ? "Stripe által igazolva" : p.source === "simplepay" ? "SimplePay által igazolva" : p.source === "barion" ? "Barion által igazolva" : "Kézzel rögzítve"}</small></td><td>${invoice ? esc(invoice.number || { issuing: "Folyamatban", unknown: "Ellenőrzendő" }[invoice.status]) + (invoice.status === "unknown" ? `<button onclick="invoiceReconcileForm('${invoice.id}')">Egyeztetés</button>` : "") : p.status === "paid" ? `<button onclick="invoiceForm('${p.id}')">Számla készítése</button>` : "—"}</td><td>${p.source === "manual" && p.status === "paid" ? `<button onclick="voidPayment('${p.id}')">Érvénytelenítés</button>` : ""}</td></tr>`;
+          return `<tr><td><strong>${esc(b?.name || "Ismeretlen")}</strong><small>${b ? new Date(b.start).toLocaleString(window.raeroLocale?.()||"hu-HU") : ""}</small></td><td>${new Date(p.paidAt).toLocaleDateString(window.raeroLocale?.()||"hu-HU")}</td><td><strong>${money(paymentNet(p))}</strong>${p.refundedAmount ? `<small>Visszatérítve: ${money(p.refundedAmount)}</small>` : ""}</td><td>${{ cash: "Készpénz", card: "Bankkártya", szep: "SZÉP-kártya", transfer: "Átutalás" }[p.method]}<small>${p.status === "void" ? "Érvénytelenítve" : p.status === "refunded" ? "Visszatérítve" : p.source === "stripe" ? "Stripe által igazolva" : p.source === "simplepay" ? "SimplePay által igazolva" : p.source === "barion" ? "Barion által igazolva" : "Kézzel rögzítve"}</small></td><td>${invoice ? esc(invoice.number || { issuing: "Folyamatban", unknown: "Ellenőrzendő" }[invoice.status]) + (invoice.status === "unknown" ? `<button onclick="invoiceReconcileForm('${invoice.id}')">Egyeztetés</button>` : "") : p.status === "paid" ? `<button onclick="invoiceForm('${p.id}')">Számla készítése</button>` : "—"}</td><td>${["manual","sample"].includes(p.source) && p.status === "paid" && !invoice && !p.refundedAmount ? `<div class="payment-edit-actions"><button onclick="editPaymentRecord('${p.id}')">Szerkesztés</button><button class="danger" onclick="deletePaymentRecord('${p.id}')" aria-label="Befizetés törlése" title="Befizetés törlése">${trashIcon()}</button></div>` : ""}</td></tr>`;
         })
         .join("") ||
       '<tr><td colspan="6">Még nincs rögzített befizetés.</td></tr>'
