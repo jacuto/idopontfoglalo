@@ -51,6 +51,8 @@ final class Settings
         );
         $defaults["primaryStaffId"] = $state["staff"][0]["id"] ?? "";
         $state["settings"] = array_replace($defaults, $old);
+        // Earlier manual fixtures included a provider reminder event that has no UI or sender.
+        if(is_array($state["settings"]["notificationRules"]["provider"]??null))unset($state["settings"]["notificationRules"]["provider"]["reminder"]);
         foreach($state["clients"] as &$contact)$contact["phone"]=Contact::phone($contact["phone"]??"",false);unset($contact);
         $state += [
             "availability" => Availability::defaults(), "groupSessions"=>[], "recurringSeries"=>[],

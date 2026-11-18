@@ -161,7 +161,7 @@ class SalonController
                 return app(WorkspaceController::class)->handle($request);
             }
             if ($path === "/api/state" && $method === "GET") {
-                $state=$this->store->read();$state['paymentDues']=\App\Services\PaymentDues::rows($state);$state['clients']=array_values(array_filter($state['clients'],fn($c)=>\App\Services\Clients::visible($c)));
+                $state=$this->store->read();$state['messages']=array_values(array_filter($state['messages'],fn($m)=>empty($m['providerDeletedAt'])));$state['paymentDues']=\App\Services\PaymentDues::rows($state);$state['clients']=array_values(array_filter($state['clients'],fn($c)=>\App\Services\Clients::visible($c)));
                 return response()->json(\App\Services\StaffAccess::projection($state,$request));
             }
             if ($path === "/api/slots/next" && $method === "GET") return response()->json($this->nextSlots($request));

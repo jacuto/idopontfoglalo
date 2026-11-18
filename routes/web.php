@@ -105,7 +105,8 @@ Route::post(
     )->webhook($r, true),
 );
 Route::get('/api/message-recipients',[\App\Http\Controllers\MessagesController::class,'recipients']);
-Route::match(['GET', 'POST', 'PATCH'], '/api/messages', [\App\Http\Controllers\MessagesController::class, 'handle']);
+Route::get('/api/public/discounts', [\App\Http\Controllers\FeaturesController::class, 'publicDiscounts']);
+Route::match(['GET', 'POST', 'PATCH', 'DELETE'], '/api/messages', [\App\Http\Controllers\MessagesController::class, 'handle']);
 Route::patch('/api/guest/profile', [\App\Http\Controllers\GuestFeaturesController::class, 'profile']);
 Route::get('/api/guest/passes', [\App\Http\Controllers\GuestFeaturesController::class, 'passes']);
 Route::post('/api/guest/claim', [\App\Http\Controllers\GuestFeaturesController::class, 'claim']);

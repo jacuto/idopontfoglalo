@@ -33,9 +33,18 @@ final class FeaturesController
             \Illuminate\Support\Facades\Cache::forget(ProviderDirectoryController::CACHE_KEY);
             return response()->json(['ok' => true]);
         }
+        if ($method === 'DELETE' && preg_match('#^api/(coupons|passes)/([a-zA-Z0-9_-]+)$#', $path, $m)) {
+            $this->store->mutate(function (&$s) use ($m) {
+                foreach ($s[$m[1]] as &$offer) if ($offer['id'] === $m[2]) {
+                    $offer['active'] = false; $offer['deletedAt'] = now()->toISOString(); return;
+                }
+                abort(404);
+            });
+            return response()->json(['ok'=>true]);
+        }
         if ($path === 'api/coupons' && $method === 'POST') {
             $data = $r->validate([
-                'id' => 'nullable|uuid', 'code' => 'required|alpha_dash|max:80', 'name' => 'required|string|max:150',
+                'id' => 'nullable|string|max:80|regex:/^[a-zA-Z0-9_-]+$/', 'code' => 'required|alpha_dash|max:80', 'name' => 'required|string|max:150',
                 'startsAt' => 'required|date', 'endsAt' => 'required|date|after:startsAt', 'services' => 'present|array', 'services.*' => 'string|max:80',
                 'type' => 'required|in:percent,fixed', 'value' => 'required|integer|min:1|max:100000000', 'active' => 'required|boolean',
                 'limit' => 'nullable|integer|min:1', 'perClient' => 'required|integer|min:1|max:10000', 'public' => 'required|boolean', 'firstVisit' => 'required|boolean',
@@ -43,6 +52,7 @@ final class FeaturesController
             if ($data['type'] === 'percent' && $data['value'] > 100) throw new InvalidArgumentException('A százalék legfeljebb 100 lehet.');
             $data['id'] = $data['id'] ?? (string) Str::uuid(); $data['code'] = strtoupper($data['code']);
             $this->store->mutate(function (&$s) use ($data) {
+                if(collect($s['coupons'])->contains(fn($c)=>$c['id']===$data['id']&&!empty($c['deletedAt'])))throw new InvalidArgumentException('A törölt kupon nem szerkeszthető.');
                 if(empty($s['settings']['couponsEnabled'])&&!collect($s['coupons'])->contains('id',$data['id']))throw new InvalidArgumentException('Az új kuponok létrehozása ki van kapcsolva.');
                 if (array_diff($data['services'], array_column($s['services'], 'id'))) throw new InvalidArgumentException('Ismeretlen szolgáltatás.');
                 foreach ($s['coupons'] as $c) if ($c['code'] === $data['code'] && $c['id'] !== $data['id']) throw new InvalidArgumentException('Ez a kuponkód már létezik.');
@@ -51,12 +61,13 @@ final class FeaturesController
             return response()->json($data, 201);
         }
         if ($path === 'api/passes' && $method === 'POST') {
-            $data = $r->validate(['id' => 'nullable|uuid', 'name' => 'required|string|max:150', 'description' => 'nullable|string|max:3000', 'price' => 'required|integer|min:0|max:100000000', 'visits' => 'required|integer|between:1,1000', 'days' => 'required|integer|between:1,3650', 'services' => 'present|array', 'services.*' => 'string', 'active' => 'required|boolean', 'terms' => 'nullable|string|max:3000', 'validityMode'=>'sometimes|in:assigned,first_use','validFrom'=>'nullable|date_format:Y-m-d','validUntil'=>'nullable|date_format:Y-m-d']);
+            $data = $r->validate(['id' => 'nullable|string|max:80|regex:/^[a-zA-Z0-9_-]+$/', 'name' => 'required|string|max:150', 'description' => 'nullable|string|max:3000', 'price' => 'required|integer|min:0|max:100000000', 'visits' => 'required|integer|between:1,1000', 'days' => 'required|integer|between:1,3650', 'services' => 'present|array', 'services.*' => 'string', 'active' => 'required|boolean', 'terms' => 'nullable|string|max:3000', 'validityMode'=>'sometimes|in:assigned,first_use','validFrom'=>'nullable|date_format:Y-m-d','validUntil'=>'nullable|date_format:Y-m-d']);
             if(!empty($data['validFrom'])&&!empty($data['validUntil'])&&$data['validFrom']>$data['validUntil'])throw new InvalidArgumentException('A bérlet záró dátuma nem lehet a kezdő dátum előtt.');
             foreach(['description','terms'] as $key)if(isset($data[$key]))$data[$key]=\App\Services\SafeHtml::clean($data[$key]);
             $data['validityMode']=$data['validityMode']??'assigned';
             $data['id'] = $data['id'] ?? (string) Str::uuid();
             $this->store->mutate(function (&$s) use ($data) {
+                if(collect($s['passes'])->contains(fn($p)=>$p['id']===$data['id']&&!empty($p['deletedAt'])))throw new InvalidArgumentException('A törölt bérlet nem szerkeszthető.');
                 if(empty($s['settings']['passesEnabled'])&&!collect($s['passes'])->contains('id',$data['id']))throw new InvalidArgumentException('Az új bérletek létrehozása ki van kapcsolva.');
                 if (array_diff($data['services'], array_column($s['services'], 'id'))) throw new InvalidArgumentException('Ismeretlen szolgáltatás.');
                 $s['passes'] = array_values(array_filter($s['passes'], fn($p) => $p['id'] !== $data['id'])); $s['passes'][] = $data;
@@ -67,13 +78,35 @@ final class FeaturesController
             $data = $r->validate(['clientId' => 'required|string', 'passId' => 'required|string']);
             return response()->json($this->store->mutate(function (&$s) use ($data) {
                 abort_unless(collect($s['clients'])->firstWhere('id', $data['clientId']), 404);
-                $p = collect($s['passes'])->firstWhere('id', $data['passId']); abort_unless($p && $p['active'], 404);
+                $p = collect($s['passes'])->firstWhere('id', $data['passId']); abort_unless($p && $p['active'] && empty($p['deletedAt']), 404);
                 $assigned = ['id' => (string) Str::uuid(), 'clientId' => $data['clientId'], 'name' => $p['name'], 'services' => $p['services'], 'remaining' => $p['visits'], 'price' => $p['price'], 'terms' => $p['terms'] ?? '', 'validityMode'=>$p['validityMode']??'assigned','days'=>$p['days'],'validFrom'=>$p['validFrom']??null,'validUntil'=>$p['validUntil']??null,'startsAt'=>null,'expiresAt'=>null,'reservations' => []];
                 \App\Services\PassValidity::assigned($assigned);
                 $s['clientPasses'][] = $assigned; return $assigned;
             }), 201);
         }
         abort(404);
+    }
+    public function publicDiscounts(Request $r)
+    {
+        $v=$r->validate(['services'=>'sometimes|array|max:20','services.*'=>'string|max:80','start'=>'nullable|date']);
+        $s=$this->store->read();$ids=$v['services']??[];
+        if(!$ids || array_diff($ids,array_column($s['services'],'id')))return response()->json(['hasCoupon'=>false,'passes'=>[]]);
+        $guest=(int)$r->session()->get('guest_id',0);$clientIds=collect($s['clients'])->filter(fn($c)=>Clients::visible($c)&&$guest&&(int)($c['guestId']??0)===$guest)->pluck('id')->all();
+        $b=['id'=>'discount-preview','services'=>$ids,'start'=>$v['start']??now()->toISOString(),'guestId'=>$guest,'clientId'=>$clientIds[0]??'', 'public'=>true,'serviceSnapshot'=>array_values(array_filter($s['services'],fn($service)=>in_array($service['id'],$ids,true)))];
+        $hasCoupon=false;
+        if(!empty($s['settings']['couponsEnabled']))foreach($s['coupons'] as $c){
+            if(empty($c['active'])||!empty($c['deletedAt'])||!now()->between(CarbonImmutable::parse($c['startsAt']),CarbonImmutable::parse($c['endsAt']))||(!empty($c['services'])&&array_diff($ids,$c['services'])))continue;
+            if($guest){try{app(Offers::class)->quote($s,$b,$c['code']);}catch(InvalidArgumentException){continue;}}
+            else if(!empty($c['limit'])&&count(array_filter($s['bookings'],fn($old)=>($old['pricing']['couponId']??null)===$c['id']&&!in_array($old['status'],['cancelled','rejected'],true)))>=$c['limit'])continue;
+            $hasCoupon=true;break;
+        }
+        $passes=[];
+        if($guest)foreach($s['clientPasses'] as $pass){
+            if(!in_array($pass['clientId'],$clientIds,true)||$pass['remaining']<1||(!empty($pass['services'])&&array_diff($ids,$pass['services'])))continue;
+            try{\App\Services\PassValidity::recalculate($pass,$s,$b);\App\Services\PassValidity::check($pass,$b);}catch(InvalidArgumentException){continue;}
+            $passes[]=array_intersect_key($pass,array_flip(['id','name','remaining','expiresAt']));
+        }
+        return response()->json(['hasCoupon'=>$hasCoupon,'passes'=>$passes])->header('Cache-Control','no-store');
     }
     public function review(Request $r, string $bookingId, string $direction)
     {

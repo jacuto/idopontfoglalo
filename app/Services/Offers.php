@@ -11,7 +11,7 @@ final class Offers
         $result = ['original' => $original, 'discount' => 0, 'payable' => $original];
         if (!$code) return $result;
         $coupon = collect($s['coupons'])->first(fn($c) => strtoupper($c['code']) === strtoupper(trim($code)));
-        if (!$coupon || !$coupon['active']) throw new InvalidArgumentException('A kupon nem található vagy nem aktív. Ellenőrizd a kódot.');
+        if (!$coupon || !$coupon['active'] || !empty($coupon['deletedAt'])) throw new InvalidArgumentException('A kupon nem található vagy nem aktív. Ellenőrizd a kódot.');
         if (now()->lt(CarbonImmutable::parse($coupon['startsAt'])) || now()->gt(CarbonImmutable::parse($coupon['endsAt']))) throw new InvalidArgumentException('A kupon még nem érvényes vagy már lejárt.');
         if (!empty($b['public']) && empty($b['guestId'])) throw new InvalidArgumentException('A kupon használatához lépj be a vendégfiókodba.');
         if (!empty($coupon['services']) && array_diff($b['services'], $coupon['services'])) throw new InvalidArgumentException('Ez a kupon nem használható az összes kiválasztott szolgáltatásra.');
