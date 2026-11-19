@@ -9,7 +9,21 @@ final class MarketingGateway
   $base=$brevo?'https://api.brevo.com/v3/':'https://'.$this->keys['dc'].'.api.mailchimp.com/3.0/';
   try{$response=$request->send($method,$base.ltrim($path,'/'),strtoupper($method)==='GET'?['query'=>$data]:['json'=>$data]);}catch(\Throwable){throw new MarketingException('A hírlevélküldő nem igazolta a kérés eredményét. Ellenőrizd a külső fiókban.');}
   if($allowNotFound&&$method==='GET'&&$response->status()===404)return ['notFound'=>true];
-  if(!$response->successful())throw new MarketingException($response->status()===429?'A hírlevélküldő kéréskorlátja betelt.':($response->status()===402?'A hírlevélküldő ingyenes vagy fizetős küldési kerete nem elegendő.':'A hírlevélküldő elutasította a kérést. Ellenőrizd a kulcsot, a feladót és a fiók küldési keretét.'));
+  if(!$response->successful()){
+   $body=$response->json();$detail=mb_strtolower(implode(' ',array_filter([is_array($body)?($body['title']??''):'',is_array($body)?($body['detail']??$body['message']??$body['code']??''):'' ],'is_string')));
+   foreach((is_array($body)?($body['errors']??[]):[]) as $error)if(is_array($error))foreach(['field','message'] as $field)if(is_string($error[$field]??null))$detail.=' '.mb_strtolower($error[$field]);
+   $reason=match(true){
+    $response->status()===429=>'A kéréskorlát betelt. Várj néhány percet.',
+    $response->status()===401||(bool)preg_match('/api.?key|api.?token/',$detail)=>'Az API-kulcs érvénytelen vagy visszavont. Ellenőrizd a kapcsolat beállítását.',
+    $response->status()===402||(bool)preg_match('/credit|quota|pricing|billing|payment|plan limit|monthly limit|sending limit/',$detail)=>'A küldési keret vagy a csomag nem elegendő. Ellenőrizd a külső fiók előfizetését és keretét.',
+    (bool)preg_match('/verif|authenticat|dkim|domain|from.email|sender/',$detail)=>'A feladó e-mail-címe vagy domainje nincs megfelelően hitelesítve. Ellenőrizd a feladót a külső fiókban.',
+    (bool)preg_match('/compliance|suspend|disabled|paused|review|permission/',$detail)||$response->status()===403=>'A fiók küldési jogosultsága korlátozott. Nézd meg a külső fiók figyelmeztetéseit.',
+    (bool)preg_match('/recipient|segment|audience|list|contact/',$detail)=>'A címzettlista vagy a közönség nem használható. Ellenőrizd a kiválasztott listát és a feliratkozásokat.',
+    (bool)preg_match('/content|html|subject|merge.tag/',$detail)=>'A levél tárgyát vagy tartalmát elutasította a küldő. Ellenőrizd a levél adatait.',
+    default=>'A kérés elutasítva. A pontos okot a külső fiók kampányánál és értesítéseinél ellenőrizheted.'};
+   $step=match(true){str_contains($path,'sendTest')||str_contains($path,'actions/test')=>'próbalevél',str_contains($path,'sendNow')||str_contains($path,'actions/send')=>'küldés',str_contains($path,'/content')=>'levéltartalom',str_contains($path,'contacts')||str_contains($path,'members')=>'címzettek',default=>'kampány / kapcsolat'};
+   throw new MarketingException(($brevo?'Brevo':'Mailchimp').' (HTTP '.$response->status().', '.$step.'): '.$reason);
+  }
   $v=$response->json();return is_array($v)?$v:[];
  }
  public function test():array{
