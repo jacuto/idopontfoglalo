@@ -111,6 +111,7 @@ class SalonController
                     "hasCoupons" => !empty($s['settings']['couponsEnabled']) && collect($s['coupons'])->contains(fn($c)=>$c['active'] && now()->between(CarbonImmutable::parse($c['startsAt']),CarbonImmutable::parse($c['endsAt']))),
                     "hasPasses" => (!empty($s['settings']['passesEnabled']) && collect($s['passes'])->contains(fn($p)=>$p['active'])) || collect($s['clientPasses'])->contains(fn($p)=>$p['remaining']>0 && (empty($p['expiresAt'])||CarbonImmutable::parse($p['expiresAt'])->isFuture())),
                     "groupSessions"=>array_values(array_map(fn($g)=>["id"=>$g["id"],"serviceId"=>$g["serviceId"],"staff"=>$g["staff"],"start"=>$g["start"],"minimumParticipants"=>(int)($g["minimumParticipants"]??0),"minimumDeadline"=>\App\Services\GroupMinimum::deadline($g)->utc()->toISOString(),"remaining"=>$g["serviceSnapshot"]["capacity"]-\App\Services\GroupSessions::booked($g,$s)],array_filter($s["groupSessions"],fn($g)=>!\App\Services\GroupMinimum::unavailable($g,$s)&&CarbonImmutable::parse($g["start"])->isFuture()))),
+                    "openingHours"=>\App\Services\PublicHours::week($s),
                     "profile" => $s["profile"],
                     "offers" => array_values(array_filter(empty($s["settings"]["couponsEnabled"])?[]:$s["coupons"], fn($c) => $c["active"] && $c["public"] && now()->between(CarbonImmutable::parse($c["startsAt"]), CarbonImmutable::parse($c["endsAt"])))),
                     "passes" => array_values(array_filter(empty($s["settings"]["passesEnabled"])?[]:$s["passes"], fn($p) => $p["active"])),
@@ -123,7 +124,7 @@ class SalonController
                             "primaryStaffId", "bookingHorizonMode", "bookingHorizonDate", "bookingHorizonMonths", "waitlistEnabled", "prepaymentEnabled", "prepaymentMode", "depositType", "depositValue", "prepaymentTerms",
                         ]),
                     ),
-                    "prepaymentAvailable"=>\App\Services\BookingPrepayments::enabled($s),
+                    "prepaymentAvailable"=>\App\Services\BookingPrepayments::operational($s),
                     "services" => array_values(
                         array_filter(
                             $s["services"],
@@ -165,7 +166,7 @@ class SalonController
                 \Illuminate\Support\Facades\Cache::forget(\App\Http\Controllers\ProviderDirectoryController::CACHE_KEY);return response()->json(['ok'=>true]);
             }
             if ($path === "/api/state" && $method === "GET") {
-                $state=$this->store->read();$state['messages']=array_values(array_filter($state['messages'],fn($m)=>empty($m['providerDeletedAt'])));$state['paymentDues']=\App\Services\PaymentDues::rows($state);$state['clients']=array_values(array_filter($state['clients'],fn($c)=>\App\Services\Clients::visible($c)));
+                $state=$this->store->read();$state['prepaymentSetup']=['enabled'=>\App\Services\BookingPrepayments::enabled($state),'ready'=>\App\Services\BookingPrepayments::ready($state)];$state['messages']=array_values(array_filter($state['messages'],fn($m)=>empty($m['providerDeletedAt'])));$state['paymentDues']=\App\Services\PaymentDues::rows($state);$state['clients']=array_values(array_filter($state['clients'],fn($c)=>\App\Services\Clients::visible($c)));
                 return response()->json(\App\Services\StaffAccess::projection($state,$request));
             }
             if ($path === "/api/slots/next" && $method === "GET") return response()->json($this->nextSlots($request));
@@ -271,7 +272,7 @@ class SalonController
                             }
                             if(in_array($b['status'],['cancelled','rejected'],true)&&in_array($next['status'],['pending','confirmed'],true)&&!empty($b['pricing']['code']))app(\App\Services\Offers::class)->quote($s,$next,$b['pricing']['code']);
                             app(\App\Services\Offers::class)->transitionPass($s, $b, $next);
-                            if(($data['status']??'')==='confirmed'&&!empty($b['awaitingPayment'])&&\App\Services\BookingPrepayments::info($s,$b)['requiredDue']>0)throw new InvalidArgumentException('A kötelező előrefizetés még nincs rendezve. Előbb rögzítsd az igazolt befizetést.');
+                            if(($data['status']??'')==='confirmed'&&!empty($b['awaitingPayment'])){$next['awaitingPayment']=false;$next['paymentOverrideAt']=now()->toISOString();$next['paymentRequirement']['targetStatus']='confirmed';}
                             $acceptedNow = $b["status"] !== "confirmed" && $next["status"] === "confirmed";
                             $b = $next;
                             app(\App\Services\Notifications::class)->enqueue(

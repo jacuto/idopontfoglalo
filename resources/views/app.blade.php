@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="/interface-updates.css?v={{ filemtime(public_path('interface-updates.css')) }}">
 <link rel="stylesheet" href="/record-tools.css?v={{ filemtime(public_path('record-tools.css')) }}">
 <link rel="stylesheet" href="/november19.css?v={{ filemtime(public_path('november19.css')) }}">
+<link rel="stylesheet" href="/booking-polish.css?v={{ filemtime(public_path('booking-polish.css')) }}">
 </head>
   <body>
     <header class="visitor-header"><a class="visitor-brand" href="/" aria-label="Ráérő főoldal"><span>◷</span> ráérő.</a><details class="visitor-menu"><summary>Menü <span aria-hidden="true">☰</span></summary><nav aria-label="Felső menü"><a href="/szolgaltato">Szolgáltatóknak</a><a href="/arak">Árak</a><a href="/kapcsolat">Kapcsolat</a><a class="booking-nav" href="/szolgaltatok">Időpontfoglalás</a><a class="visitor-account" href="/fiokom">Saját fiókom</a></nav></details></header>
@@ -50,6 +51,7 @@
 <script src="/interface-updates.js?v={{ filemtime(public_path('interface-updates.js')) }}" defer></script>
 <script src="/record-tools.js?v={{ filemtime(public_path('record-tools.js')) }}" defer></script>
 <script src="/november19.js?v={{ filemtime(public_path('november19.js')) }}" defer></script>
+<script src="/booking-polish.js?v={{ filemtime(public_path('booking-polish.js')) }}" defer></script>
 <script src="/boot.js?v={{ filemtime(public_path('boot.js')) }}" defer></script>
   </body>
 </html>

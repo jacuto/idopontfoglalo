@@ -5,6 +5,7 @@ namespace App\Services;
 final class BookingPrepayments
 {
  public static function enabled(array $s):bool{return !empty($s['settings']['prepaymentEnabled'])&&app(PlatformConnections::class)->enabled('prepayment');}
+ public static function operational(array $s):bool{return self::enabled($s)&&self::ready($s);}
  public static function allows(array $s,string $method):bool{return in_array($method,$s['settings']['prepaymentMethods']??['card','transfer'],true);}
  public static function bankReady(array $s):bool{return trim($s['settings']['prepaymentAccount']??'')!==''&&trim($s['settings']['prepaymentAccountName']??'')!=='';}
  public static function ready(array $s):bool{return (self::allows($s,'card')&&Payments::cardReady($s))||(self::allows($s,'szep')&&Payments::szepReady())||(self::allows($s,'transfer')&&self::bankReady($s));}
@@ -23,13 +24,13 @@ final class BookingPrepayments
   }return min($total,max(0,$target));
  }
  public static function attach(array $s,array &$b):void{
-  if(empty($b['public'])||!self::enabled($s))return;$target=self::target($s,$b);if(!$target)return;
+  if(empty($b['public'])||!self::operational($s))return;$target=self::target($s,$b);if(!$target)return;
   abort_unless(self::ready($s),422,'A szolgáltató előrefizetést kér, de nincs működő fizetési kapcsolat vagy teljes átutalási számlaadat beállítva. Kérj segítséget a szolgáltatótól.');
   $b['paymentRequirement']=['amount'=>$target,'targetStatus'=>$b['status']];$b['awaitingPayment']=true;$b['status']='pending';
  }
  public static function info(array $s,array $b):array{
   $settings=$s['settings'];$total=(int)Offers::total($b);$paid=(int)collect($s['payments'])->where('bookingId',$b['id'])->where('status','paid')->sum(fn($p)=>$p['amount']-($p['refundedAmount']??0));
-  $target=(int)($b['paymentRequirement']['amount']??self::target($s,$b));$enabled=self::enabled($s);$due=max(0,$target-$paid);
+  $target=(int)($b['paymentRequirement']['amount']??self::target($s,$b));$enabled=self::operational($s);$due=max(0,$target-$paid);
   return ['enabled'=>$enabled,'mode'=>$target>0&&$target<$total?'deposit':'full','required'=>!empty($b['paymentRequirement'])&&$enabled,'requiredAmount'=>$target,'requiredDue'=>$enabled?$due:0,'awaitingPayment'=>!empty($b['awaitingPayment'])&&$enabled,'balance'=>max(0,$total-$paid),'deposit'=>$due,'paid'=>$paid,'bankName'=>$settings['prepaymentBank']??'','accountName'=>$settings['prepaymentAccountName']??'','account'=>self::allows($s,'transfer')&&self::bankReady($s)?$settings['prepaymentAccount']:'','reference'=>'RAERO-'.app(Tenant::class)->id.'-'.substr(str_replace('-','',$b['id']),0,12),'terms'=>$settings['prepaymentTerms']??'','cardReady'=>$enabled&&self::allows($s,'card')&&Payments::cardReady($s),'szepReady'=>$enabled&&self::allows($s,'szep')&&Payments::szepReady()];
  }
  public static function amount(array $s,array $b,string $mode='full'):int{
@@ -39,7 +40,7 @@ final class BookingPrepayments
  public static function validateConfig(array $s):void{
   $settings=$s['settings'];self::validateDeposit($settings);
   foreach($s['services'] as $service)self::validateDeposit($service);
-  if(self::enabled($s))abort_unless(self::ready($s),422,'Az előrefizetéshez válassz legalább egy fizetési módot, és állítsd be a hozzá tartozó kapcsolatot vagy átutalási számlaadatokat.');
+
  }
  private static function validateDeposit(array $v):void{if(($v['depositType']??'percent')==='percent'&&(int)($v['depositValue']??30)>100)throw new \InvalidArgumentException('A százalékos előleg legfeljebb 100% lehet.');}
  public static function reconcile(array &$s):void{

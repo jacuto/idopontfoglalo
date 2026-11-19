@@ -240,7 +240,7 @@ const renderWithUnread=render;
 render=function(){renderWithUnread();if(!isPublic){const actions=$('.top-actions');if(actions){const b=document.createElement('button');b.textContent='Üzenet az üzemeltetőnek';b.onclick=()=>operatorConversation(false);actions.prepend(b);}}};
 
 const originalManage=managePage;
-managePage=async function(){await originalManage();try{await api('/api/guest');const card=$('.public .card');if(card){const b=document.createElement('button');b.textContent='Foglalás kapcsolása a saját vendégfiókomhoz';b.onclick=async()=>{try{await api('/api/guest/claim','POST',{token:manageToken});toast('Foglalás a vendégfiókodhoz kapcsolva.');}catch(e){toast(e.message);}};card.append(b);}}catch{}};
+managePage=async function(){try{await api('/api/guest');}catch{}await originalManage();};
 async function changeCalendarLimit(id){await providerSubscriptionPage(id);$('#provider-subscription-form [name=calendarLimit]')?.focus();}
 async function platformConnectionsForm(){
 try{const c=await api('/api/platform/connections');const fields=[['stripe_key','Saját Stripe titkos kulcs',true],['stripe_price','Stripe havi ár azonosítója (4 000 Ft)'],['stripe_webhook_secret','Stripe webhook aláírókulcs',true],['billingo_key','Saját Billingo API-kulcs',true],['billingo_block','Billingo számlatömb azonosító'],['smtp_host','Központi SMTP-kiszolgáló'],['smtp_port','SMTP-port'],['smtp_username','SMTP-felhasználónév'],['smtp_password','SMTP-jelszó',true],['mail_from','Feladó emailcíme'],['mail_name','Feladó neve']];

@@ -254,6 +254,7 @@ class AuthController
                 401,
             );
         }
+        \App\Services\GuestBookingLinks::sync($account);
         $bookings = array_values(
             array_filter(
                 app(SalonStore::class)->read()["bookings"],

@@ -364,7 +364,7 @@ function servicesPage() {
 }
 function serviceForm(id) {
   const old = state.services.find((s) => s.id === id) || {};
-  let savedServiceId=id,metadataSaved=false;
+  let savedServiceId=id,metadataSaved=false,uploadComplete=false,savePhase="metadata";
   showModal(
     `<h2>${id ? "Szolgáltatás szerkesztése" : "Új szolgáltatás"}</h2><form id="service-form"><label>Megnevezés</label><input name="name" value="${esc(old.name || "")}" required><label>Szolgáltatás leírása</label><textarea name="description">${esc(old.description || "")}</textarea><div class="form-grid"><div><label>Időtartam (perc)</label><input name="duration" type="number" min="5" required value="${old.duration || 60}"></div><div><label>Ár (Ft)</label><input name="price" type="number" min="0" step="1" required value="${old.price ?? 10000}"></div></div><label>Szakaszok: munka, hatóidő, munka (opcionális)</label><input name="phases" placeholder="30,35,30" value="${old.phases?.join(",") || ""}"><label class="check"><input name="automatic" type="checkbox" ${old.automatic ? "checked" : ""}>Automatikus megerősítés</label><label>Ki végzi?</label>${activePeople()
       .map(
@@ -375,6 +375,7 @@ function serviceForm(id) {
         "",
       )}<div id="form-error" class="error"></div><div class="buttons"><button type="button" onclick="$('#modal').close()">Mégse</button><button class="primary">Mentés</button></div></form>`,
   );
+  $("#service-form").addEventListener("change",e=>{if(e.target.name==="image")uploadComplete=false;});
   $("#service-form").onsubmit = async (e) => {
     e.preventDefault();
     const f = new FormData(e.target);
@@ -394,6 +395,7 @@ function serviceForm(id) {
       v.phases = f.get("phases").split(",").map(Number);
     else delete v.phases;
     const saveButton=e.target.querySelector('button.primary');if(saveButton.disabled)return;saveButton.disabled=true;
+    metadataSaved=false;savePhase="metadata";
     try {
       await api("/api/config", "PUT", {
         services: state.services.some(s=>s.id===savedServiceId)
@@ -401,11 +403,12 @@ function serviceForm(id) {
           : [...state.services, v],
       });
       savedServiceId=v.id;metadataSaved=true;
-      const image=e.target.elements.image?.files[0];if(image){const upload=new FormData();upload.set('target','service');upload.set('entityId',savedServiceId);upload.set('image',image);await api('/api/media','POST',upload);}
-      state=await api('/api/state');$("#modal").close();render();
+      const image=e.target.elements.image?.files[0];if(image&&!uploadComplete){savePhase='upload';const upload=new FormData();upload.set('target','service');upload.set('entityId',savedServiceId);upload.set('image',image);const uploaded=await api('/api/media','POST',upload);if(uploaded?.url)old.image=uploaded.url;uploadComplete=true;}
+      savePhase='refresh';state=await api('/api/state');$("#modal").close();render();
       toast("Szolgáltatás mentve");
     } catch (err) {
-      e.target.querySelector("#form-error").textContent = (metadataSaved?"A szolgáltatás adatai elmentve; a kép feltöltése vagy a nézet frissítése nem sikerült: ":"")+err.message;
+      const errorBox=e.target.querySelector("#form-error");errorBox.textContent=metadataSaved?(savePhase==='upload'?'A szolgáltatás adatait elmentettük, de a képfeltöltés eredményét nem sikerült ellenőrizni. Ellenőrizd a képet; ha nem jelent meg, próbáld újra a feltöltést.':'Az adatokat és a képet elmentettük, de a nézet frissítése nem sikerült. Nem kell újra mentened az adatokat.'):err.message;
+      if(metadataSaved){logClientIssue(savePhase==='upload'?'media_upload_failed':'view_refresh_failed');const retry=document.createElement('button');retry.type='button';retry.textContent=savePhase==='upload'?'Képfeltöltés újrapróbálása':'Nézet frissítése';retry.onclick=async()=>{retry.disabled=true;try{if(savePhase==='upload'){const current=await api('/api/state');const remote=current.services.find(s=>s.id===savedServiceId);if(remote?.image&&remote.image!==(old.image||'')){state=current;dialog.close();render();return;}const image=e.target.elements.image.files[0],upload=new FormData();upload.set('target','service');upload.set('entityId',savedServiceId);upload.set('image',image);const uploaded=await api('/api/media','POST',upload);if(uploaded?.url)old.image=uploaded.url;uploadComplete=true;savePhase='refresh';}state=await api('/api/state');dialog.close();render();toast('Szolgáltatás és kép mentve.');}catch(error){errorBox.firstChild.textContent='Az adatokat megőriztük. '+error.message;retry.disabled=false;}};errorBox.append(document.createElement('br'),retry);}errorBox.scrollIntoView({block:'center'});
     } finally {saveButton.disabled=false;}
   };
 }

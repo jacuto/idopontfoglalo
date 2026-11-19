@@ -28,12 +28,14 @@ const localdt = (d) =>
   String(d.getMinutes()).padStart(2, "0");
 let csrfToken;
 const api = async (url, method = "GET", body, tenant) => {
+ try {
   if(method==="DELETE"&&typeof confirmDeletionRequest==="function"&&!confirmDeletionRequest())throw new Error("A törlést megszakítottad.");
   if (method !== "GET" && !csrfToken) {
     const response = await fetch("/api/csrf", {
       headers: { Accept: "application/json" },
     });
-    const csrf = await response.json();
+    const csrf = await response.json().catch(()=>null);
+    if(!response.ok||!csrf?.token)throw new Error("A biztonságos kapcsolatot most nem sikerült előkészíteni. Frissítsd az oldalt, majd próbáld újra.");
     csrfToken = csrf.token;
   }
   if(isPublic&&/^\/api\/(slots(?:\/next)?|quote)(?:[?]|$)/.test(url))url+=(url.includes('?')?'&':'?')+'public=1';
@@ -49,17 +51,18 @@ const api = async (url, method = "GET", body, tenant) => {
     ...(body ? { body: body instanceof FormData ? body : JSON.stringify(body) } : {}),
   });
   let r = await send();
-  if(r.status===419&&method!=="GET"){const tokenResponse=await fetch("/api/csrf",{headers:{Accept:"application/json"}});if(tokenResponse.ok){csrfToken=(await tokenResponse.json()).token;r=await send();}}
+  if(r.status===419&&method!=="GET"){const tokenResponse=await fetch("/api/csrf",{headers:{Accept:"application/json"}});if(tokenResponse.ok){const refreshed=await tokenResponse.json().catch(()=>null);if(!refreshed?.token)throw new Error('A biztonságos kapcsolat frissítése nem sikerült. Frissítsd az oldalt, majd próbáld újra.');csrfToken=refreshed.token;r=await send();}}
   const d = await r.json().catch(()=>null);
   if (!r.ok) {
     const seconds=Math.max(1,Number(d?.retryAfter||r.headers.get('Retry-After')||60));
     const fallback={401:'A bejelentkezés lejárt. Jelentkezz be újra.',403:'Nincs jogosultságod ehhez a művelethez.',404:'A kért adat vagy végpont nem található.',405:'A szerver nem engedélyezi ezt a kérési módot.',413:'A feltöltött fájl vagy kérés túl nagy.',419:'A munkamenet biztonsági azonosítója lejárt. Frissítsd az oldalt.',422:'Ellenőrizd a megadott adatokat.',500:'Szerverhiba történt. A pontos ok a Laravel naplójában található.',502:'A kiszolgáló átmenetileg nem érhető el.',503:'A kiszolgáló átmenetileg nem érhető el.'};
     const rawDetail=d?.error||d?.message;const detail=typeof rawDetail==='string'?rawDetail.trim():'';
     const message=r.status===429?'Túl sok próbálkozás. Próbáld újra '+seconds+' másodperc múlva.':r.status>=500?(fallback[r.status]||fallback[500]):detail&&!['Unauthenticated.','Forbidden','Not Found'].includes(detail)?detail:(fallback[r.status]||'A kérés nem sikerült.');
-    const error=Error((window.raeroTranslate?window.raeroTranslate(message):message)+(r.status===429?'':' (HTTP '+r.status+')'));error.status=r.status;error.url=url;throw error;
+    const error=Error((window.raeroTranslate?window.raeroTranslate(message):message)+(r.status===429?'':' (HTTP '+r.status+')'));error.status=r.status;error.url=url;error.errors=d?.errors||{};if(typeof showRequestErrors==="function")showRequestErrors(error);throw error;
   }
   if(d===null&&r.status!==204){const error=Error('A szerver nem JSON-választ adott. Frissítsd az oldalt. (HTTP '+r.status+')');error.status=r.status;error.url=url;throw error;}
   return d;
+ } catch(error){if(error instanceof TypeError&&/fetch|network|load/i.test(error.message)){const e=new Error("Nem sikerült kapcsolatba lépni a kiszolgálóval. Ellenőrizd az internetkapcsolatot, majd próbáld újra. A művelet eredménye nem biztos, hogy ellenőrizhető.");e.status=0;e.url=url;if(typeof logClientIssue==="function"&&!String(url).includes("/api/client-issue"))logClientIssue("network_request_failed");throw e;}throw error;}
 };
 const toast = (t) => {
   $("#toast").textContent = t;
@@ -77,6 +80,7 @@ async function refresh() {
   render();
 }
 function showModal(html) {
+  $("#modal").dataset.openedAt=String(performance.now());
   $("#modal").innerHTML = html;
   $("#modal").showModal();
 }
@@ -206,6 +210,7 @@ async function submitBooking(e) {
       trackBooking();
       $("#public-form").innerHTML =
         `<div class="success">${remembered}<h2>${b.status === "pending" ? "Foglalási kérésed megérkezett!" : "Az időpontod megerősítve!"}</h2><p>${b.awaitingPayment ? "A foglalás a kért előrefizetés igazolásáig függőben marad. A fizetéshez nyisd meg az alábbi hivatkozást." : b.status === "pending" ? "A szalon jóváhagyására vár." : "Várunk szeretettel!"}</p><p>Mentsd el a módosítási hivatkozásod. A szalon beállításai alapján e-mailes értesítőt is kaphatsz:</p><a href="/modositas?provider=${providerId()}&token=${b.token}" class="${state.prepaymentAvailable?'primary':''}">${state.prepaymentAvailable?'Előrefizetés / előleg és foglalás kezelése →':'Foglalásom kezelése →'}</a></div>`;
+      if(typeof renderBookingPaymentSummary==='function')renderBookingPaymentSummary(b.token);
     } else {
       $("#modal").close();
       await refresh();

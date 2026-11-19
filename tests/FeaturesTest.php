@@ -71,8 +71,8 @@ class FeaturesTest extends TestCase {
   $this->postJson('/api/bookings',$this->booking(['clientId'=>'one']))->assertCreated()->assertJsonPath('clientId','one')->assertJsonPath('name','Régi vendég');
   $this->assertCount(1,app(SalonStore::class)->read()['clients']);
  }
- public function test_guest_never_claims_bookings_by_email_or_client_id():void {
-  $b=$this->postJson('/api/bookings',$this->booking())->assertCreated()->json();$this->guest();
+ public function test_unverified_guest_never_claims_bookings_by_email_or_client_id():void {
+  $b=$this->postJson('/api/bookings',$this->booking())->assertCreated()->json();$this->guest();DB::table('guest_accounts')->where('id',10)->update(['email_verified'=>false]);
   $this->getJson('/api/guest')->assertJsonCount(0,'bookings');
   $this->postJson('/api/bookings',$this->booking(['clientId'=>$b['clientId'],'start'=>'2035-03-13T09:00:00Z']))->assertCreated();
   $this->getJson('/api/guest')->assertJsonCount(1,'bookings');

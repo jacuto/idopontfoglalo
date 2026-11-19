@@ -32,9 +32,9 @@ final class FeaturesController
                 'email' => 'nullable|email|max:200', 'website' => 'nullable|url:http,https|max:1000',
                 'mapUrl' => 'nullable|url:http,https|max:1000', 'facebook' => 'nullable|url:http,https|max:1000', 'instagram' => 'nullable|url:http,https|max:1000',
                 'logo' => ['nullable','string','max:1000',self::publicImageRule()], 'cover' => ['nullable','string','max:1000',self::publicImageRule()], 'photos' => 'sometimes|array|max:12', 'photos.*' => ['string','max:1000',self::publicImageRule()],
-                'acceptedPayments'=>'sometimes|array|max:6','acceptedPayments.*'=>'in:cash,card,transfer,szep,otp_szep,other','hours' => 'nullable|string|max:1500', 'terms' => 'nullable|string|max:5000',
+                'acceptedPayments'=>'sometimes|array|max:6','acceptedPayments.*'=>'in:cash,card,transfer,szep,otp_szep,other','showOpeningHours'=>'sometimes|boolean','hours' => 'nullable|string|max:1500', 'terms' => 'nullable|string|max:5000',
             ]);
-            $data=\App\Services\Contact::apply($data);
+            $data=\App\Services\Contact::apply($data);if(array_key_exists('showOpeningHours',$data))$data['showOpeningHours']=(bool)$data['showOpeningHours'];
             foreach(['description','terms'] as $key)if(isset($data[$key]))$data[$key]=\App\Services\SafeHtml::clean($data[$key]);
             $this->store->mutate(function (&$s) use ($data) { if(isset($data['photos'])&&count($data['photos'])>5&&$data['photos']!==($s['profile']['photos']??[]))throw new \InvalidArgumentException('Legfeljebb 5 üzletfotó adható meg.');$s['profile'] = array_replace($s['profile']??[], $data); });
             \Illuminate\Support\Facades\Cache::forget(ProviderDirectoryController::CACHE_KEY);

@@ -8,7 +8,10 @@ function offerFields() {
 function serviceSelectionChanged(){if(isPublic&&$('#booking-date')){if(!$('#booking-date').value)$('#booking-date').value=datekey(new Date());++slotRequest;}updateStaff();}
 function bookingDaySelected(){const date=$('#booking-date');if(date)date.dataset.userChosen='true';loadSlots();}
 const dialog=$('#modal');
-dialog.addEventListener('click',e=>{const r=dialog.getBoundingClientRect();if(e.target===dialog&&(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom))dialog.close();});
+let backdropPointerGeneration=null;
+const outsideDialog=e=>{const r=dialog.getBoundingClientRect();return e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom;};
+document.addEventListener('pointerdown',e=>{backdropPointerGeneration=dialog.open&&e.target===dialog&&outsideDialog(e)?dialog.dataset.openedAt:null;},true);
+dialog.addEventListener('click',e=>{const intentional=backdropPointerGeneration!==null&&backdropPointerGeneration===dialog.dataset.openedAt&&performance.now()-Number(dialog.dataset.openedAt)>300;backdropPointerGeneration=null;if(intentional&&e.target===dialog&&outsideDialog(e))dialog.close();});
 const phoneLink=phone=>phone?`<a class="call-link" href="tel:${esc(phoneHref(phone))}" aria-label="Hívás: ${esc(phoneFormatted(phone))}">${contactMark('phone')}${esc(phoneFormatted(phone))}</a>`:'<span class="muted">Nincs telefonszám</span>';
 function phoneAction(phone,label) {return phone?`<a class="call-action" href="tel:${esc(String(phone).replace(/[^+0-9]/g,''))}" aria-label="Hívás: ${esc(phone)}">${contactMark('phone')}${esc(label)}</a>`:'<span class="muted">—</span>';}
 function bookingContact(b){return state.clients.find(c=>c.id===b.clientId)||b;}
