@@ -81,6 +81,7 @@ Route::match(['GET','POST'],'/api/sms-wallet',[\App\Http\Controllers\SmsWalletCo
 Route::post('/api/sms-wallet/deliveries/{id}/resolve',[\App\Http\Controllers\SmsWalletController::class,'resolve'])->whereNumber('id');
 Route::match(['GET','POST'],'/api/platform/sms-wallet',[\App\Http\Controllers\SmsWalletController::class,'operator']);
 foreach(['/api/marketing','/api/platform/marketing'] as $prefix){
+ Route::post($prefix.'/design-preview',[\App\Http\Controllers\MarketingController::class,'designPreview']);
  Route::match(['GET','PUT','POST','DELETE'],$prefix.'/connection',[\App\Http\Controllers\MarketingController::class,'connection']);
  Route::match(['GET','POST'],$prefix.'/campaigns/{id?}/{action?}',[\App\Http\Controllers\MarketingController::class,'campaigns'])->whereUuid('id')->whereIn('action',['prepare','send','test','report','cancel','delete']);
  Route::match(['GET','POST'],$prefix.'/consents',[\App\Http\Controllers\MarketingController::class,'consents']);

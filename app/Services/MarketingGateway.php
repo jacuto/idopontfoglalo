@@ -37,7 +37,7 @@ final class MarketingGateway
  }
  public function create(object $campaign,string $list,array $recipients):string{
   if($this->keys['engine']==='brevo'&&empty($this->keys['folderId']))$this->keys=array_replace($this->keys,MarketingConnections::get((int)$campaign->provider_id));
-  $emailHtml=NewsletterDesign::render($campaign->html,$this->keys,$this->keys['engine']==='brevo'?'{{ unsubscribe }}':'*|UNSUB|*');
+  $emailHtml=NewsletterDesign::render($campaign->html,$this->keys,$this->keys['engine']==='brevo'?'{{ unsubscribe }}':'*|UNSUB|*',$campaign->template_key??'general',NewsletterDesign::bookingUrl((int)$campaign->provider_id));
   $emailText=NewsletterDesign::text($campaign->html,$this->keys,$this->keys['engine']==='brevo'?'{{ unsubscribe }}':'*|UNSUB|*');
   if($this->keys['engine']==='brevo'){
    // A segment is built for this campaign so an older contact in the shared list cannot leak in.
