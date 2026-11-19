@@ -28,6 +28,7 @@ const localdt = (d) =>
   String(d.getMinutes()).padStart(2, "0");
 let csrfToken;
 const api = async (url, method = "GET", body, tenant) => {
+  if(method==="DELETE"&&typeof confirmDeletionRequest==="function"&&!confirmDeletionRequest())throw new Error("A törlést megszakítottad.");
   if (method !== "GET" && !csrfToken) {
     const response = await fetch("/api/csrf", {
       headers: { Accept: "application/json" },

@@ -17,7 +17,7 @@ final class TenantContext
         abort_unless(is_scalar($selector) && preg_match('/^[1-9][0-9]{0,8}$/', (string) $selector), 404);
         $id = (int) $selector;
         $public = in_array($r->path(), ['api/provider-login', 'api/provider-workspace', 'api/provider-register', 'api/provider-social', 'api/provider-password/forgot', 'api/provider-password/reset', 'api/providers', 'api/public', 'api/public/discounts', 'api/quote', 'api/slots', 'api/slots/next', 'api/bookings', 'api/manage', 'api/manage/review', 'api/manage/checkout', 'api/login', 'api/stripe/webhook', 'api/simplepay/ipn','api/simplepay/szep-ipn','api/barion/callback'], true)
-            || $r->is('api/waitlist/token/*') || $r->is('api/waitlist/join') || $r->is('api/marketing/webhook/*') || $r->is('api/platform/*') || $r->is('api/platform-messages*') || !$r->is('api/*') || $r->is('api/guest*') || $r->is('api/auth/*');
+            || $r->is('api/waitlist/token/*') || $r->is('api/waitlist/availability') || $r->is('api/waitlist/join') || $r->is('api/marketing/webhook/*') || $r->is('api/platform/*') || $r->is('api/platform-messages*') || !$r->is('api/*') || $r->is('api/guest*') || $r->is('api/auth/*');
         if($r->is('api/calendar/connection')&&$r->query('owner','guest')==='guest')$public=true;
         // Old admin sessions remain scoped exclusively to the original salon.
         $owner = (int) $r->session()->get('provider_id', 1);

@@ -82,6 +82,7 @@ class SalonStore
             if($checkGroups)GroupMinimum::evaluate($state);
             $result = $callback($state);
             BookingPrepayments::reconcile($state);
+            AutomaticPayments::reconcile($state);
             app(GoogleCalendar::class)->enqueue($state,$before);
             DB::table("salon_state")
                 ->where("id", app(Tenant::class)->id)

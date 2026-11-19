@@ -82,7 +82,7 @@ class BookingRules
         ) {
             throw new InvalidArgumentException("Válassz munkatársat.");
         }
-        if(!$historical)Blacklist::guard($state,$booking);
+        if(!$historical){Blacklist::guard($state,$booking);foreach($state['subscription']['calendarReductions']??[] as $change)if($change['status']==='scheduled'&&$change['staffId']===($booking['staff']??'')&&CarbonImmutable::parse($booking['start'])->gte(CarbonImmutable::parse($change['effectiveAt'])))throw new InvalidArgumentException('Ez a naptár a kiválasztott időpontban már kikapcsol. Válassz másik munkatársat.');}
         $duration = 0;
         foreach ($booking["services"] as $id) {
             $service = $this->service($state["services"], $id);

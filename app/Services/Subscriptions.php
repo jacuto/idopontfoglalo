@@ -9,14 +9,15 @@ final class Subscriptions
 {
     public static function monthlyAmount(array $state, ?string $at=null):int{
         if($at===null&&PlatformAccess::mode($state)!=='active')return 0;
-        $count=0;foreach($state['subscription']['calendarAddons']??[] as $addon)if($at===null||Time::parse($addon['startsAt'])->lte(Time::parse($at)))$count+=(int)$addon['quantity'];return PlanPricing::base($state,$at)+2000*$count;
+        $count=0;foreach($state['subscription']['calendarAddons']??[] as $addon)if(($at===null&&($addon['quantity']>=0||Time::parse($addon['startsAt'])->lte(now())))||($at!==null&&Time::parse($addon['startsAt'])->lte(Time::parse($at))))$count+=(int)$addon['quantity'];return PlanPricing::base($state,$at)+2000*$count;
     }
     public static function amountForPeriod(array $state,string $at):int{foreach($state['subscription']['charges']??[] as $e)if($e['kind']==='monthly'&&Time::parse($e['from'])->equalTo(Time::parse($at)))return (int)$e['amount'];return self::monthlyAmount($state,$at);}
     public static function nextPeriod(array $state):string{
-        $sub=$state['subscription'];if(empty($sub['id'])&&!empty($sub['paidUntil'])&&Time::parse($sub['paidUntil'])->isFuture())return Time::parse($sub['paidUntil'])->toISOString();if(!empty($sub['trialEndsAt'])&&Time::parse($sub['trialEndsAt'])->isFuture())return Time::parse($sub['trialEndsAt'])->toISOString();foreach($sub['charges']??[] as $entry)if($entry['kind']==='monthly'&&Time::parse($entry['from'])->lte(now())&&Time::parse($entry['to'])->isFuture())return $entry['to'];return now()->addMonthNoOverflow()->toISOString();
+        $sub=$state['subscription'];if(!empty($sub['paidUntil'])&&Time::parse($sub['paidUntil'])->isFuture())return Time::parse($sub['paidUntil'])->toISOString();if(!empty($sub['trialEndsAt'])&&Time::parse($sub['trialEndsAt'])->isFuture())return Time::parse($sub['trialEndsAt'])->toISOString();foreach($sub['charges']??[] as $entry)if($entry['kind']==='monthly'&&Time::parse($entry['from'])->lte(now())&&Time::parse($entry['to'])->isFuture())return $entry['to'];return now()->addMonthNoOverflow()->toISOString();
     }
     public static function refresh(array &$state): void
     {
+        CalendarReductions::apply($state);
         $sub = &$state['subscription'];
         $sub['calendarBlocked'] = false;
         foreach($sub['charges']??[] as $i=>$entry)if($entry['kind']==='monthly'&&!in_array($entry['status'],['paid','waived'],true)&&PlatformAccess::exempt($sub,Time::parse($entry['from']),Time::parse($entry['to']))){$sub['charges'][$i]['status']='waived';$sub['charges'][$i]['waivedReason']='operator_access_period';}

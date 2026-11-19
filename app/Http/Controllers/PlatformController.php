@@ -38,7 +38,8 @@ final class PlatformController {
   }
   if($path==='api/platform/legal'&&$method==='GET')return response()->json(app(\App\Services\PublicDocuments::class)->settings());
   if($path==='api/platform/legal'&&$method==='PUT'){
-   $v=$r->validate(['privacyEmail'=>'required|email|max:200','hostingName'=>'required|string|max:200','hostingAddress'=>'required|string|max:300','hostingPrivacyUrl'=>'nullable|url:https|max:500','scope'=>'required|in:business,all','retentionNotes'=>'required|string|max:4000']);
+   $r->merge(\App\Services\WebAddresses::fields($r->all()));
+   $v=$r->validate(['privacyEmail'=>'required|email|max:200','hostingName'=>'required|string|max:200','hostingAddress'=>'required|string|max:300','hostingPrivacyUrl'=>'nullable|url:http,https|max:500','scope'=>'required|in:business,all','retentionNotes'=>'required|string|max:4000']);
    app(\App\Services\PublicDocuments::class)->save($v);return response()->json(['ok'=>true]);
   }
   if(preg_match('#^api/platform/providers/([1-9][0-9]*)/plan$#',$path,$m)&&$method==='PATCH') {

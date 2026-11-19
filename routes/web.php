@@ -66,6 +66,7 @@ Route::get('/hirlevel/leiratkozas/{id}', [\App\Http\Controllers\NewsletterContro
 Route::match(['GET','POST'], '/api/platform/newsletters/{id?}/{action?}', [\App\Http\Controllers\NewsletterController::class,'handle'])->whereNumber('id')->whereIn('action',['test','schedule']);
 Route::match(['GET','POST'], '/api/platform-messages', [\App\Http\Controllers\PlatformMessagesController::class,'handle']);
 Route::patch('/api/platform-messages/read', [\App\Http\Controllers\PlatformMessagesController::class,'read']);
+Route::get('/api/waitlist/availability',[\App\Http\Controllers\WaitlistController::class,'availability'])->middleware('throttle:60,1');
 Route::post('/api/waitlist/join',[\App\Http\Controllers\WaitlistController::class,'join'])->middleware('throttle:3,60');
 Route::match(['GET','POST'],'/api/waitlist/token/{token}',[\App\Http\Controllers\WaitlistController::class,'token'])->where('token','[a-f0-9]{64}')->middleware('throttle:30,1');
 Route::match(['GET','DELETE'],'/api/waitlist/{id?}',[\App\Http\Controllers\WaitlistController::class,'manage'])->whereUuid('id');

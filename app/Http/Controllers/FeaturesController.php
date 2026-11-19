@@ -24,6 +24,7 @@ final class FeaturesController
             return response()->json($this->store->mutate(fn(&$s)=>\App\Services\RecordCorrections::issuedPass($s,$match[1],$v,$method==='DELETE',$actor)));
         }
         if ($path === 'api/profile' && $method === 'PUT') {
+            $r->merge(\App\Services\WebAddresses::fields($r->all()));
             $data = $r->validate([
                 'intro' => 'nullable|string|max:500', 'description' => 'nullable|string|max:12000',
                 'city'=>'nullable|string|max:100','zip'=>'nullable|string|max:20','categories'=>'sometimes|array|max:7','categories.*'=>\Illuminate\Validation\Rule::in(array_keys(\App\Services\ProviderDiscovery::CATEGORIES)),

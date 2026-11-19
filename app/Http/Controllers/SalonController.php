@@ -402,7 +402,7 @@ class SalonController
                     "settings.closingTime" => "sometimes|date_format:H:i",
                     "settings.reviewRequestsEnabled"=>"sometimes|boolean","settings.reviewRequestDelayHours"=>"sometimes|integer|between:0,720",
                     "settings.advancedBookingEnabled"=>"sometimes|boolean","settings.servicePhasesEnabled"=>"sometimes|boolean","settings.couponsEnabled"=>"sometimes|boolean","settings.passesEnabled"=>"sometimes|boolean","settings.guestInvitationPolicy"=>"sometimes|in:none,email,sms,email_first,sms_first",
-                    "settings.paymentDefaults"=>"sometimes|array:enabled,method,note", "settings.paymentDefaults.enabled"=>"sometimes|boolean", "settings.paymentDefaults.method"=>"sometimes|in:cash,card,transfer", "settings.paymentDefaults.note"=>"nullable|string|max:300",
+                    "settings.paymentDefaults"=>"sometimes|array:enabled,method,note,automatic", "settings.paymentDefaults.automatic"=>"sometimes|boolean", "settings.paymentDefaults.enabled"=>"sometimes|boolean", "settings.paymentDefaults.method"=>"sometimes|in:cash,card,transfer", "settings.paymentDefaults.note"=>"nullable|string|max:300",
                     "settings.defaultServiceId"=>"nullable|string|max:80", "settings.skipUnnamedWarning"=>"sometimes|boolean",
                     "settings.slotStep"=>"sometimes|integer|in:5,10,15,20,30,60", "settings.noShowFee"=>"sometimes|integer|min:0|max:100000000",
                     "settings.businessMode" => "sometimes|in:solo,team",

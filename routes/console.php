@@ -186,3 +186,6 @@ Artisan::command('raero:auto-invoices {--limit=10}',function(){$this->info(json_
 Artisan::command('raero:waitlist {--limit=10}',function(){$this->info(json_encode(\App\Services\Waitlist::run((int)$this->option('limit'))));});
 \Illuminate\Support\Facades\Schedule::command('raero:waitlist')->everyMinute()->withoutOverlapping();
 \Illuminate\Support\Facades\Schedule::call(function(){\App\Services\SystemIssues::prune();DB::table('waitlist_entries')->whereIn('status',['expired','cancelled','notified'])->where('updated_at','<',now()->subDays(90))->delete();})->daily();
+
+Artisan::command('raero:auto-payments',function(){$this->info((string)\App\Services\AutomaticPayments::run());})->purpose('Opcionális befizetésrögzítés igazolt megjelenés után');
+\Illuminate\Support\Facades\Schedule::command('raero:auto-payments')->everyMinute()->withoutOverlapping();
