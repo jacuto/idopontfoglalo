@@ -12,6 +12,12 @@ final class WaitlistController {
   $catalog=collect($s['services'])->filter(fn($service)=>empty($service['archived']));if(array_diff($ids,$catalog->pluck('id')->all()))return response()->json(['eligible'=>false]);
   // Compare actual bookable starts with the same day without salon bookings.
   // Opening hours, breaks, time off, horizon and external calendar busy times remain in force.
+  $day=Date::createFromFormat('!Y-m-d',$v['date'],'Europe/Budapest');$from=$day->getTimestamp();$to=$day->addDay()->getTimestamp();$rules=app(\App\Services\BookingRules::class);
+  $people=array_filter(\App\Services\Settings::activeStaff($s),fn($p)=>($v['staff']==='any'||$p['id']===$v['staff'])&&!$catalog->whereIn('id',$ids)->contains(fn($service)=>!in_array($p['id'],\App\Services\Settings::serviceStaff($s,$service),true)));$staffIds=array_column($people,'id');
+  $relevant=array_filter($s['bookings'],function($b)use($staffIds,$from,$to,$rules,$s){if(!in_array($b['staff'],$staffIds,true)||!in_array($b['status'],['pending','confirmed'],true))return false;foreach($rules->occupied($b,$s) as [$begin,$end])if($begin<$to&&$end>$from)return true;return false;});
+  if(!$relevant)return response()->json(['eligible'=>false])->header('Cache-Control','no-store');
+  // Keep one external-calendar snapshot for both probes; external refreshes are not salon bookings.
+  $s['_googleBusy']=app(\App\Services\GoogleCalendar::class)->busy($s,(int)$r->session()->get('guest_id',0));
   $probe=$r->duplicate(array_replace($r->query->all(),['public'=>1]));$controller=app(SalonController::class);
   $actual=$controller->slots($probe,$s);$s['bookings']=[];$possible=$controller->slots($probe,$s);
   return response()->json(['eligible'=>count(array_diff(array_column($possible,'start'),array_column($actual,'start')))>0])->header('Cache-Control','no-store');

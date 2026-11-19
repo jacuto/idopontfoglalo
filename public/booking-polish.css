@@ -11,3 +11,9 @@ html body .booking-primary-focus{border:2px solid #5339df!important;border-top:7
 @media(max-width:1000px){.subscription-top-row{grid-template-columns:minmax(0,1fr)}.subscription-method-grid{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:650px){html body .booking-primary-focus{padding:20px 15px!important}html body .booking-primary-focus h2{font-size:26px!important}.web-address-prefix{font-size:12px;padding:0 8px}.bank-account-highlight{font-size:18px}.booking-payment-result{padding:15px}.subscription-top-row .subscription-overview{grid-template-columns:minmax(0,1fr)}}
 html body .public-hours-switch{display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:9px!important;padding:12px!important;font-weight:500!important}html body .public-hours-switch input{width:17px!important;height:17px!important;min-height:0!important;flex:0 0 17px;margin:0!important}
+/* Read the complete service description in place; keep provider text inside its card. */
+html body .feedback-booking-page .service-public-copy .rich-text.is-expanded{display:block!important;max-height:none!important;height:auto!important;-webkit-line-clamp:unset!important;overflow:visible!important}
+html body .feedback-booking-page .service-public-card:has(.rich-text.is-expanded){align-items:flex-start!important}
+html body .public-opening-hours .hours-extra,html body .public-provider-description .rich-text{position:static!important;float:none!important;box-sizing:border-box;max-width:100%;min-width:0;overflow-wrap:anywhere;white-space:normal}
+html body .public-opening-hours .hours-extra{display:block!important;grid-column:1/-1;white-space:pre-line;line-height:1.7;margin:15px 0 0!important}
+.public-provider-description{max-width:none!important;min-width:0}.public-provider-description>h2{margin-top:0}.public-provider-description .description-toggle{margin-top:10px}

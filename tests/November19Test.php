@@ -46,6 +46,15 @@ class November19Test extends TestCase
   $this->putJson('/api/profile',['instagram'=>'www.instagram.com/teszt','facebook'=>'facebook.com/teszt'])->assertOk();
   foreach(['https://instagram.com.evil.example/test','facebook.com/test','javascript:alert(1)','https://instagram.com@evil.example'] as $in)$this->putJson('/api/profile',['instagram'=>$in])->assertUnprocessable();
  }
+ public function test_waitlist_excludes_other_days_other_workers_closed_hours_and_available_parallel_capacity():void{
+  $store=app(SalonStore::class);$day=now()->addDay()->toDateString();$start=Time::parse($day.' 10:00','Europe/Budapest')->utc()->toISOString();
+  $store->mutate(function(&$s)use($start){$s['settings']['waitlistEnabled']=true;$s['services'][0]['staff']=['anna','eszter'];$s['bookings']=[$this->booking(['start'=>Time::parse($start)->addDay()->toISOString()])];});
+  $query=fn($staff)=>'/api/waitlist/availability?'.http_build_query(['date'=>$day,'services'=>'cut','staff'=>$staff]);$this->getJson($query('anna'))->assertOk()->assertJsonPath('eligible',false);
+  $store->mutate(function(&$s)use($start){$s['bookings'][0]['start']=$start;$s['bookings'][0]['staff']='eszter';});$this->getJson($query('anna'))->assertJsonPath('eligible',false);$this->getJson($query('any'))->assertJsonPath('eligible',false);$this->getJson($query('eszter'))->assertJsonPath('eligible',true);
+  $store->mutate(function(&$s)use($day){$s['availability']['overrides']=[['date'=>$day,'staffId'=>'eszter','closed'=>true,'openingTime'=>'08:00','closingTime'=>'20:00']];});$this->getJson($query('eszter'))->assertJsonPath('eligible',false);
+  $store->mutate(function(&$s)use($start){$s['availability']['overrides']=[];$s['bookings'][0]['staff']='anna';$s['bookings'][0]['start']=$start;$s['services'][0]['bookingMode']='parallel';$s['services'][0]['capacity']=2;$s['bookings'][0]['serviceSnapshot'][0]['bookingMode']='parallel';$s['bookings'][0]['serviceSnapshot'][0]['capacity']=2;});$this->getJson($query('anna'))->assertJsonPath('eligible',false);
+  $store->mutate(function(&$s){$other=$s['bookings'][0];$other['id']='second';$s['bookings'][]=$other;});$this->getJson($query('anna'))->assertJsonPath('eligible',true);
+ }
  public function test_waitlist_is_only_useful_when_booking_removes_otherwise_bookable_start():void{
   $store=app(SalonStore::class);$day=now()->addDay()->toDateString();$store->mutate(function(&$s){$s['settings']['waitlistEnabled']=true;});$query='/api/waitlist/availability?'.http_build_query(['date'=>$day,'services'=>'cut','staff'=>'anna']);
   $this->getJson($query)->assertOk()->assertJsonPath('eligible',false);
