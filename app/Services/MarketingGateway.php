@@ -37,16 +37,17 @@ final class MarketingGateway
  }
  public function create(object $campaign,string $list,array $recipients):string{
   if($this->keys['engine']==='brevo'&&empty($this->keys['folderId']))$this->keys=array_replace($this->keys,MarketingConnections::get((int)$campaign->provider_id));
-  $footer='<hr><p>'.e($this->keys['company']??$this->keys['senderName']).' · '.e(implode(', ',array_filter([$this->keys['zip']??'',$this->keys['city']??'',$this->keys['address']??'']))).'</p>';
+  $emailHtml=NewsletterDesign::render($campaign->html,$this->keys,$this->keys['engine']==='brevo'?'{{ unsubscribe }}':'*|UNSUB|*');
+  $emailText=NewsletterDesign::text($campaign->html,$this->keys,$this->keys['engine']==='brevo'?'{{ unsubscribe }}':'*|UNSUB|*');
   if($this->keys['engine']==='brevo'){
    // A segment is built for this campaign so an older contact in the shared list cannot leak in.
    $v=$this->call('POST','contacts/lists',['name'=>'Ráérő kampány '.substr($campaign->id,0,8),'folderId'=>(int)$this->keys['folderId']]);$campaignList=$v['id']??null;if(!$campaignList)throw new MarketingException('A kampány címzettlistája nem jött létre.');
    // Brevo adds existing contacts in one idempotent list-membership request.
    foreach(array_chunk(array_column($recipients,'email'),150) as $emails)$this->call('POST','contacts/lists/'.$campaignList.'/contacts/add',['emails'=>$emails]);
-   $v=$this->call('POST','emailCampaigns',['name'=>'Ráérő '.substr($campaign->id,0,8),'subject'=>$campaign->subject,'sender'=>['email'=>$this->keys['senderEmail'],'name'=>$this->keys['senderName']],'htmlContent'=>$campaign->html.$footer.'<p><a href="{{ unsubscribe }}">Leiratkozás</a></p>','recipients'=>['listIds'=>[(int)$campaignList]],'toField'=>'{EMAIL}']);
+   $v=$this->call('POST','emailCampaigns',['name'=>'Ráérő '.substr($campaign->id,0,8),'subject'=>$campaign->subject,'sender'=>['email'=>$this->keys['senderEmail'],'name'=>$this->keys['senderName']],'htmlContent'=>$emailHtml,'textContent'=>$emailText,'recipients'=>['listIds'=>[(int)$campaignList]],'toField'=>'{EMAIL}']);
   }else{
    $segment=$this->call('POST','lists/'.rawurlencode($list).'/segments',['name'=>'Raero-'.substr($campaign->id,0,8),'static_segment'=>array_column($recipients,'email')]);if(empty($segment['id']))throw new MarketingException('A Mailchimp címzettcsoport nem jött létre.');
-   $v=$this->call('POST','campaigns',['type'=>'regular','recipients'=>['list_id'=>$list,'segment_opts'=>['saved_segment_id'=>(int)$segment['id']]],'settings'=>['subject_line'=>$campaign->subject,'from_name'=>$this->keys['senderName'],'reply_to'=>$this->keys['senderEmail'],'title'=>'Raero-'.substr($campaign->id,0,8)]]);if(empty($v['id']))throw new MarketingException('A Mailchimp-kampány nem jött létre.');$this->call('PUT','campaigns/'.rawurlencode($v['id']).'/content',['html'=>$campaign->html.$footer.'<p><a href="*|UNSUB|*">Leiratkozás</a></p>']);
+   $v=$this->call('POST','campaigns',['type'=>'regular','recipients'=>['list_id'=>$list,'segment_opts'=>['saved_segment_id'=>(int)$segment['id']]],'settings'=>['subject_line'=>$campaign->subject,'from_name'=>$this->keys['senderName'],'reply_to'=>$this->keys['senderEmail'],'title'=>'Raero-'.substr($campaign->id,0,8)]]);if(empty($v['id']))throw new MarketingException('A Mailchimp-kampány nem jött létre.');$this->call('PUT','campaigns/'.rawurlencode($v['id']).'/content',['html'=>$emailHtml,'plain_text'=>$emailText]);
   }
   if(empty($v['id']))throw new MarketingException('A kampányazonosító hiányzik.');return (string)$v['id'];
  }

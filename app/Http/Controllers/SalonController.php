@@ -456,6 +456,7 @@ class SalonController
                     "settings.notifyGuest" => "sometimes|boolean",
                     "settings.notifyProvider" => "sometimes|boolean",
                     "settings.reminderGuest" => "sometimes|boolean",
+                    "settings.guestRemindersPaused" => "sometimes|boolean",
                     "settings.billingName" => "nullable|string|max:200",
                     "settings.billingTaxNumber" => "nullable|string|max:30",
                     "settings.billingCountry" => "sometimes|string|size:2",
@@ -620,7 +621,7 @@ class SalonController
                                 "notifyGuest",
                                 "notifyProvider",
                                 "providerEmail",
-                                "reminderGuest", "notificationRules", "providerPhone",
+                                "reminderGuest", "notificationRules", "providerPhone", "guestRemindersPaused",
                             ]
                             as $k
                         ) {

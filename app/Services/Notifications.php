@@ -11,6 +11,7 @@ class Notifications
     public function __construct(private Connections $connections) {}
     public function enqueue(array $booking, array $state, string $event): void
     {
+        $booking=NotificationPreferences::withClient($booking,$state);
         $settings = $state['settings'];
         $event = NotificationPreferences::event($event, $booking);
         $booking['notificationVersion'] = $settings['notificationVersion'] ?? 1;
@@ -90,6 +91,7 @@ class Notifications
             return ['recipient'=>$p['recipient'],'text'=>mb_strimwidth($s['settings']['name'],0,40,'…').' · Csoportos óra elmarad · '.CarbonImmutable::parse($g['start'])->setTimezone('Europe/Budapest')->format('Y.m.d. H:i')];
         }
         $b=collect($s['bookings'])->firstWhere('id',$p['bookingId']??'');if(!$b||$b['updatedAt']!==($p['version']??null))return null;
+        $b=NotificationPreferences::withClient($b,$s);
         $event=NotificationPreferences::event($p['event'],$b);
         if(!NotificationPreferences::enabled($s['settings'],$p['audience'],$event,'sms',$b))return null;
         if($event==='reminder'&&(!PaidFeatures::enabled($s)||$b['status']!=='confirmed'||CarbonImmutable::parse($b['start'])->isPast()||($p['settingsVersion']??1)!==($s['settings']['notificationVersion']??1)))return null;
@@ -183,6 +185,7 @@ class Notifications
                     $this->finish($job->id, 'sent', ['attempts' => $job->attempts + 1]); $counts['sent']++; continue;
                 }
                 $b = collect($s["bookings"])->firstWhere("id", $p["bookingId"]);
+                if($b)$b=NotificationPreferences::withClient($b,$s);
                 $event = NotificationPreferences::event($p['event'], $b ?? []);
                 $enabled = NotificationPreferences::enabled($s['settings'], $p['audience'], $event, $p['channel'], $b ?? []);
                 if ($event === 'reminder' && !PaidFeatures::enabled($s)) $enabled = false;

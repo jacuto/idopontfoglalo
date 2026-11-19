@@ -26,11 +26,24 @@ final class NotificationPreferences
 
     public static function enabled(array $settings, string $audience, string $event, string $channel, array $booking = []): bool
     {
+        if ($audience==='guest'&&$event==='reminder') {
+            if(!empty($settings['guestRemindersPaused']))return false;
+            $preference=$booking['reminderPreference']??'inherit';
+            if($preference==='off')return false;
+            if($preference==='on')return in_array($settings['channel']??'email',[$channel,'mindkettő'],true);
+        }
         // Preserve the legacy safety notice, without turning on new paid channels.
         if (!isset($settings['notificationRules']) && $event === 'group_missed' && $audience === 'guest') {
             return $channel === 'email' || empty($booking['email']);
         }
         return !empty(self::choices($settings)[$audience][$event][$channel]);
+    }
+
+    public static function withClient(array $booking,array $state):array
+    {
+        $client=collect($state['clients']??[])->firstWhere('id',$booking['clientId']??'');
+        $booking['reminderPreference']=$client['reminderPreference']??'inherit';
+        return $booking;
     }
 
     public static function event(string $event, array $booking): string

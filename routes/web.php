@@ -82,7 +82,7 @@ Route::post('/api/sms-wallet/deliveries/{id}/resolve',[\App\Http\Controllers\Sms
 Route::match(['GET','POST'],'/api/platform/sms-wallet',[\App\Http\Controllers\SmsWalletController::class,'operator']);
 foreach(['/api/marketing','/api/platform/marketing'] as $prefix){
  Route::match(['GET','PUT','POST','DELETE'],$prefix.'/connection',[\App\Http\Controllers\MarketingController::class,'connection']);
- Route::match(['GET','POST'],$prefix.'/campaigns/{id?}/{action?}',[\App\Http\Controllers\MarketingController::class,'campaigns'])->whereUuid('id')->whereIn('action',['prepare','send','test','report','cancel']);
+ Route::match(['GET','POST'],$prefix.'/campaigns/{id?}/{action?}',[\App\Http\Controllers\MarketingController::class,'campaigns'])->whereUuid('id')->whereIn('action',['prepare','send','test','report','cancel','delete']);
  Route::match(['GET','POST'],$prefix.'/consents',[\App\Http\Controllers\MarketingController::class,'consents']);
 }
 Route::match(['GET','PUT'],'/api/guest/marketing-consent',[\App\Http\Controllers\MarketingController::class,'guestConsent']);
@@ -114,6 +114,9 @@ Route::post('/api/guest/claim', [\App\Http\Controllers\GuestFeaturesController::
 Route::post('/api/guest/avatar', [\App\Http\Controllers\GuestFeaturesController::class, 'avatar']);
 Route::get('/api/guest/avatar/{id}', [\App\Http\Controllers\GuestFeaturesController::class, 'image'])->whereNumber('id');
 Route::post('/api/guest/bookings/{id}/review', [\App\Http\Controllers\GuestFeaturesController::class, 'review']);
+Route::post('/api/clients/{id}/reminder-preference',[\App\Http\Controllers\ReminderPreferencesController::class,'save']);
+Route::post('/api/reminder-preferences/reset',[\App\Http\Controllers\ReminderPreferencesController::class,'save']);
+
 Route::any("/api/{path}", [SalonController::class, "handle"])
     ->where("path", ".*")
     ->middleware(ApiHeaders::class);

@@ -43,6 +43,7 @@
 <script src="/usability.js?v={{ filemtime(public_path('usability.js')) }}" defer></script>
 <script src="/presentation.js?v={{ filemtime(public_path('presentation.js')) }}" defer></script>
 <script src="/gallery.js?v={{ filemtime(public_path('gallery.js')) }}" defer></script>
+<script src="/newsletter-templates.js?v={{ filemtime(public_path('newsletter-templates.js')) }}" defer></script>
 <script src="/commerce.js?v={{ filemtime(public_path('commerce.js')) }}" defer></script>
 <script src="/launch-tools.js?v={{ filemtime(public_path('launch-tools.js')) }}" defer></script>
 <script src="/booking-payments.js?v={{ filemtime(public_path('booking-payments.js')) }}" defer></script>
@@ -52,6 +53,7 @@
 <script src="/record-tools.js?v={{ filemtime(public_path('record-tools.js')) }}" defer></script>
 <script src="/november19.js?v={{ filemtime(public_path('november19.js')) }}" defer></script>
 <script src="/booking-polish.js?v={{ filemtime(public_path('booking-polish.js')) }}" defer></script>
+<script src="/reminder-preferences.js?v={{ filemtime(public_path('reminder-preferences.js')) }}" defer></script>
 <script src="/boot.js?v={{ filemtime(public_path('boot.js')) }}" defer></script>
   </body>
 </html>
