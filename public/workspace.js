@@ -595,7 +595,7 @@ function settingsPage() {
       v = Object.fromEntries(f);
     for (const k of [
       "confirmation",
-      "guestRemindersPaused", "guestInvitationSmsEnabled", "waitlistEnabled", "providerRemindersEnabled", "autoInvoice", "skipUnnamedWarning", "reviewRequestsEnabled", "advancedBookingEnabled", "servicePhasesEnabled", "couponsEnabled", "passesEnabled",
+      "loyaltyEnabled", "guestRemindersPaused", "guestInvitationSmsEnabled", "waitlistEnabled", "providerRemindersEnabled", "autoInvoice", "skipUnnamedWarning", "reviewRequestsEnabled", "advancedBookingEnabled", "servicePhasesEnabled", "couponsEnabled", "passesEnabled",
     ])
       v[k] = e.target.elements[k] ? f.has(k) : !!state.settings[k];
     v.notificationRules=notificationChoices(state.settings);

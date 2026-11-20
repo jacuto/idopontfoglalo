@@ -8,7 +8,7 @@ final class Settings
             "businessMode" => "team",
             "primaryStaffId" => "anna",
             "reviewRequestsEnabled"=>false,"reviewRequestDelayHours"=>24,
-            "advancedBookingEnabled"=>false,"servicePhasesEnabled"=>false,"couponsEnabled"=>true,"passesEnabled"=>true,"guestInvitationPolicy"=>"none",
+            "loyaltyEnabled"=>false,"advancedBookingEnabled"=>false,"servicePhasesEnabled"=>false,"couponsEnabled"=>true,"passesEnabled"=>true,"guestInvitationPolicy"=>"none",
             "paymentDefaults"=>["automatic"=>false,"enabled"=>true,"method"=>"cash","note"=>""],
             "slotStep"=>10,"noShowFee"=>0,"defaultServiceId"=>null,"skipUnnamedWarning"=>false,
             "openingTime" => "08:00",

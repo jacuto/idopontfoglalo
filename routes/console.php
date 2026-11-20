@@ -189,3 +189,6 @@ Artisan::command('raero:waitlist {--limit=10}',function(){$this->info(json_encod
 
 Artisan::command('raero:auto-payments',function(){$this->info((string)\App\Services\AutomaticPayments::run());})->purpose('Opcionális befizetésrögzítés igazolt megjelenés után');
 \Illuminate\Support\Facades\Schedule::command('raero:auto-payments')->everyMinute()->withoutOverlapping();
+
+Artisan::command('raero:loyalty',function(){$count=0;foreach(DB::table('salon_state')->pluck('id') as $id)app(\App\Services\Tenant::class)->run((int)$id,function()use(&$count){$store=app(\App\Services\SalonStore::class);$s=$store->read();if(!empty($s['settings']['loyaltyEnabled'])||!empty($s['loyalty']['earnings'])){$store->mutate(fn(&$s)=>null);$count++;}});$this->info((string)$count);})->purpose('Pontgyűjtő egyenlegek rendezése igazolt látogatás és fizetés alapján');
+\Illuminate\Support\Facades\Schedule::command('raero:loyalty')->everyMinute()->withoutOverlapping();

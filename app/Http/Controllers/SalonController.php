@@ -108,6 +108,7 @@ class SalonController
             if ($path === "/api/public" && $method === "GET") {
                 $s = $this->store->read();
                 return response()->json([
+                    "loyaltyEnabled" => !empty($s['settings']['loyaltyEnabled']),
                     "hasCoupons" => !empty($s['settings']['couponsEnabled']) && collect($s['coupons'])->contains(fn($c)=>$c['active'] && now()->between(CarbonImmutable::parse($c['startsAt']),CarbonImmutable::parse($c['endsAt']))),
                     "hasPasses" => (!empty($s['settings']['passesEnabled']) && collect($s['passes'])->contains(fn($p)=>$p['active'])) || collect($s['clientPasses'])->contains(fn($p)=>$p['remaining']>0 && (empty($p['expiresAt'])||CarbonImmutable::parse($p['expiresAt'])->isFuture())),
                     "groupSessions"=>array_values(array_map(fn($g)=>["id"=>$g["id"],"serviceId"=>$g["serviceId"],"staff"=>$g["staff"],"start"=>$g["start"],"minimumParticipants"=>(int)($g["minimumParticipants"]??0),"minimumDeadline"=>\App\Services\GroupMinimum::deadline($g)->utc()->toISOString(),"remaining"=>$g["serviceSnapshot"]["capacity"]-\App\Services\GroupSessions::booked($g,$s)],array_filter($s["groupSessions"],fn($g)=>!\App\Services\GroupMinimum::unavailable($g,$s)&&CarbonImmutable::parse($g["start"])->isFuture()))),
@@ -198,6 +199,7 @@ class SalonController
                     "clientId" => "nullable|string|max:80",
                     "coupon" => "nullable|string|max:80",
                     "passId" => "nullable|string|max:80",
+                    "loyaltyRewardId" => "nullable|string|max:80",
                     "name" => "nullable|string|max:150", "allowUnnamed"=>"sometimes|boolean", "rememberUnnamed"=>"sometimes|boolean",
                     "phone" => "nullable|string|max:40",
                     "email" => "nullable|email|max:200",
@@ -402,7 +404,7 @@ class SalonController
                     "settings.openingTime" => "sometimes|date_format:H:i",
                     "settings.closingTime" => "sometimes|date_format:H:i",
                     "settings.reviewRequestsEnabled"=>"sometimes|boolean","settings.reviewRequestDelayHours"=>"sometimes|integer|between:0,720",
-                    "settings.advancedBookingEnabled"=>"sometimes|boolean","settings.servicePhasesEnabled"=>"sometimes|boolean","settings.couponsEnabled"=>"sometimes|boolean","settings.passesEnabled"=>"sometimes|boolean","settings.guestInvitationPolicy"=>"sometimes|in:none,email,sms,email_first,sms_first",
+                    "settings.loyaltyEnabled"=>"sometimes|boolean","settings.advancedBookingEnabled"=>"sometimes|boolean","settings.servicePhasesEnabled"=>"sometimes|boolean","settings.couponsEnabled"=>"sometimes|boolean","settings.passesEnabled"=>"sometimes|boolean","settings.guestInvitationPolicy"=>"sometimes|in:none,email,sms,email_first,sms_first",
                     "settings.paymentDefaults"=>"sometimes|array:enabled,method,note,automatic", "settings.paymentDefaults.automatic"=>"sometimes|boolean", "settings.paymentDefaults.enabled"=>"sometimes|boolean", "settings.paymentDefaults.method"=>"sometimes|in:cash,card,transfer", "settings.paymentDefaults.note"=>"nullable|string|max:300",
                     "settings.defaultServiceId"=>"nullable|string|max:80", "settings.skipUnnamedWarning"=>"sometimes|boolean",
                     "settings.slotStep"=>"sometimes|integer|in:5,10,15,20,30,60", "settings.noShowFee"=>"sometimes|integer|min:0|max:100000000",
@@ -779,6 +781,7 @@ class SalonController
                         : "confirmed";
                     $b["pricing"] = app(\App\Services\Offers::class)->quote($s, $b, $data["coupon"] ?? null);
                     app(\App\Services\Offers::class)->reservePass($s, $b, $data["passId"] ?? null, !$b["public"]);
+                    \App\Services\Loyalty::reserve($s,$b,$data['loyaltyRewardId']??null,!$b['public']);
                     \App\Services\BookingPrepayments::attach($s,$b);
                     $s["bookings"][] = $b;
                     if((!$b['public']||!empty($s['settings']['guestInvitationSmsEnabled']))&&!empty($b['clientId'])){ $client=collect($s['clients'])->firstWhere('id',$b['clientId']);if($client)\App\Services\ClientInvitations::queue($s,$client);}

@@ -131,7 +131,7 @@ final class FeaturesController
     public function quote(Request $r)
     {
         $s = $this->store->read();
-        $data = $r->validate(['services' => 'required|array|min:1|max:20', 'services.*' => 'string', 'coupon' => 'nullable|string|max:80', 'passId'=>'nullable|string|max:80','start'=>'nullable|date', 'clientId' => 'nullable|string|max:80']);
+        $data = $r->validate(['services' => 'required|array|min:1|max:20', 'services.*' => 'string', 'coupon' => 'nullable|string|max:80', 'passId'=>'nullable|string|max:80','loyaltyRewardId'=>'nullable|string|max:80','start'=>'nullable|date', 'clientId' => 'nullable|string|max:80']);
         $b = ['services' => $data['services'], 'serviceSnapshot' => array_map(fn($id) => app(\App\Services\BookingRules::class)->service($s['services'], $id), $data['services']), 'guestId' => $r->session()->get('guest_id'), 'clientId' => '', 'public' => true];
         if ($r->session()->get('admin') === true && !$r->boolean('public') && (int) $r->session()->get('provider_id', 1) === app(Tenant::class)->id) {
             \App\Services\StaffAccess::ownClient($s,$data['clientId']??null,$r);
@@ -142,6 +142,7 @@ final class FeaturesController
         $b['id']='preview';$b['start']=$data['start']??now()->toISOString();
         $b['pricing']=app(Offers::class)->quote($s,$b,$data['coupon']??null);
         app(Offers::class)->reservePass($s,$b,$data['passId']??null,!$b['public']);
+        \App\Services\Loyalty::reserve($s,$b,$data['loyaltyRewardId']??null,!$b['public']);
         return response()->json(array_replace($b['pricing'],['prepayment'=>['enabled'=>\App\Services\BookingPrepayments::enabled($s),'requiredAmount'=>\App\Services\BookingPrepayments::enabled($s)?\App\Services\BookingPrepayments::target($s,$b):0]]));
     }
     private static function publicImageRule():\Closure{return static function($attribute,$value,$fail){if(!\App\Services\ProviderDiscovery::image($value)&&!(filter_var($value,FILTER_VALIDATE_URL)&&parse_url($value,PHP_URL_SCHEME)==='http'))$fail('Érvényes képcímet adj meg.');};}

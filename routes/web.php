@@ -118,6 +118,9 @@ Route::post('/api/guest/bookings/{id}/review', [\App\Http\Controllers\GuestFeatu
 Route::post('/api/clients/{id}/reminder-preference',[\App\Http\Controllers\ReminderPreferencesController::class,'save']);
 Route::post('/api/reminder-preferences/reset',[\App\Http\Controllers\ReminderPreferencesController::class,'save']);
 
+Route::match(['GET','PUT'],'/api/loyalty',[\App\Http\Controllers\LoyaltyController::class,'settings']);
+Route::get('/api/clients/{id}/loyalty',[\App\Http\Controllers\LoyaltyController::class,'client']);
+Route::get('/api/guest/loyalty',[\App\Http\Controllers\LoyaltyController::class,'guest']);
 Route::any("/api/{path}", [SalonController::class, "handle"])
     ->where("path", ".*")
     ->middleware(ApiHeaders::class);

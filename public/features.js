@@ -53,16 +53,16 @@ function chooseClient(index) {
 }
 async function previewPrice() {
   try {
-    const price = await api('/api/quote','POST',{services:[...document.querySelectorAll('[name=services]:checked')].map(x=>x.value),coupon:$('[name=coupon]')?.value || null,clientId:$('[name=clientId]')?.value || null,passId:$('[name=passId]')?.value || null,start:$('[name=start]')?.value || null});
-    $('#price-preview').textContent = `Eredeti ár: ${money(price.original)} · Kedvezmény: ${money(price.discount)} · Fizetendő: ${money(price.payable)}`;
-  } catch(e) { $('#price-preview').textContent = e.message; }
+    const price = await api('/api/quote','POST',{public:isPublic,services:[...document.querySelectorAll('[name=services]:checked')].map(x=>x.value),coupon:$('[name=coupon]')?.value || null,clientId:$('[name=clientId]')?.value || null,loyaltyRewardId:$('[name=loyaltyRewardId]')?.value || null,passId:$('[name=passId]')?.value || null,start:$('[name=start]')?.value || null});
+    for(const output of [$('#price-preview'),$('.loyalty-quote')].filter(Boolean))output.textContent=`Eredeti ár: ${money(price.original)} · Kedvezmény: ${money(price.discount)} · Fizetendő: ${money(price.payable)}`;
+  } catch(e) { for(const output of [$('#price-preview'),$('.loyalty-quote')].filter(Boolean))output.textContent=e.message; }
 }
 const baseSubmit = submitBooking;
 submitBooking = async function(e) {
   // A visible server quote is required before a discounted booking is submitted.
-  if ($('[name=coupon]')?.value || $('[name=passId]')?.value) {
+  if ($('[name=coupon]')?.value || $('[name=passId]')?.value || $('[name=loyaltyRewardId]')?.value) {
     e.preventDefault();
-    try { const price = await api('/api/quote','POST',{services:[...document.querySelectorAll('[name=services]:checked')].map(x=>x.value),coupon:$('[name=coupon]')?.value,clientId:$('[name=clientId]')?.value || null,passId:$('[name=passId]')?.value || null,start:$('[name=start]')?.value || null});
+    try { const price = await api('/api/quote','POST',{public:isPublic,services:[...document.querySelectorAll('[name=services]:checked')].map(x=>x.value),coupon:$('[name=coupon]')?.value,clientId:$('[name=clientId]')?.value || null,loyaltyRewardId:$('[name=loyaltyRewardId]')?.value || null,passId:$('[name=passId]')?.value || null,start:$('[name=start]')?.value || null});
       if (!confirm(`Eredeti ár: ${money(price.original)}\nKedvezmény: ${money(price.discount)}\nFizetendő: ${money(price.payable)}\nLefoglalod?`)) return;
     } catch(err) { $('#form-error').textContent = err.message; return; }
   }
