@@ -1,4 +1,5 @@
-let calendarMode = window.innerWidth < 650 ? "day" : "week",
+function savedCalendarMode(){try{const mode=localStorage.getItem("raero-calendar-mode");if(["day","week","month"].includes(mode))return mode;}catch{}return innerWidth<650?"day":"week";}
+let calendarMode = savedCalendarMode(),
   calendarAnchor = new Date(),
   reportFrom = datekey(
     new Date(new Date().getFullYear(), new Date().getMonth(), 1),
@@ -268,7 +269,7 @@ function calendarPage() {
 let calendarResizeTimer;
 window.addEventListener("resize", () => {
   clearTimeout(calendarResizeTimer);
-  calendarResizeTimer = setTimeout(() => { const mobile = innerWidth < 650; if (mobile && !calendarWasMobile && calendarMode === "week") calendarMode = "day"; calendarWasMobile = mobile; if (document.querySelector(".timeline") && !document.querySelector("dialog[open]")) calendarPage(); }, 150);
+  calendarResizeTimer = setTimeout(() => { const mobile = innerWidth < 650;  calendarWasMobile = mobile; if (document.querySelector(".timeline") && !document.querySelector("dialog[open]")) calendarPage(); }, 150);
 });
 function clientsPage() {
   $("#content").innerHTML =

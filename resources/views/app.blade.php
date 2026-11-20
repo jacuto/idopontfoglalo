@@ -13,6 +13,8 @@
 <link rel="stylesheet" href="/record-tools.css?v={{ filemtime(public_path('record-tools.css')) }}">
 <link rel="stylesheet" href="/november19.css?v={{ filemtime(public_path('november19.css')) }}">
 <link rel="stylesheet" href="/booking-polish.css?v={{ filemtime(public_path('booking-polish.css')) }}">
+<link rel="stylesheet" href="/mobile-followup.css?v={{ filemtime(public_path('mobile-followup.css')) }}">
+@include('partials.consent')
 </head>
   <body>
     <header class="visitor-header"><a class="visitor-brand" href="/" aria-label="Ráérő főoldal"><span>◷</span> ráérő.</a><details class="visitor-menu"><summary>Menü <span aria-hidden="true">☰</span></summary><nav aria-label="Felső menü"><a href="/szolgaltato">Szolgáltatóknak</a><a href="/arak">Árak</a><a href="/kapcsolat">Kapcsolat</a><a class="booking-nav" href="/szolgaltatok">Időpontfoglalás</a><a class="visitor-account" href="/fiokom">Saját fiókom</a></nav></details></header>
@@ -56,6 +58,7 @@
 <script src="/reminder-preferences.js?v={{ filemtime(public_path('reminder-preferences.js')) }}" defer></script>
 <script src="/loyalty.js?v={{ filemtime(public_path('loyalty.js')) }}" defer></script>
 <script src="/history-pagination.js?v={{ filemtime(public_path('history-pagination.js')) }}" defer></script>
+<script src="/mobile-followup.js?v={{ filemtime(public_path('mobile-followup.js')) }}" defer></script>
 <script src="/boot.js?v={{ filemtime(public_path('boot.js')) }}" defer></script>
   </body>
 </html>
