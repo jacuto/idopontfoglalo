@@ -74,21 +74,13 @@ class WorkspaceController
             return response()->json(["ok" => true]);
         }
         if ($path === "/api/deliveries" && $method === "GET") {
-            return response()->json(
-                DB::table("deliveries")->where("provider_id", app(\App\Services\Tenant::class)->id)
-                    ->select(
-                        "id",
-                        "status", "payload",
-                        "attempts",
-                        "available_at",
-                        "error",
-                        "provider_reference",
-                        "updated_at",
-                    )
-                    ->latest("id")
-                    ->limit(100)
-                    ->get()->map(function($row){$row=\App\Services\DeliveryDescriptions::for($row,$this->store->read());$row->sms_wallet_status=\App\Services\SmsWallet::item($row->id)?->status;return $row;}),
-            );
+            $q=DB::table('deliveries')->where('provider_id',app(\App\Services\Tenant::class)->id)->select('id','status','payload','attempts','available_at','error','provider_reference','updated_at')->orderByDesc('id');
+            $scope=$request->validate(['scope'=>'sometimes|in:all,waiting,errors'])['scope']??'all';$waiting=['pending','blocked','processing','waiting_balance'];$errors=['unknown','on_hold','failed'];
+            $counts=['all'=>(int)(clone $q)->count(),'waiting'=>(int)(clone $q)->whereIn('status',$waiting)->count(),'errors'=>(int)(clone $q)->whereIn('status',$errors)->count()];
+            if($scope==='waiting')$q->whereIn('status',$waiting);if($scope==='errors')$q->whereIn('status',$errors);
+            $paged=$request->has('page');$page=$paged?\App\Services\HistoryPage::query($q,$request,20):['items'=>$q->limit(100)->get()];$state=$this->store->read();
+            $rows=$page['items']->map(function($row)use($state){$row=\App\Services\DeliveryDescriptions::for($row,$state);$row->sms_wallet_status=\App\Services\SmsWallet::item($row->id)?->status;return $row;});
+            return response()->json($paged?['items'=>$rows,'pagination'=>$page['pagination'],'counts'=>$counts]:$rows);
         }
         if ($path === "/api/deliveries/run" && $method === "POST") {
             return response()->json(app(Notifications::class)->run(10, app(\App\Services\Tenant::class)->id));

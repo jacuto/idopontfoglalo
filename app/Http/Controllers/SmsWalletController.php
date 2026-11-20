@@ -9,6 +9,12 @@ final class SmsWalletController {
   if($r->isMethod('GET'))return response()->json(SmsWallet::info($provider));
   $v=$r->validate(['amount'=>'required|integer|in:3000,5000,10000','requestId'=>'required|uuid','acceptPrice'=>'accepted']);return response()->json($r->is('api/sms-wallet/transfer')?SmsTopups::transfer($provider,$v['amount'],$v['requestId']):app(SmsTopups::class)->checkout($provider,$v['amount'],$v['requestId']));
  }
+ public function history(Request $r,string $kind){
+  abort_unless($r->session()->get('admin')===true&&!StaffAccess::editor($r)&&(int)$r->session()->get('provider_id',1)===app(Tenant::class)->id,403);abort_unless(in_array($kind,['ledger','topups'],true),404);
+  $q=DB::table($kind==='ledger'?'sms_ledger':'sms_topups')->where('provider_id',app(Tenant::class)->id);
+  $q=$kind==='ledger'?$q->select('id','kind','amount','created_at')->orderByDesc('id'):$q->select('id','amount','refunded','status','invoice_number','invoice_issued_on','created_at')->orderByDesc('created_at')->orderByDesc('id');
+  return response()->json(\App\Services\HistoryPage::query($q,$r,10));
+ }
  public function operator(Request $r){
   abort_unless($r->session()->get('platform_admin')===true,403);
   if($r->isMethod('GET'))return response()->json(['providers'=>DB::table('salon_state')->get()->map(fn($row)=>['id'=>$row->id,'name'=>json_decode($row->data,true)['settings']['name']??('#'.$row->id)]),'price'=>SmsWallet::price(),'wallets'=>DB::table('sms_wallets')->get(),'topups'=>DB::table('sms_topups')->latest('created_at')->limit(300)->get()]);

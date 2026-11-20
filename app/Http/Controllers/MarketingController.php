@@ -22,7 +22,13 @@ final class MarketingController
  }
  public function campaigns(Request $r,?string $id=null,?string $action=null){
   $provider=$this->owner($r);
-  if($r->isMethod('GET'))return response()->json(['campaigns'=>DB::table('marketing_campaigns')->where('provider_id',$provider)->whereNull('deleted_at')->select('id','engine','subject','html','template_key','status','remote_id','recipient_count','scheduled_at','submitted_at','error','created_at','updated_at')->latest('created_at')->limit(100)->get(),'recipients'=>MarketingCampaigns::recipients($provider),'connection'=>MarketingConnections::status($provider),'bookingUrl'=>\App\Services\NewsletterDesign::bookingUrl($provider)]);
+  if($r->isMethod('GET')){
+   $q=DB::table('marketing_campaigns')->where('provider_id',$provider)->whereNull('deleted_at')->select('id','engine','subject','html','template_key','status','remote_id','recipient_count','scheduled_at','submitted_at','error','created_at','updated_at')->orderByDesc('created_at')->orderByDesc('id');
+   if($r->filled('campaignId')){$idFilter=$r->validate(['campaignId'=>'required|uuid'])['campaignId'];$q->where('id',$idFilter);}
+   $page=$r->has('page')?\App\Services\HistoryPage::query($q,$r,5):['items'=>$q->limit(100)->get(),'pagination'=>null];
+   return response()->json(['campaigns'=>$page['items'],'campaignPagination'=>$page['pagination'],'recipients'=>MarketingCampaigns::recipients($provider),'connection'=>MarketingConnections::status($provider),'bookingUrl'=>\App\Services\NewsletterDesign::bookingUrl($provider)]);
+  }
+
   $keys=MarketingConnections::get($provider);abort_unless(!empty($keys['apiKey']),422,'Előbb kapcsold össze a hírlevélküldő fiókodat.');
   if(!$id){$v=$r->validate(['subject'=>'required|string|max:200','html'=>'required|string|max:50000','templateKey'=>'sometimes|in:free,offer,new,notice,general']);$id=(string)Str::uuid();DB::table('marketing_campaigns')->insert(['id'=>$id,'provider_id'=>$provider,'engine'=>$keys['engine'],'subject'=>$v['subject'],'html'=>SafeHtml::clean($v['html']),'template_key'=>$v['templateKey']??'general','status'=>'draft','created_at'=>now(),'updated_at'=>now()]);return response()->json(['id'=>$id],201);}
   $campaign=DB::table('marketing_campaigns')->where('id',$id)->where('provider_id',$provider)->whereNull('deleted_at')->first();abort_unless($campaign,404);

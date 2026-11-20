@@ -121,6 +121,7 @@ Route::post('/api/reminder-preferences/reset',[\App\Http\Controllers\ReminderPre
 Route::match(['GET','PUT'],'/api/loyalty',[\App\Http\Controllers\LoyaltyController::class,'settings']);
 Route::get('/api/clients/{id}/loyalty',[\App\Http\Controllers\LoyaltyController::class,'client']);
 Route::get('/api/guest/loyalty',[\App\Http\Controllers\LoyaltyController::class,'guest']);
+Route::get('/api/sms-wallet/history/{kind}',[\App\Http\Controllers\SmsWalletController::class,'history'])->whereIn('kind',['ledger','topups']);
 Route::any("/api/{path}", [SalonController::class, "handle"])
     ->where("path", ".*")
     ->middleware(ApiHeaders::class);

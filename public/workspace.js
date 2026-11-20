@@ -667,10 +667,11 @@ async function connectionsForm() {
     if ($("#connections-form")) $("#connections-form").textContent = e.message;
   }
 }
-async function deliveryRows() {
+async function deliveryRows(page=1) {
+  const host=$("#delivery-table");if(!host)return;const ticket=host.deliveryPageTicket=(host.deliveryPageTicket||0)+1;
   try {
-    const rows = await api("/api/deliveries");
-    if (!$("#delivery-table")) return;
+    const data=await api("/api/deliveries?page="+page),rows=data.items;
+    if(!host.isConnected||ticket!==host.deliveryPageTicket)return;
     const labels = {
       pending: "Várakozik",
       blocked: "Kapcsolatra vár",
@@ -683,8 +684,9 @@ async function deliveryRows() {
     };
     $("#delivery-table").innerHTML =
       `<table><thead><tr><th>#</th><th>Állapot</th><th>Esedékes</th><th></th></tr></thead><tbody>${rows.map((r) => `<tr><td>${r.id}</td><td>${labels[r.status] || r.status}${r.provider_reference?`<small> · ${esc(r.provider_reference)}</small>`:""}${r.error ? `<small class="muted"> · ${esc(r.error)}</small>` : ""}</td><td>${new Date(r.available_at).toLocaleString(window.raeroLocale?.()||"hu-HU")}</td><td>${r.status==='unknown'&&r.sms_wallet_status==='unknown'?`<button onclick="resolveSmsDelivery(${r.id})">SMS eredményének rendezése</button>`:["failed", "blocked", "unknown", "on_hold"].includes(r.status) ? `<button onclick="retryDelivery(${r.id},${['unknown','on_hold'].includes(r.status)})">Újrapróbálás</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="4">Nincs küldési feladat.</td></tr>'}</tbody></table>`;
+    historyPageControls(host.querySelector('table'),data.pagination,deliveryRows,'Küldési előzmények lapozása');
   } catch (e) {
-    if ($("#delivery-table")) $("#delivery-table").textContent = e.message;
+    if(host.isConnected&&ticket===host.deliveryPageTicket)host.textContent=e.message;
   }
 }
 async function runDeliveries() {

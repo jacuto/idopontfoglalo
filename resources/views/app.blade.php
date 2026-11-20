@@ -55,6 +55,7 @@
 <script src="/booking-polish.js?v={{ filemtime(public_path('booking-polish.js')) }}" defer></script>
 <script src="/reminder-preferences.js?v={{ filemtime(public_path('reminder-preferences.js')) }}" defer></script>
 <script src="/loyalty.js?v={{ filemtime(public_path('loyalty.js')) }}" defer></script>
+<script src="/history-pagination.js?v={{ filemtime(public_path('history-pagination.js')) }}" defer></script>
 <script src="/boot.js?v={{ filemtime(public_path('boot.js')) }}" defer></script>
   </body>
 </html>
