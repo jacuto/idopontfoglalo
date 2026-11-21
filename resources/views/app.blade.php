@@ -16,6 +16,8 @@
 <link rel="stylesheet" href="/mobile-followup.css?v={{ filemtime(public_path('mobile-followup.css')) }}">
 <link rel="stylesheet" href="/contact-import.css?v={{ filemtime(public_path('contact-import.css')) }}">
 @include('partials.consent')
+@include('partials.pwa')
+<link rel="stylesheet" href="/pwa.css?v={{ filemtime(public_path('pwa.css')) }}">
 </head>
   <body>
     <header class="visitor-header"><a class="visitor-brand" href="/" aria-label="Ráérő főoldal"><span>◷</span> ráérő.</a><details class="visitor-menu"><summary>Menü <span aria-hidden="true">☰</span></summary><nav aria-label="Felső menü"><a href="/szolgaltato">Szolgáltatóknak</a><a href="/arak">Árak</a><a href="/kapcsolat">Kapcsolat</a><a class="booking-nav" href="/szolgaltatok">Időpontfoglalás</a><a class="visitor-account" href="/fiokom">Saját fiókom</a></nav></details></header>
@@ -62,6 +64,8 @@
 <script src="/mobile-followup.js?v={{ filemtime(public_path('mobile-followup.js')) }}" defer></script>
 <script src="/contact-import.js?v={{ filemtime(public_path('contact-import.js')) }}" defer></script>
 <script src="/calendar-import.js?v={{ filemtime(public_path('calendar-import.js')) }}" defer></script>
+<script src="/pwa.js?v={{ filemtime(public_path('pwa.js')) }}" defer></script>
+<script src="/import-draft.js?v={{ filemtime(public_path('import-draft.js')) }}" defer></script>
 <script src="/boot.js?v={{ filemtime(public_path('boot.js')) }}" defer></script>
   </body>
 </html>

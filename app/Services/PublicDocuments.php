@@ -11,6 +11,6 @@ final class PublicDocuments {
  }
  public function page(string $document){
   $operator=app(\App\Http\Controllers\PlatformController::class)->operator();unset($operator['legal']);
-  return response()->view('documents.'.$document,['operator'=>$operator,'legal'=>$this->settings(),'updated'=>'2026. november 12.'])->header('Cache-Control','no-cache');
+  return response()->view('documents.'.$document,['operator'=>$operator,'legal'=>$this->settings(),'updated'=>$document==='privacy'?'2026. november 21.':'2026. november 12.'])->header('Cache-Control','no-cache');
  }
 }

@@ -2,6 +2,9 @@
 use App\Http\Controllers\SalonController;
 use App\Http\Middleware\ApiHeaders;
 use Illuminate\Support\Facades\Route;
+Route::get('/app.webmanifest',[\App\Http\Controllers\PwaController::class,'manifest']);
+Route::get('/pwa/icon-{size}.png',[\App\Http\Controllers\PwaController::class,'icon'])->whereIn('size',['180','192','512']);
+Route::get('/app',[\App\Http\Controllers\PwaController::class,'launch']);
 
 Route::get('/auth/calendar-import/callback',[\App\Http\Controllers\CalendarImportController::class,'callback']);
 Route::get('/auth/calendar-import',[\App\Http\Controllers\CalendarImportController::class,'start']);
@@ -9,6 +12,7 @@ Route::get('/api/calendar-import/{id}',[\App\Http\Controllers\CalendarImportCont
 Route::post('/api/calendar-import/events',[\App\Http\Controllers\CalendarImportController::class,'events'])->middleware('throttle:10,1');
 Route::post('/api/calendar-import/preview',[\App\Http\Controllers\CalendarImportController::class,'preview'])->middleware('throttle:20,1');
 Route::post('/api/calendar-import/commit',[\App\Http\Controllers\CalendarImportController::class,'commit'])->middleware('throttle:10,1');
+Route::match(['GET','PUT','POST','DELETE'],'/api/contact-import/draft',[\App\Http\Controllers\ImportDraftController::class,'handle'])->middleware('throttle:240,1');
 Route::get('/api/contact-import/status',[\App\Http\Controllers\ContactImportController::class,'status']);
 Route::post('/api/contact-import/dismiss',[\App\Http\Controllers\ContactImportController::class,'dismiss']);
 Route::post('/api/contact-import/file',[\App\Http\Controllers\ContactImportController::class,'file'])->middleware('throttle:20,1');
