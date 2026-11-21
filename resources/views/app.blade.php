@@ -61,6 +61,7 @@
 <script src="/history-pagination.js?v={{ filemtime(public_path('history-pagination.js')) }}" defer></script>
 <script src="/mobile-followup.js?v={{ filemtime(public_path('mobile-followup.js')) }}" defer></script>
 <script src="/contact-import.js?v={{ filemtime(public_path('contact-import.js')) }}" defer></script>
+<script src="/calendar-import.js?v={{ filemtime(public_path('calendar-import.js')) }}" defer></script>
 <script src="/boot.js?v={{ filemtime(public_path('boot.js')) }}" defer></script>
   </body>
 </html>

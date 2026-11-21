@@ -18,7 +18,7 @@ final class AvailabilityController
             'overrides.*.openingTime'=>'required|date_format:H:i','overrides.*.closingTime'=>'required|date_format:H:i',
             'blocks'=>'present|array|max:500','blocks.*'=>'required|array:id,fromDate,toDate,fromTime,toTime,allDay,staffId,label',
             'blocks.*.id'=>'required|uuid|distinct','blocks.*.fromDate'=>'required|date_format:Y-m-d','blocks.*.toDate'=>'required|date_format:Y-m-d',
-            'blocks.*.fromTime'=>'required|date_format:H:i','blocks.*.toTime'=>'required|date_format:H:i','blocks.*.allDay'=>'required|boolean',
+            'blocks.*.fromTime'=>'required|date_format:H:i','blocks.*.toTime'=>['required','regex:/^(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]|24:00)$/'],'blocks.*.allDay'=>'required|boolean',
             'blocks.*.staffId'=>'present|nullable|string|max:80','blocks.*.label'=>'required|string|max:100',
             'dayLunches'=>'sometimes|array|max:500','dayLunches.*'=>'array:date,enabled,from,to,staffId','dayLunches.*.date'=>'required|date_format:Y-m-d','dayLunches.*.enabled'=>'required|boolean','dayLunches.*.from'=>'required|date_format:H:i','dayLunches.*.to'=>'required|date_format:H:i','dayLunches.*.staffId'=>'present|nullable|string|max:80',
             'lunch'=>'required|array:enabled,from,to,weekdays,staffId','lunch.enabled'=>'required|boolean','lunch.from'=>'required|date_format:H:i','lunch.to'=>'required|date_format:H:i',

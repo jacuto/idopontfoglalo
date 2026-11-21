@@ -3,6 +3,12 @@ use App\Http\Controllers\SalonController;
 use App\Http\Middleware\ApiHeaders;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/auth/calendar-import/callback',[\App\Http\Controllers\CalendarImportController::class,'callback']);
+Route::get('/auth/calendar-import',[\App\Http\Controllers\CalendarImportController::class,'start']);
+Route::get('/api/calendar-import/{id}',[\App\Http\Controllers\CalendarImportController::class,'calendars'])->whereUuid('id');
+Route::post('/api/calendar-import/events',[\App\Http\Controllers\CalendarImportController::class,'events'])->middleware('throttle:10,1');
+Route::post('/api/calendar-import/preview',[\App\Http\Controllers\CalendarImportController::class,'preview'])->middleware('throttle:20,1');
+Route::post('/api/calendar-import/commit',[\App\Http\Controllers\CalendarImportController::class,'commit'])->middleware('throttle:10,1');
 Route::get('/api/contact-import/status',[\App\Http\Controllers\ContactImportController::class,'status']);
 Route::post('/api/contact-import/dismiss',[\App\Http\Controllers\ContactImportController::class,'dismiss']);
 Route::post('/api/contact-import/file',[\App\Http\Controllers\ContactImportController::class,'file'])->middleware('throttle:20,1');

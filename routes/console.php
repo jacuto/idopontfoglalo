@@ -195,3 +195,6 @@ Artisan::command('raero:loyalty',function(){$count=0;foreach(DB::table('salon_st
 
 Artisan::command('raero:contact-import-cleanup',function(){$this->info((string)\App\Services\ContactImportCache::prune());})->purpose('Lejárt, titkosított névjegyimport-előnézetek törlése');
 \Illuminate\Support\Facades\Schedule::command('raero:contact-import-cleanup')->everyFiveMinutes()->withoutOverlapping();
+
+Artisan::command('raero:newsletter-status',function(){$this->info((string)\App\Services\MarketingCampaigns::reconcile());})->purpose('Késleltetett hírlevélküldések utólagos, csak olvasási állapotellenőrzése');
+\Illuminate\Support\Facades\Schedule::command('raero:newsletter-status')->everyMinute()->withoutOverlapping();

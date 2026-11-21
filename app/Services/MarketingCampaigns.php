@@ -36,8 +36,26 @@ final class MarketingCampaigns
      if($job->engine==='brevo'){$account=$gateway->call('GET','account');foreach($account['plan']??[] as $plan)if(($plan['type']??'')==='free'&&isset($plan['credits'])&&(int)$plan['credits']<count($items))throw new MarketingException('A Brevo napi ingyenes keretébe nem fér bele a teljes kampány. Csökkentsd a címzettlistát vagy válassz nagyobb küldési keretet.');}
      $gateway->send($job->remote_id);DB::table('marketing_campaigns')->where('id',$job->id)->update(['status'=>'submitted','submitted_at'=>now(),'error'=>null,'updated_at'=>now()]);$counts['submitted']++;
     }
-   }catch(\Throwable $e){SystemIssues::capture($e,'newsletter',app(Tenant::class)->id);$message=$e instanceof MarketingException?$e->getMessage():'A hírlevélküldő válasza nem igazolható. Ellenőrizd a külső fiókot.';DB::table('marketing_campaigns')->where('id',$job->id)->update(['status'=>'unknown','error'=>mb_substr($message,0,500),'updated_at'=>now()]);$counts['unknown']++;}
+   }catch(\Throwable $e){SystemIssues::capture($e,'newsletter',app(Tenant::class)->id);$message=($job->status==='scheduled'&&!empty($job->remote_id))?('A küldés eredménye még nem igazolható. A külső állapotot utólag is ellenőrizzük; ne küldd el újra. '.($e instanceof MarketingException?$e->getMessage():'')):($e instanceof MarketingException?$e->getMessage():'A hírlevélküldő válasza nem igazolható. Ellenőrizd a külső fiókot.');DB::table('marketing_campaigns')->where('id',$job->id)->update(['status'=>'unknown','error'=>mb_substr($message,0,500),'updated_at'=>now()]);$counts['unknown']++;}
   }
   return $counts;
  }
+ /** Read-only reconciliation: never repeat a campaign send, even after a timeout. */
+ public static function check(object $campaign):array{
+  $keys=MarketingConnections::get((int)$campaign->provider_id);
+  if(empty($keys['apiKey'])||($keys['engine']??'')!==$campaign->engine)throw new MarketingException('Az eredeti hírlevélkapcsolat nem elérhető. Ellenőrizd a külső fiókot.');
+  $snapshot=json_decode($campaign->recipients??'{}',true);if(!empty($snapshot['revision'])&&$snapshot['revision']!==($keys['revision']??''))throw new MarketingException('A kapcsolat megváltozott; az eredeti küldőfiókban ellenőrizd a kampányt.');
+  $report=(new MarketingGateway($keys))->report($campaign->remote_id);$remote=mb_substr((string)($report['status']??''),0,40);
+  $positive=in_array(mb_strtolower($remote),['sending','sent','inprogress','queued','scheduled','schedule'],true);
+  $update=['remote_status'=>$remote,'remote_checked_at'=>now(),'remote_check_error'=>null];
+  if($positive){$update['status']=mb_strtolower($remote)==='sent'?'sent':'submitted';$update['error']=null;$update['submitted_at']=$campaign->submitted_at??now();}
+  // Do not overwrite a new edit, cancellation, or another campaign generation after the HTTP request.
+  DB::table('marketing_campaigns')->where('id',$campaign->id)->where('provider_id',$campaign->provider_id)->where('remote_id',$campaign->remote_id)->whereNull('deleted_at')->whereIn('status',['ready','unknown','submitted','blocked','sent'])->when(mb_strtolower($remote)!=='sent',fn($q)=>$q->where('status','!=','sent'))->update($update);
+  return ['status'=>$remote,'emailsSent'=>$report['emails_sent']??$report['statistics']['globalStats']['sent']??null];
+ }
+ public static function reconcile(int $limit=10):int{
+  $count=0;$rows=DB::table('marketing_campaigns')->whereNull('deleted_at')->whereNotNull('remote_id')->whereIn('status',['unknown','submitted','blocked'])->where('updated_at','>=',now()->subDays(7))->where(fn($q)=>$q->whereNull('remote_checked_at')->orWhere('remote_checked_at','<',now()->subMinutes(2)))->orderBy('remote_checked_at')->limit(min(50,max(1,$limit)))->get();
+  foreach($rows as $row){try{self::check($row);}catch(\Throwable){DB::table('marketing_campaigns')->where('id',$row->id)->where('remote_id',$row->remote_id)->update(['remote_checked_at'=>now(),'remote_check_error'=>'Az utólagos állapotellenőrzés most nem sikerült. Később újrapróbáljuk.']);}++$count;}return $count;
+ }
+
 }

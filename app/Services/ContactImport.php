@@ -7,11 +7,17 @@ use InvalidArgumentException;
 /** Imports only contact fields: never account links, bookings or notification consent. */
 final class ContactImport
 {
+    public static function phone(string $raw):string
+    {
+        $value=preg_replace('/^tel:\s*/i','',trim($raw));
+        if(preg_match('/[\p{L}]/u',$value)||substr_count($value,'+')>1||(str_contains($value,'+')&&!str_starts_with($value,'+')))throw new InvalidArgumentException('Ellenőrizd a telefonszámot: betűt vagy több számot tartalmazhat.');
+        $digits=preg_replace('/\D/','',$value);return Contact::phone(str_starts_with($value,'+')?'+'.$digits:$digits);
+    }
     public static function inspect(array $clients, array $input): array
     {
         $name=trim((string)($input['name']??''));
         try {
-            $record=['name'=>$name,'phone'=>Contact::phone($input['phone']??''),'email'=>Contact::email($input['email']??'')];
+            $record=['name'=>$name,'phone'=>self::phone($input['phone']??''),'email'=>Contact::email($input['email']??'')];
             if(mb_strlen($name)>150||mb_strlen($record['email'])>200||strlen($record['phone'])>40)throw new InvalidArgumentException('Túl hosszú név vagy elérhetőség.');
             if($record['phone']===''&&$record['email']==='')throw new InvalidArgumentException('Legalább telefonszám vagy e-mail szükséges.');
         }catch(InvalidArgumentException $e){return ['status'=>'invalid','message'=>$e->getMessage(),'record'=>['name'=>$name,'phone'=>(string)($input['phone']??''),'email'=>(string)($input['email']??'')],'changes'=>[]];}

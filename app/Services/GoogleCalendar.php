@@ -6,7 +6,7 @@ final class GoogleCalendar
 {
  public function enqueue(array $state,array $before=[]):void {
   $provider=app(Tenant::class)->id;$changed=[];$staff=[];$guests=[];
-  foreach($state['bookings'] as $b){$old=$before[$b['id']]??[];$version=self::version($b);if(($old['version']??null)===$version)continue;$changed[]=[$b,$old,$version];$staff[]=$b['staff'];if(!empty($old['staff']))$staff[]=$old['staff'];foreach([$b['guestId']??null,$old['guestId']??null] as $g)if($g)$guests[]=(string)$g;}
+  foreach($state['bookings'] as $b){if(!empty($b['calendarImport']))continue;$old=$before[$b['id']]??[];$version=self::version($b);if(($old['version']??null)===$version)continue;$changed[]=[$b,$old,$version];$staff[]=$b['staff'];if(!empty($old['staff']))$staff[]=$old['staff'];foreach([$b['guestId']??null,$old['guestId']??null] as $g)if($g)$guests[]=(string)$g;}
   if(!$changed||!Schema::hasTable('calendar_tasks'))return;
   $connections=DB::table('calendar_connections')->where('enabled',true)->where(function($q)use($provider,$staff,$guests){$q->where(fn($q)=>$q->where('owner_type','staff')->where('provider_id',$provider)->whereIn('owner_id',array_unique($staff)));if($guests)$q->orWhere(fn($q)=>$q->where('owner_type','guest')->where('provider_id',0)->whereIn('owner_id',array_unique($guests)));})->get();$by=[];foreach($connections as $c)$by[$c->owner_type.':'.$c->owner_id][]=$c;
   foreach($changed as [$b,$old,$version]){$targets=[];foreach(array_unique(['staff:'.$b['staff'],'staff:'.($old['staff']??''),'guest:'.($b['guestId']??''),'guest:'.($old['guestId']??'')]) as $key)foreach($by[$key]??[] as $c)$targets[$c->id]=$c;
@@ -33,7 +33,7 @@ final class GoogleCalendar
     if(!empty($event['start']['date']))$from=Date::parse($event['start']['date'],'Europe/Budapest')->toISOString();if(!empty($event['end']['date']))$to=Date::parse($event['end']['date'],'Europe/Budapest')->toISOString();
     $meta=$event['extendedProperties']['private']??[];
     if($c->owner_type==='staff'&&(string)($meta['raero_provider']??'')===(string)$c->provider_id)continue;
-    $busy[]=['start'=>Date::parse($from)->getTimestamp(),'end'=>Date::parse($to)->getTimestamp(),'bookingId'=>$meta['raero_booking']??null,'providerId'=>$meta['raero_provider']??null];
+    $busy[]=['calendarId'=>$c->calendar_id,'eventId'=>$event['id']??null,'start'=>Date::parse($from)->getTimestamp(),'end'=>Date::parse($to)->getTimestamp(),'bookingId'=>$meta['raero_booking']??null,'providerId'=>$meta['raero_provider']??null];
    }
    $page=$response['nextPageToken']??null;$pages++;if($page&&$pages>=5)throw new \RuntimeException('Too many calendar pages.');
   }while($page);
@@ -47,7 +47,7 @@ final class GoogleCalendar
  public function validate(array $b,array $s,int $duration,?string $ignore):void {
   $all=$this->busy($s,!empty($b['public'])?(int)($b['guestId']??0):null);$ranges=$all['staff:'.$b['staff']]??[];if(!empty($b['public'])&&!empty($b['guestId']))$ranges=array_merge($ranges,$all['guest:'.$b['guestId']]??[]);
   $from=Date::parse($b['start'])->getTimestamp();$to=$from+$duration*60;
-  foreach($ranges as $range){if($ignore&&($range['bookingId']??null)===$ignore&&(int)($range['providerId']??0)===app(Tenant::class)->id)continue;if($from<$range['end']&&$to>$range['start'])throw new \InvalidArgumentException('Ez az időszak a kapcsolt Google Naptárban foglalt. Válassz másik időpontot.');}
+  foreach($ranges as $range){if(!empty($b['calendarImport'])&&!empty($range['eventId'])&&hash_equals($b['calendarImport']['sourceKey']??'',hash('sha256',($range['calendarId']??'').'|'.$range['eventId'])))continue;if($ignore&&($range['bookingId']??null)===$ignore&&(int)($range['providerId']??0)===app(Tenant::class)->id)continue;if($from<$range['end']&&$to>$range['start'])throw new \InvalidArgumentException('Ez az időszak a kapcsolt Google Naptárban foglalt. Válassz másik időpontot.');}
  }
  private function execute(object $job,object $c):void {
   $row=DB::table('salon_state')->find($job->provider_id);if(!$row)return;$s=json_decode($row->data,true);$b=collect($s['bookings'])->firstWhere('id',$job->booking_id);if(!$b)return;

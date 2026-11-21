@@ -28,7 +28,7 @@ function newsletterTemplateTools(form,editor,platform,data={},campaign={}){
 }
 
 function newsletterWatchStatus(platform,data,campaign,form,endpoint){
- if(!['preparing','processing','scheduled'].includes(campaign.status))return;
+ if(!['preparing','processing','scheduled','submitted','unknown'].includes(campaign.status)||(['submitted','unknown'].includes(campaign.status)&&!campaign.remote_id))return;
  const message=document.createElement('p');message.setAttribute('role','status');message.className='notice';form.append(message);
  const started=Date.now();let failures=0;
  const tick=async()=>{
@@ -36,8 +36,9 @@ function newsletterWatchStatus(platform,data,campaign,form,endpoint){
   const scheduled=campaign.scheduled_at&&new Date(campaign.scheduled_at)>new Date();
   message.textContent=campaign.status==='scheduled'?(scheduled?'A hírlevél időzítve van. Az állapot automatikusan frissül.':'Küldésre vár. Az állapot automatikusan frissül.'):'Címzettek előkészítése… Nem kell másik oldalra lépned.';
   if(Date.now()-started>90000&&!scheduled)message.textContent='A háttérfeldolgozás a szokásosnál tovább tart. A szerver ütemezőjének percenként futnia kell. Az állapotot továbbra is automatikusan ellenőrizzük.';
-  try{const next=await api(endpoint+'/campaigns?campaignId='+encodeURIComponent(campaign.id));if(!form.isConnected)return;const found=next.campaigns.find(c=>c.id===campaign.id);if(!found){message.textContent='A hírlevél már nem található a listában.';return;}if(found.status!==campaign.status){next.historyPage=data.historyPage;marketingEditor(platform,next,found);return;}failures=0;}catch{if(!form.isConnected)return;failures++;message.textContent='Az állapotot most nem sikerült lekérdezni. Hamarosan újrapróbáljuk; ne indítsd el újra a küldést.';}
-  if(form.isConnected)setTimeout(tick,failures?10000:3000);
+  try{if(['submitted','unknown'].includes(campaign.status)){message.textContent='A külső küldést ellenőrizzük. Ez akár több tíz percig is eltarthat; ne indíts új küldést.';await api(endpoint+'/campaigns/'+campaign.id+'/report','POST',{});}
+  const next=await api(endpoint+'/campaigns?campaignId='+encodeURIComponent(campaign.id));if(!form.isConnected)return;const found=next.campaigns.find(c=>c.id===campaign.id);if(!found){message.textContent='A hírlevél már nem található a listában.';return;}if(found.status!==campaign.status){next.historyPage=data.historyPage;marketingEditor(platform,next,found);return;}failures=0;}catch{if(!form.isConnected)return;failures++;message.textContent='Az állapotot most nem sikerült lekérdezni. Hamarosan újrapróbáljuk; ne indítsd el újra a küldést.';}
+  if(form.isConnected)setTimeout(tick,failures?30000:['submitted','unknown'].includes(campaign.status)?30000:3000);
  };setTimeout(tick,1000);
 }
 
