@@ -5,7 +5,7 @@ document.addEventListener('blur',e=>{if(e.target.matches('input')&&(e.target.typ
 document.addEventListener('submit',e=>{for(const input of e.target.querySelectorAll('input'))if(input.type==='url'||webNames.has(input.name))normalizeWebInput(input);},true);
 // Native URL controls validate before submit; normalize during input as well when leaving the field.
 document.addEventListener('invalid',e=>{if(e.target.matches('input')&&(e.target.type==='url'||webNames.has(e.target.name))){normalizeWebInput(e.target);}},true);
-const closeMark='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>';
+const closeMark=RaeroUI.icons.close(18);
 function polishNovemberIcons(root=document){if(!root?.querySelectorAll)return;for(const button of root.querySelectorAll('.dialog-close-icon,.modal-corner-close,.photo-lightbox>button'))if(!button.dataset.centeredClose){button.dataset.centeredClose='1';button.innerHTML=closeMark;button.setAttribute('aria-label','Bezárás');}for(const button of root.querySelectorAll('.remove-provider-photo,.service-delete-action,.staff-remove-corner')){if(!button.querySelector('svg'))button.innerHTML=trashIcon();button.classList.add('centered-trash');}}
 const novemberIconObserver=new MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)if(node.nodeType===1)polishNovemberIcons(node.matches('button')?node.parentElement:node);});novemberIconObserver.observe(document.body,{childList:true,subtree:true});
 // One confirmation per deletion, including older handlers which already call confirm().

@@ -294,20 +294,7 @@ function clientForm(id) {
   showModal(
     `<h2>${id ? "Vendég szerkesztése" : "Új vendég"}</h2><form id="client-form"><label>Név</label><input name="name" value="${esc(c.name || "")}" required><label>Telefonszám</label><input name="phone" value="${esc(c.phone || "")}" type="tel" ${c.guestId?'readonly aria-readonly="true"':''}><label>E-mail</label><input name="email" value="${esc(c.email || "")}" type="email" ${c.guestId?'readonly aria-readonly="true"':''}>${c.guestId?'<p class="hint">Ez regisztrált vendég. Telefonszámát a saját vendégfiókjában módosíthatja; az e-mail-cím a fiókhoz tartozik.</p>':''}<div id="form-error" class="error"></div><div class="buttons"><button type="button" onclick="$('#modal').close()">Mégse</button><button class="primary">Mentés</button></div></form>`,
   );
-  $("#client-form").onsubmit = async (e) => {
-    e.preventDefault();
-    const data = Object.fromEntries(new FormData(e.target));
-    try {
-      if (id) await api("/api/clients/" + id, "PATCH", data);
-      else await api('/api/clients','POST',data);
-      $("#modal").close();
-      await refresh();
-      toast("Vendég mentve");
-    } catch (err) {
-      $("#form-error").textContent = err.message;
-    }
-  };
-}
+  RaeroUI.forms.bind($('#client-form'),{submit:({data})=>id?api('/api/clients/'+id,'PATCH',data):api('/api/clients','POST',data),success:async()=>{dialog.close();await refresh();toast('Vendég mentve');},error:error=>RaeroUI.forms.error($('#form-error'),error)});}
 function staffPage() {
   $("#content").innerHTML =
     `<div class="toolbar"><p>${activePeople().length} aktív munkatárs</p><button onclick="exportData('staff')">↓ Exportálás</button><button onclick="importPicker('staff')">↑ Importálás</button></div><div class="entity-grid">${activePeople()
@@ -322,23 +309,7 @@ function staffForm(id) {
   showModal(
     `<h2>${id ? "Munkatárs szerkesztése" : "Munkatárs felvétele"}</h2><form id="staff-form"><label>Név</label><input name="name" required value="${esc(p.name || "")}"><label>Szakterület</label><input name="role" required list="roles" value="${esc(p.role || "")}"><datalist id="roles">${["Fodrász", "Masszőr", "Műkörmös", "Pedikűrös", "Szempilla-stylist"].map((v) => `<option>${v}</option>`).join("")}</datalist><label>E-mail</label><input name="email" type="email" value="${esc(p.email || "")}"><label>Telefonszám</label><input name="phone" value="${esc(p.phone || "")}"><div class="error" id="form-error"></div><div class="buttons"><button type="button" onclick="$('#modal').close()">Mégse</button><button class="primary">Mentés</button></div></form>`,
   );
-  $("#staff-form").onsubmit = async (e) => {
-    e.preventDefault();
-    const data = Object.fromEntries(new FormData(e.target));
-    try {
-      if (id) await api("/api/staff/" + id, "PATCH", data);
-      else
-        await api("/api/config", "PUT", {
-          staff: [...state.staff, { id: crypto.randomUUID(), ...data }],
-        });
-      $("#modal").close();
-      await refresh();
-      toast("Munkatárs mentve");
-    } catch (err) {
-      $("#form-error").textContent = err.message;
-    }
-  };
-}
+  RaeroUI.forms.bind($('#staff-form'),{submit:({data})=>id?api('/api/staff/'+id,'PATCH',data):api('/api/config','PUT',{staff:[...state.staff,{id:crypto.randomUUID(),...data}]}),success:async()=>{dialog.close();await refresh();toast('Munkatárs mentve');},error:error=>RaeroUI.forms.error($('#form-error'),error)});}
 async function archiveStaff(id) {
   if (
     !confirm(
@@ -404,12 +375,12 @@ function serviceForm(id) {
           : [...state.services, v],
       });
       savedServiceId=v.id;metadataSaved=true;
-      const image=e.target.elements.image?.files[0];if(image&&!uploadComplete){savePhase='upload';const upload=new FormData();upload.set('target','service');upload.set('entityId',savedServiceId);upload.set('image',image);const uploaded=await api('/api/media','POST',upload);if(uploaded?.url)old.image=uploaded.url;uploadComplete=true;}
+      const image=e.target.elements.image?.files[0];if(image&&!uploadComplete){savePhase='upload';const uploaded=await RaeroUI.media.upload(api,image,{target:'service',entityId:savedServiceId});if(uploaded?.url)old.image=uploaded.url;uploadComplete=true;}
       savePhase='refresh';state=await api('/api/state');$("#modal").close();render();
       toast("Szolgáltatás mentve");
     } catch (err) {
       const errorBox=e.target.querySelector("#form-error");errorBox.textContent=metadataSaved?(savePhase==='upload'?'A szolgáltatás adatait elmentettük, de a képfeltöltés eredményét nem sikerült ellenőrizni. Ellenőrizd a képet; ha nem jelent meg, próbáld újra a feltöltést.':'Az adatokat és a képet elmentettük, de a nézet frissítése nem sikerült. Nem kell újra mentened az adatokat.'):err.message;
-      if(metadataSaved){logClientIssue(savePhase==='upload'?'media_upload_failed':'view_refresh_failed');const retry=document.createElement('button');retry.type='button';retry.textContent=savePhase==='upload'?'Képfeltöltés újrapróbálása':'Nézet frissítése';retry.onclick=async()=>{retry.disabled=true;try{if(savePhase==='upload'){const current=await api('/api/state');const remote=current.services.find(s=>s.id===savedServiceId);if(remote?.image&&remote.image!==(old.image||'')){state=current;dialog.close();render();return;}const image=e.target.elements.image.files[0],upload=new FormData();upload.set('target','service');upload.set('entityId',savedServiceId);upload.set('image',image);const uploaded=await api('/api/media','POST',upload);if(uploaded?.url)old.image=uploaded.url;uploadComplete=true;savePhase='refresh';}state=await api('/api/state');dialog.close();render();toast('Szolgáltatás és kép mentve.');}catch(error){errorBox.firstChild.textContent='Az adatokat megőriztük. '+error.message;retry.disabled=false;}};errorBox.append(document.createElement('br'),retry);}errorBox.scrollIntoView({block:'center'});
+      if(metadataSaved){logClientIssue(savePhase==='upload'?'media_upload_failed':'view_refresh_failed');const retry=document.createElement('button');retry.type='button';retry.textContent=savePhase==='upload'?'Képfeltöltés újrapróbálása':'Nézet frissítése';retry.onclick=async()=>{retry.disabled=true;try{if(savePhase==='upload'){const current=await api('/api/state');const remote=current.services.find(s=>s.id===savedServiceId);if(remote?.image&&remote.image!==(old.image||'')){state=current;dialog.close();render();return;}const image=e.target.elements.image.files[0],uploaded=await RaeroUI.media.upload(api,image,{target:'service',entityId:savedServiceId});if(uploaded?.url)old.image=uploaded.url;uploadComplete=true;savePhase='refresh';}state=await api('/api/state');dialog.close();render();toast('Szolgáltatás és kép mentve.');}catch(error){errorBox.firstChild.textContent='Az adatokat megőriztük. '+error.message;retry.disabled=false;}};errorBox.append(document.createElement('br'),retry);}errorBox.scrollIntoView({block:'center'});
     } finally {saveButton.disabled=false;}
   };
 }
@@ -445,17 +416,7 @@ function exportData(kind) {
     fields.join(";") +
     "\n" +
     rows.map((row) => fields.map((k) => quote(row[k])).join(";")).join("\n");
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(
-    new Blob([csv], { type: "text/csv;charset=utf-8" }),
-  );
-  a.download = {
-    clients: "vendegek.csv",
-    staff: "munkatarsak.csv",
-    bookings: "foglalasok.csv",
-  }[kind];
-  a.click();
-  URL.revokeObjectURL(a.href);
+  RaeroUI.files.save(new Blob([csv], {type:"text/csv;charset=utf-8"}), {clients:"vendegek.csv",staff:"munkatarsak.csv",bookings:"foglalasok.csv"}[kind]);
 }
 function parseCsv(raw) {
   const rows = [];
@@ -764,20 +725,7 @@ function paymentForm(bookingId) {
     }
   };
 }
-async function voidPayment(id) {
-  if (
-    !confirm(
-      "Érvényteleníted a kézzel rögzített befizetést? A kiállított számlát ez nem sztornózza.",
-    )
-  )
-    return;
-  try {
-    await api("/api/payments/" + id + "/void", "POST", {});
-    await refresh();
-  } catch (e) {
-    toast(e.message);
-  }
-}
+
 function invoiceForm(paymentId) {
   const p = state.payments.find((p) => p.id === paymentId),
     b = state.bookings.find((b) => b.id === p.bookingId),
@@ -900,21 +848,7 @@ async function startSubscription() {
     toast(e.message);
   }
 }
-async function socialButtons(container, mode = "guest") {
-  try {
-    const p = await api("/api/auth/providers");
-    if (!$(container)) return;
-    $(container).innerHTML =
-      ["google", "facebook"]
-        .filter((k) => p[k])
-        .map(
-          (k) =>
-            `<a class="social-button" href="/auth/${k}?provider=${providerId()}&mode=${mode}${mode === "guest" && ["booking","messages","operatorMessages"].includes(new URLSearchParams(location.search).get("returnTo")) ? "&returnTo=" + new URLSearchParams(location.search).get("returnTo") : ""}">${k === "google" ? "Google" : "Facebook"}-fiókkal ${mode === "admin" ? "belépés" : "belépés / regisztráció"}</a>`,
-        )
-        .join("") ||
-      '<p class="hint">A közösségi belépés a szolgáltatói kapcsolat beállítása után érhető el.</p>';
-  } catch {}
-}
+
 async function guestPage() {
   if (new URLSearchParams(location.search).has("messages") || new URLSearchParams(location.search).has("platformMessages")) { location.replace("/uzenetek" + location.search); return; }
   try {
@@ -977,7 +911,7 @@ publicPage = function () {
 };
 
 // Measurement is disabled for this release, including previously stored consent.
-function trackingConsent() {}
+
 function trackBooking() {}
 async function payGuest() {
   try {
@@ -988,10 +922,7 @@ async function payGuest() {
   }
 }
 
-function resetConsent() {
-  localStorage.removeItem("raero-consent-v1");
-  location.reload();
-}
+
 
 function invoiceReconcileForm(id) {
   showModal(

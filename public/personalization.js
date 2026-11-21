@@ -25,8 +25,7 @@ const calendarBeforePersonalization=calendarPage;
 calendarPage=function(){calendarBeforePersonalization();if(!state.settings.advancedBookingEnabled)document.querySelectorAll('[onclick="groupSessionsDialog()"] ').forEach(b=>b.hidden=true);};
 const groupsBeforePersonalization=groupSessionsDialog;
 groupSessionsDialog=async function(){await groupsBeforePersonalization();if(!state.settings.advancedBookingEnabled)document.querySelector('#modal [onclick="groupSessionForm()"]')?.remove();};
-const offersBeforePersonalization=offersPage;
-offersPage=function(){offersBeforePersonalization();const s=state.settings;for(const [key,action]of[['couponsEnabled','couponForm()'],['passesEnabled','passForm()']])if(!s[key])document.querySelector(`#content [onclick="${action}"]`)?.remove();if(!s.couponsEnabled&&!s.passesEnabled)$('#content').insertAdjacentHTML('afterbegin','<p class="notice">A kuponok és az új bérletek létrehozása ki van kapcsolva az Alapbeállításoknál. A korábban kiadottak továbbra is kezelhetők.</p>');};
+
 function domesticPhone(value){let d=String(value).replace(/\D/g,'');if(d.startsWith('0036'))d='06'+d.slice(4);else if(d.startsWith('36'))d='06'+d.slice(2);return d;}
 const contactBeforePersonalization=bindContactFields;
 bindContactFields=function(root=document){
@@ -50,7 +49,7 @@ bookingForm=function(dt,staff){bookingBeforePersonalization(dt,staff);const form
 function bookingQrDialog(){
  const url=location.origin+'/foglalas?provider='+encodeURIComponent(providerId()),qr=qrcode(0,'M');qr.addData(url);qr.make();const svg=qr.createSvgTag({cellSize:8,margin:32,scalable:true});
  showModal(`<h2>Foglalóoldalad QR-kódja</h2><div class="booking-qr">${svg}</div><p class="qr-url">${esc(url)}</p><div class="buttons"><button id="qr-svg">SVG letöltése</button><button id="qr-png" class="primary">PNG letöltése</button><button id="qr-print">Nyomtatás</button><button onclick="$('#modal').close()">Bezárás</button></div>`);
- const save=(blob,name)=>{const link=document.createElement('a'),object=URL.createObjectURL(blob);link.href=object;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(object),1000);};
+ const save=RaeroUI.files.save;
  $('#qr-svg').onclick=()=>save(new Blob([svg],{type:'image/svg+xml'}),'foglalas-qr.svg');
  $('#qr-png').onclick=()=>{const canvas=document.createElement('canvas'),n=qr.getModuleCount(),cell=12;canvas.width=canvas.height=(n+8)*cell;const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#000';for(let y=0;y<n;y++)for(let x=0;x<n;x++)if(qr.isDark(y,x))ctx.fillRect((x+4)*cell,(y+4)*cell,cell,cell);canvas.toBlob(blob=>{if(blob)save(blob,'foglalas-qr.png');});};
  $('#qr-print').onclick=()=>{const popup=window.open('','_blank','width=700,height=800');if(!popup){toast('A nyomtatáshoz engedélyezd a felugró ablakot.');return;}popup.document.write(`<!doctype html><html lang="hu"><meta charset="utf-8"><title>Foglalás QR-kód</title><style>body{text-align:center;font:18px sans-serif;padding:30px}svg{width:300px;height:300px}p{overflow-wrap:anywhere}</style><h1>${esc(state.settings.name)}</h1><h2>Foglalj időpontot!</h2>${svg}<p>${esc(url)}</p></html>`);popup.document.close();popup.focus();popup.print();};

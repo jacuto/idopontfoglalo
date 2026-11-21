@@ -5,18 +5,7 @@ let state,
   isPublic = location.pathname.replace(/\/+$/, "") === "/foglalas",
   manageToken = new URLSearchParams(location.search).get("token");
 const $ = (s) => document.querySelector(s),
-  esc = (s) =>
-    String(s ?? "").replace(
-      /[&<>"']/g,
-      (c) =>
-        ({
-          "&": "&amp;",
-          "<": "&lt;",
-          ">": "&gt;",
-          '"': "&quot;",
-          "'": "&#39;",
-        })[c],
-    );
+  esc = RaeroUI.escapeHtml;
 const money = (n) => (window.raeroLanguage||"hu")==="hu"?new Intl.NumberFormat("hu-HU").format(n)+" Ft":new Intl.NumberFormat(window.raeroLocale?.()||"en-GB",{style:"currency",currency:"HUF",maximumFractionDigits:0}).format(n);
 const datekey = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -79,11 +68,8 @@ async function refresh() {
   state = await api(isPublic ? "/api/public" : "/api/state");
   render();
 }
-function showModal(html) {
-  $("#modal").dataset.openedAt=String(performance.now());
-  $("#modal").innerHTML = html;
-  $("#modal").showModal();
-}
+function showModal(html) { RaeroUI.modal.open($('#modal'),html); }
+
 function serviceChecks() {
  return `<div class="booking-service-picker"><div class="selected-services"></div><select aria-label="Szolgáltatás hozzáadása" onchange="addBookingService(this.value)"><option value="">Válassz szolgáltatást…</option>${state.services.filter(s=>!s.archived).map(s=>`<option value="${esc(s.id)}">${esc(s.name)} · ${s.duration} perc · ${money(s.price)}</option>`).join('')}</select><div hidden>${state.services.filter(s=>!s.archived).map(s=>`<input type="checkbox" name="services" value="${esc(s.id)}">`).join('')}</div></div>`;
 }
@@ -236,16 +222,7 @@ async function setStatus(id, status) {
     toast(e.message);
   }
 }
-async function configSave(body) {
-  try {
-    await api("/api/config", "PUT", body);
-    if ($("#modal").open) $("#modal").close();
-    await refresh();
-    toast("Beállítások mentve");
-  } catch (e) {
-    toast(e.message);
-  }
-}
+
 function publicPage() {
   $("#app").innerHTML =
     `<div class="public"><div class="brand"><span>◷</span>ráérő.</div><div style="text-align:center"><span class="badge">ONLINE IDŐPONTFOGLALÁS</span><h1 style="margin-top:20px">${esc(state.settings.name)}</h1><p>Egy kis idő, ami csak rólad szól.</p></div><div class="card" id="public-form"><h2>Foglalj időpontot</h2><p>Válassz szolgáltatást és időpontot. Regisztráció nem szükséges.</p><form id="booking-form">${bookingFields()}<div class="buttons"><button class="primary">Időpont lefoglalása →</button></div></form></div></div>`;

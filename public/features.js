@@ -8,31 +8,18 @@ bookingFields = function(dt) {
     .replaceAll('list="clients" oninput="fillClient(this.value)"', 'role="combobox" aria-autocomplete="list" aria-controls="client-results" aria-expanded="false" autocomplete="off" oninput="searchClient(this)" onkeydown="clientKey(event,this)"')
     + offerFields();
 };
-let clientMatches = [], clientIndex = -1, clientTicket = 0, searchTimer;
+let clientMatches=[],clientIndex=-1,activeClientSearch=null;const clientSearchInputs=new WeakMap();
 function closeClients() {
   const box = $('#client-results'); if (box) { box.hidden = true; box.innerHTML = ''; }
   document.querySelectorAll('[aria-controls="client-results"]').forEach(x => { x.setAttribute('aria-expanded','false'); x.removeAttribute('aria-activedescendant'); });
   clientIndex = -1;
 }
-function searchClient(input) {
-  const selected = $('[name=clientId]'); if (selected) selected.value = '';
-  for(const key of ['phone','email']){const field=$(`[name=${key}]`);if(field)field.readOnly=false;}
-  const pass = $('[name=passId]'); if (pass) pass.innerHTML = '<option value="">Nem használok bérletet</option>';
-  clearTimeout(searchTimer); const ticket = ++clientTicket; closeClients();
-  if (input.value.trim().length < 3) return;
-  const value = input.value;
-  searchTimer = setTimeout(async () => {
-    try {
-      const result = await api('/api/clients/search?q=' + encodeURIComponent(value));
-      if (ticket !== clientTicket || !$('#client-results') || !input.isConnected) return;
-      clientMatches = result; const box = $('#client-results'); box.hidden = false;
-      input.setAttribute('aria-expanded','true');
-      box.innerHTML = result.map((c,i) => `<button type="button" role="option" aria-selected="false" id="client-option-${i}" onmousedown="event.preventDefault()" onclick="chooseClient(${i})"><strong>${esc(c.name)}</strong><small>${esc(c.phone || 'Nincs telefon')} · ${esc(c.email || 'Nincs email')}</small></button>`).join('') || '<p>Nincs találat. A megadott adatokkal új vendéget rögzítünk.</p>';
-    } catch (e) { if (ticket === clientTicket && $('#client-hint')) $('#client-hint').textContent = e.message; }
-  }, 180);
+function searchClient(input){
+ const selected=$('[name=clientId]');if(selected)selected.value='';for(const key of ['phone','email']){const field=$('[name='+key+']');if(field)field.readOnly=false;}const pass=$('[name=passId]');if(pass)pass.innerHTML='<option value="">Nem használok bérletet</option>';activeClientSearch?.cancel();closeClients();
+ let search=clientSearchInputs.get(input);if(!search){search=RaeroUI.search(input,{listen:false,minLength:3,delay:180,load:value=>api('/api/clients/search?q='+encodeURIComponent(value)),results:result=>{const box=$('#client-results');if(!box)return;clientMatches=result;box.hidden=false;input.setAttribute('aria-expanded','true');box.innerHTML=result.map((c,i)=>`<button type="button" role="option" aria-selected="false" id="client-option-${i}" onmousedown="event.preventDefault()" onclick="chooseClient(${i})"><strong>${esc(c.name)}</strong><small>${esc(c.phone||'Nincs telefon')} · ${esc(c.email||'Nincs email')}</small></button>`).join('')||'<p>Nincs találat. A megadott adatokkal új vendéget rögzítünk.</p>';},error:e=>{if($('#client-hint'))$('#client-hint').textContent=e.message;}});clientSearchInputs.set(input,search);}activeClientSearch=search;search.run();
 }
 function clientKey(e,input) {
-  if (e.key === 'Escape') { ++clientTicket; clearTimeout(searchTimer); closeClients(); return; }
+  if (e.key === 'Escape') { activeClientSearch?.cancel(); closeClients(); return; }
   if ($('#client-results')?.hidden || !clientMatches.length) return;
   if (['ArrowDown','ArrowUp'].includes(e.key)) {
     e.preventDefault(); clientIndex = clientIndex < 0 ? (e.key === 'ArrowDown' ? 0 : clientMatches.length - 1) : (clientIndex + (e.key === 'ArrowDown' ? 1 : -1) + clientMatches.length) % clientMatches.length;
@@ -43,7 +30,7 @@ function clientKey(e,input) {
 }
 function chooseClient(index) {
   const c = clientMatches[index]; if (!c) return;
-  ++clientTicket; clearTimeout(searchTimer);
+  activeClientSearch?.cancel();
   for (const key of ['name','phone','email']) $(`[name=${key}]`).value = c[key] || '';
   $('[name=clientId]').value = c.id; closeClients();
   const linked=state.clients?.find(x=>x.id===c.id)?.guestId;for(const key of ['phone','email'])$(`[name=${key}]`).readOnly=!!linked;
@@ -108,9 +95,7 @@ publicPage = function() {
   document.querySelectorAll('a[href="/fiokom"]').forEach(a=>a.href=providerLink('/fiokom'));
 };
 function startService(id){const el=document.querySelector(`[name=services][value="${CSS.escape(id)}"]`);if(el){el.checked=true;serviceSelectionChanged();$('#public-form').scrollIntoView({behavior:'smooth'});}}
-function offersPage() {
-  $('#content').innerHTML=`<div class="toolbar"><button class="primary" onclick="couponForm()">Új kupon</button><button onclick="passForm()">Új bérlet</button><button onclick="assignPassForm()">Bérlet hozzárendelése vendéghez</button></div><h2>Kuponok</h2><div class="entity-grid">${(state.coupons||[]).filter(c=>!c.deletedAt).map(c=>`<article class="card item"><h3>${esc(c.name)}</h3><p>${esc(c.code)} · ${c.type==='percent'?c.value+'%':money(c.value)}</p><p>${c.active?'Aktív':'Inaktív'} · ${c.public?'Nyilvános':'Csak kóddal'}</p><div class="offer-card-actions"><button onclick="couponForm('${c.id}')">Szerkesztés</button><button class="danger" onclick="deleteCatalogOffer('coupons','${c.id}')">Törlés</button></div></article>`).join('')||'<p>Még nincs kupon. Az Új kupon gombbal készíthetsz ajánlatot.</p>'}</div><h2>Bérletek</h2><div class="entity-grid">${(state.passes||[]).filter(p=>!p.deletedAt).map(p=>`<article class="card item"><h3>${esc(p.name)}</h3><p>${p.visits} alkalom · ${money(p.price)} · ${p.days} nap · ${p.active?'Aktív':'Inaktív'}</p><div class="offer-card-actions"><button onclick="passForm('${p.id}')">Szerkesztés</button><button class="danger" onclick="deleteCatalogOffer('passes','${p.id}')">Törlés</button></div></article>`).join('')||'<p>Még nincs bérlet. Az Új bérlet gombbal hozhatod létre az elsőt.</p>'}</div><p class="hint">A meglévő foglalások árai és a kiadott bérletek feltételei szerkesztéskor nem változnak.</p>`;
-}
+
 function catalogChecks(selected=[]) { return state.services.filter(s=>!s.archived).map(s=>`<label class="check"><input type="checkbox" name="services" value="${s.id}" ${selected.includes(s.id)?'checked':''}>${esc(s.name)}</label>`).join(''); }
 function couponForm(id) {
  const c=(state.coupons||[]).find(c=>c.id===id)||{startsAt:new Date().toISOString(),endsAt:new Date(Date.now()+30*86400000).toISOString(),perClient:1,type:'percent',value:10,active:true,public:false,firstVisit:false};
@@ -125,7 +110,7 @@ function passForm(id){
  showModal(`<h2>${id?'Bérlet szerkesztése':'Új bérlet'}</h2><form id="offer-form"><label>Név</label><input name="name" required value="${esc(p.name||'')}"><label>Leírás</label><textarea name="description">${esc(p.description||'')}</textarea><div class="form-grid">${[['price','Ár (Ft)',0],['visits','Alkalmak száma',1]].map(([k,l,min])=>`<div><label>${l}</label><input name="${k}" type="number" required min="${min}" value="${p[k]}"></div>`).join('')}</div><fieldset><legend>Meddig használható?</legend><label>Mikortól számoljuk a napokat?</label><select name="validityMode"><option value="assigned" ${p.validityMode!=='first_use'?'selected':''}>A kiadástól / megadott kezdőnaptól</option><option value="first_use" ${p.validityMode==='first_use'?'selected':''}>Az első bérletes időponttól</option></select><label>Érvényesség napokban</label><input name="days" type="number" min="1" max="3650" required value="${p.days}"><details ${p.validFrom||p.validUntil?'open':''}><summary>Konkrét kezdő vagy záró dátum (nem kötelező)</summary><div class="form-grid"><div><label>Legkorábban ettől</label><input type="date" name="validFrom" value="${esc(p.validFrom||'')}"></div><div><label>Legkésőbb eddig</label><input type="date" name="validUntil" value="${esc(p.validUntil||'')}"></div></div><p class="hint">A megadott dátumokon kívül nem használható. Záró dátum esetén az a végső határ.</p></details></fieldset>${serviceScope(p.services)}<label>Felhasználási feltételek</label><textarea name="terms">${esc(p.terms||'')}</textarea><label class="check option-card"><input type="checkbox" name="active" ${p.active?'checked':''}>A bérlet kiadható új vendégnek</label><p class="hint">Foglaláskor lefoglalunk egy alkalmat. Lemondáskor visszaadjuk; megjelenés vagy meg nem jelenés jelölésekor elfogy. Az első időponttól számolt érvényesség a foglalt látogatás napjához igazodik, nem a foglalás készítésének napjához.</p><p id="form-error" class="error"></p><div class="buttons"><button type="button" onclick="$('#modal').close()">Mégse</button><button class="primary">Mentés</button></div></form>`);
  bindServiceScope();$('#offer-form').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),d=Object.fromEntries(f);if(id)d.id=id;d.services=f.getAll('services');d.active=f.has('active');for(const k of ['price','visits','days'])d[k]=Number(d[k]);d.validFrom=d.validFrom||null;d.validUntil=d.validUntil||null;await saveOffer('/api/passes',d);};
 }
-async function saveOffer(path,d) {try{await api(path,'POST',d);$('#modal').close();await refresh();toast('Sikeresen elmentettük.');}catch(e){$('#form-error').textContent=e.message;}}
+async function saveOffer(path,d){const form=$('#offer-form,#assign-form');return RaeroUI.action(form,()=>api(path,'POST',d),{button:form?.querySelector('.primary'),onSuccess:async()=>{dialog.close();await refresh();toast('Sikeresen elmentettük.');},onError:error=>RaeroUI.forms.error($('#form-error'),error)});}
 function assignPassForm() {
  showModal(`<h2>Bérlet kiadása</h2><p>A hozzárendelés nem jelent befizetést. A vásárlást és a számlázást külön rögzítsd.</p><form id="assign-form"><label>Vendég</label><select name="clientId">${state.clients.map(c=>`<option value="${c.id}">${esc(c.name)} · ${esc(c.phone)}</option>`).join('')}</select><label>Bérlet</label><select name="passId">${(state.passes||[]).filter(p=>p.active).map(p=>`<option value="${p.id}">${esc(p.name)} · ${money(p.price)}</option>`).join('')}</select><p id="form-error" class="error"></p><div class="buttons"><button type="button" onclick="$('#modal').close()">Mégse</button><button class="primary">Bérlet kiadása</button></div></form>`);
  $('#assign-form').onsubmit=async e=>{e.preventDefault();await saveOffer('/api/client-passes',Object.fromEntries(new FormData(e.target)));};

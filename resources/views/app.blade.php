@@ -26,7 +26,10 @@
     <dialog id="modal"></dialog>
     <div id="toast" role="status"></div>
     <script src="/i18n.js?v={{ filemtime(public_path('i18n.js')) }}" defer></script>
-    <script src="/app.js?v={{ filemtime(public_path('app.js')) }}" defer></script>
+    <script src="/lib/ui.js?v={{ filemtime(public_path('lib/ui.js')) }}" defer></script>
+<script src="/lib/components.js?v={{ filemtime(public_path('lib/components.js')) }}" defer></script>
+<script src="/lib/lists.js?v={{ filemtime(public_path('lib/lists.js')) }}" defer></script>
+<script src="/app.js?v={{ filemtime(public_path('app.js')) }}" defer></script>
     <script src="/workspace.js?v={{ filemtime(public_path('workspace.js')) }}" defer></script>
     <script src="/features.js?v={{ filemtime(public_path('features.js')) }}" defer></script>
     <script src="/availability.js?v={{ filemtime(public_path('availability.js')) }}" defer></script>
