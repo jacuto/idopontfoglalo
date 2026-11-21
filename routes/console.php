@@ -192,3 +192,6 @@ Artisan::command('raero:auto-payments',function(){$this->info((string)\App\Servi
 
 Artisan::command('raero:loyalty',function(){$count=0;foreach(DB::table('salon_state')->pluck('id') as $id)app(\App\Services\Tenant::class)->run((int)$id,function()use(&$count){$store=app(\App\Services\SalonStore::class);$s=$store->read();if(!empty($s['settings']['loyaltyEnabled'])||!empty($s['loyalty']['earnings'])){$store->mutate(fn(&$s)=>null);$count++;}});$this->info((string)$count);})->purpose('Pontgyűjtő egyenlegek rendezése igazolt látogatás és fizetés alapján');
 \Illuminate\Support\Facades\Schedule::command('raero:loyalty')->everyMinute()->withoutOverlapping();
+
+Artisan::command('raero:contact-import-cleanup',function(){$this->info((string)\App\Services\ContactImportCache::prune());})->purpose('Lejárt, titkosított névjegyimport-előnézetek törlése');
+\Illuminate\Support\Facades\Schedule::command('raero:contact-import-cleanup')->everyFiveMinutes()->withoutOverlapping();

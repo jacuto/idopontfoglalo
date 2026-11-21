@@ -2,6 +2,16 @@
 use App\Http\Controllers\SalonController;
 use App\Http\Middleware\ApiHeaders;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/api/contact-import/status',[\App\Http\Controllers\ContactImportController::class,'status']);
+Route::post('/api/contact-import/dismiss',[\App\Http\Controllers\ContactImportController::class,'dismiss']);
+Route::post('/api/contact-import/file',[\App\Http\Controllers\ContactImportController::class,'file'])->middleware('throttle:20,1');
+Route::post('/api/contact-import/preview',[\App\Http\Controllers\ContactImportController::class,'preview'])->middleware('throttle:30,1');
+Route::post('/api/contact-import/commit',[\App\Http\Controllers\ContactImportController::class,'commit'])->middleware('throttle:20,1');
+Route::get('/api/contact-import/remote/{id}',[\App\Http\Controllers\ContactImportController::class,'remote'])->whereUuid('id');
+Route::get('/auth/contact-import/{engine}/callback',[\App\Http\Controllers\ContactImportController::class,'callback'])->whereIn('engine',['google','microsoft']);
+Route::get('/auth/contact-import/{engine}',[\App\Http\Controllers\ContactImportController::class,'start'])->whereIn('engine',['google','microsoft']);
+
 Route::post('/api/bookings/{id}/review-request',[\App\Http\Controllers\ReviewRequestController::class,'request']);
 Route::post('/api/manage/review',[\App\Http\Controllers\ReviewRequestController::class,'review'])->middleware('throttle:10,1');
 Route::patch('/api/clients/{id}/blacklist',[\App\Http\Controllers\BookingToolsController::class,'blacklist']);

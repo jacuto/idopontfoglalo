@@ -125,6 +125,8 @@ platformConnectionsForm=async function(){
     ['bulkgate_application_id','Application ID'],['bulkgate_application_token','Application token',true],['bulkgate_sender_type','Feladó típusa'],['bulkgate_sender_value','Feladó értéke (opcionális)']]],
    ['Google-belépés és Google Naptár','google',[
     ['google_client_id','Google Client ID'],['google_client_secret','Google Client Secret',true]]],
+   ['Google-névjegyek importálása',null,[['contacts_google_client_id','Google Contacts Client ID (üresen: közös Google-kapcsolat)'],['contacts_google_client_secret','Google Contacts Client Secret',true]]],
+   ['Outlook-névjegyek importálása',null,[['contacts_microsoft_client_id','Microsoft Application (client) ID'],['contacts_microsoft_client_secret','Microsoft Client Secret',true]]],
    ['Facebook-belépés','facebook',[
     ['facebook_client_id','Facebook App ID'],['facebook_client_secret','Facebook App Secret',true]]],
    ['Apple-belépés (opcionális)','apple',[

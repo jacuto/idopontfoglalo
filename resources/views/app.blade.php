@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="/november19.css?v={{ filemtime(public_path('november19.css')) }}">
 <link rel="stylesheet" href="/booking-polish.css?v={{ filemtime(public_path('booking-polish.css')) }}">
 <link rel="stylesheet" href="/mobile-followup.css?v={{ filemtime(public_path('mobile-followup.css')) }}">
+<link rel="stylesheet" href="/contact-import.css?v={{ filemtime(public_path('contact-import.css')) }}">
 @include('partials.consent')
 </head>
   <body>
@@ -59,6 +60,7 @@
 <script src="/loyalty.js?v={{ filemtime(public_path('loyalty.js')) }}" defer></script>
 <script src="/history-pagination.js?v={{ filemtime(public_path('history-pagination.js')) }}" defer></script>
 <script src="/mobile-followup.js?v={{ filemtime(public_path('mobile-followup.js')) }}" defer></script>
+<script src="/contact-import.js?v={{ filemtime(public_path('contact-import.js')) }}" defer></script>
 <script src="/boot.js?v={{ filemtime(public_path('boot.js')) }}" defer></script>
   </body>
 </html>

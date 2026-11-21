@@ -26,7 +26,7 @@ final class FeaturesController
         if ($path === 'api/profile' && $method === 'PUT') {
             $r->merge(\App\Services\WebAddresses::fields($r->all()));
             $data = $r->validate([
-                'intro' => 'nullable|string|max:500', 'description' => 'nullable|string|max:12000',
+                'shareText'=>'sometimes|nullable|string|max:500', 'intro' => 'nullable|string|max:500', 'description' => 'nullable|string|max:12000',
                 'city'=>'nullable|string|max:100','zip'=>'nullable|string|max:20','categories'=>'sometimes|array|max:7','categories.*'=>\Illuminate\Validation\Rule::in(array_keys(\App\Services\ProviderDiscovery::CATEGORIES)),
                 'address' => 'nullable|string|max:500', 'directions' => 'nullable|string|max:1500', 'phone' => 'nullable|string|max:40',
                 'email' => 'nullable|email|max:200', 'website' => 'nullable|url:http,https|max:1000',

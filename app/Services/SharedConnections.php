@@ -3,7 +3,7 @@ namespace App\Services;
 use Illuminate\Support\Facades\Crypt;
 final class SharedConnections
 {
- public const KEYS=['smtp_host','smtp_port','smtp_username','smtp_password','mail_from','mail_name','bulkgate_application_id','bulkgate_application_token','bulkgate_sender_type','bulkgate_sender_value','google_client_id','google_client_secret','facebook_client_id','facebook_client_secret','apple_client_id','apple_team_id','apple_key_id','apple_private_key'];
+ public const KEYS=['smtp_host','smtp_port','smtp_username','smtp_password','mail_from','mail_name','bulkgate_application_id','bulkgate_application_token','bulkgate_sender_type','bulkgate_sender_value','contacts_google_client_id','contacts_google_client_secret','contacts_microsoft_client_id','contacts_microsoft_client_secret','google_client_id','google_client_secret','facebook_client_id','facebook_client_secret','apple_client_id','apple_team_id','apple_key_id','apple_private_key'];
  public static function all():array {
   $legacy=[];$path=config('integrations.path');if($path&&is_file($path))$legacy=json_decode(Crypt::decryptString(file_get_contents($path)),true,512,JSON_THROW_ON_ERROR);
   $saved=app(PlatformConnections::class)->values();$result=[];
