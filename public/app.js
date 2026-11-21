@@ -15,16 +15,17 @@ const localdt = (d) =>
   String(d.getHours()).padStart(2, "0") +
   ":" +
   String(d.getMinutes()).padStart(2, "0");
-let csrfToken;
+let csrfToken, csrfPending;
+function readCsrfToken(){
+ if(!csrfPending)csrfPending=(async()=>{const response=await fetch('/api/csrf',{headers:{Accept:'application/json'}});const data=await response.json().catch(()=>null);return {ok:response.ok,token:data?.token};})().finally(()=>{csrfPending=null;});
+ return csrfPending;
+}
 const api = async (url, method = "GET", body, tenant) => {
  try {
   if(method==="DELETE"&&typeof confirmDeletionRequest==="function"&&!confirmDeletionRequest())throw new Error("A törlést megszakítottad.");
   if (method !== "GET" && !csrfToken) {
-    const response = await fetch("/api/csrf", {
-      headers: { Accept: "application/json" },
-    });
-    const csrf = await response.json().catch(()=>null);
-    if(!response.ok||!csrf?.token)throw new Error("A biztonságos kapcsolatot most nem sikerült előkészíteni. Frissítsd az oldalt, majd próbáld újra.");
+    const csrf = await readCsrfToken();
+    if(!csrf.ok||!csrf.token)throw new Error("A biztonságos kapcsolatot most nem sikerült előkészíteni. Frissítsd az oldalt, majd próbáld újra.");
     csrfToken = csrf.token;
   }
   if(isPublic&&/^\/api\/(slots(?:\/next)?|quote)(?:[?]|$)/.test(url))url+=(url.includes('?')?'&':'?')+'public=1';
@@ -40,7 +41,7 @@ const api = async (url, method = "GET", body, tenant) => {
     ...(body ? { body: body instanceof FormData ? body : JSON.stringify(body) } : {}),
   });
   let r = await send();
-  if(r.status===419&&method!=="GET"){const tokenResponse=await fetch("/api/csrf",{headers:{Accept:"application/json"}});if(tokenResponse.ok){const refreshed=await tokenResponse.json().catch(()=>null);if(!refreshed?.token)throw new Error('A biztonságos kapcsolat frissítése nem sikerült. Frissítsd az oldalt, majd próbáld újra.');csrfToken=refreshed.token;r=await send();}}
+  if(r.status===419&&method!=="GET"){const refreshed=await readCsrfToken();if(refreshed.ok){if(!refreshed.token)throw new Error('A biztonságos kapcsolat frissítése nem sikerült. Frissítsd az oldalt, majd próbáld újra.');csrfToken=refreshed.token;r=await send();}}
   const d = await r.json().catch(()=>null);
   if (!r.ok) {
     const seconds=Math.max(1,Number(d?.retryAfter||r.headers.get('Retry-After')||60));

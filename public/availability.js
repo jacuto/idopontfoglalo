@@ -11,11 +11,7 @@ function bindCalendarSelection(){
 function currentAvailability() {
   return state.availability || {overrides:[],blocks:[],lunch:{enabled:false,from:'12:00',to:'12:30',weekdays:[1,2,3,4,5],staffId:null}};
 }
-function calendarHours(date) {
-  const day=currentAvailability().overrides.find(d=>d.date===date);
-  if(day?.closed)return [null,null];
-  return [timeMinutes(day?.openingTime || state.settings.openingTime || '08:00'),timeMinutes(day?.closingTime || state.settings.closingTime || '20:00')];
-}
+
 function calendarRanges(date, staff) {
   const availability=currentAvailability(),ranges=[];
   for(const b of availability.blocks)if(date>=b.fromDate&&date<=b.toDate&&(!b.staffId||b.staffId===staff))ranges.push([b.allDay?0:timeMinutes(b.fromTime),b.allDay?1440:timeMinutes(b.toTime),b.label]);

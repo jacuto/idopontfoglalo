@@ -4,7 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="referrer" content="same-origin" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
+    @php($raeroFrontend = app(\App\Services\FrontendAssets::class)->manifest())
+    @php($raeroBundledAssets = $raeroFrontend !== null)
     <title>Ráérő — időpontok egyszerűen</title>
+@if($raeroBundledAssets)
+<link rel="stylesheet" href="/{{ $raeroFrontend['style'] }}">
+@else
     <link rel="stylesheet" href="/style.css?v={{ filemtime(public_path('style.css')) }}" />
     <link rel="stylesheet" href="/showcase.css?v={{ filemtime(public_path('showcase.css')) }}" />
   <link rel="stylesheet" href="/workspace-polish.css?v={{ filemtime(public_path('workspace-polish.css')) }}">
@@ -15,9 +20,12 @@
 <link rel="stylesheet" href="/booking-polish.css?v={{ filemtime(public_path('booking-polish.css')) }}">
 <link rel="stylesheet" href="/mobile-followup.css?v={{ filemtime(public_path('mobile-followup.css')) }}">
 <link rel="stylesheet" href="/contact-import.css?v={{ filemtime(public_path('contact-import.css')) }}">
+@endif
 @include('partials.consent')
 @include('partials.pwa')
+@unless($raeroBundledAssets)
 <link rel="stylesheet" href="/pwa.css?v={{ filemtime(public_path('pwa.css')) }}">
+@endunless
 </head>
   <body>
     <header class="visitor-header"><a class="visitor-brand" href="/" aria-label="Ráérő főoldal"><span>◷</span> ráérő.</a><details class="visitor-menu"><summary>Menü <span aria-hidden="true">☰</span></summary><nav aria-label="Felső menü"><a href="/szolgaltato">Szolgáltatóknak</a><a href="/arak">Árak</a><a href="/kapcsolat">Kapcsolat</a><a class="booking-nav" href="/szolgaltatok">Időpontfoglalás</a><a class="visitor-account" href="/fiokom">Saját fiókom</a></nav></details></header>
@@ -25,6 +33,9 @@
     @include('partials.footer')
     <dialog id="modal"></dialog>
     <div id="toast" role="status"></div>
+@if($raeroBundledAssets)
+<script src="/{{ $raeroFrontend['script'] }}" defer></script>
+@else
     <script src="/i18n.js?v={{ filemtime(public_path('i18n.js')) }}" defer></script>
     <script src="/lib/ui.js?v={{ filemtime(public_path('lib/ui.js')) }}" defer></script>
 <script src="/lib/components.js?v={{ filemtime(public_path('lib/components.js')) }}" defer></script>
@@ -70,5 +81,6 @@
 <script src="/pwa.js?v={{ filemtime(public_path('pwa.js')) }}" defer></script>
 <script src="/import-draft.js?v={{ filemtime(public_path('import-draft.js')) }}" defer></script>
 <script src="/boot.js?v={{ filemtime(public_path('boot.js')) }}" defer></script>
+@endif
   </body>
 </html>

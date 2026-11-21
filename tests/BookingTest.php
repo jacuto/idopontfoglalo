@@ -72,7 +72,7 @@ class BookingTest extends TestCase
             ->assertOk()
             ->assertJsonMissingPath("clients")
             ->assertJsonMissingPath("bookings");
-        $this->get("/")->assertOk()->assertSee("app.js");
+        $this->get("/")->assertOk()->assertSee("/build/app.");
         $this->get("/foglalas")->assertOk();
     }
     public function test_login_and_logout(): void

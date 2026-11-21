@@ -29,7 +29,7 @@ const minutesTime = (n) =>
   String(Math.floor(n / 60)).padStart(2, "0") +
   ":" +
   String(n % 60).padStart(2, "0");
-function render() {
+function renderWorkspaceBase() {
   if (isPublic) return publicPage();
   if (state.settings.businessMode === "solo" && view === "staff")
     view = "calendar";
@@ -93,6 +93,8 @@ function render() {
     billing: billingPage,
   })[view]();
 }
+function render(){RaeroUI.rendering.run(renderWorkspaceBase);}
+
 function calendarMove(direction) {
   if (calendarMode === "month") {
     calendarAnchor = new Date(
@@ -107,7 +109,7 @@ function calendarMove(direction) {
   calendarPage();
 }
 let calendarDetailed = false, calendarWasMobile = window.innerWidth < 650;
-function calendarPage() {
+function calendarWorkspaceBase() {
   const today = datekey(new Date()),
     active = state.bookings.filter(
       (b) => !["cancelled", "rejected"].includes(b.status),
@@ -266,6 +268,8 @@ function calendarPage() {
   });
   grid.addEventListener("focusout", e => { if (!grid.contains(e.relatedTarget)) { clearGuide(); guidedKey = ""; } });
 }
+function calendarPage(){RaeroUI.calendarRendering.run(calendarWorkspaceBase);}
+
 let calendarResizeTimer;
 window.addEventListener("resize", () => {
   clearTimeout(calendarResizeTimer);
@@ -304,12 +308,7 @@ function staffPage() {
       )
       .join("")}</div>`;
 }
-function staffForm(id) {
-  const p = state.staff.find((p) => p.id === id) || {};
-  showModal(
-    `<h2>${id ? "Munkatárs szerkesztése" : "Munkatárs felvétele"}</h2><form id="staff-form"><label>Név</label><input name="name" required value="${esc(p.name || "")}"><label>Szakterület</label><input name="role" required list="roles" value="${esc(p.role || "")}"><datalist id="roles">${["Fodrász", "Masszőr", "Műkörmös", "Pedikűrös", "Szempilla-stylist"].map((v) => `<option>${v}</option>`).join("")}</datalist><label>E-mail</label><input name="email" type="email" value="${esc(p.email || "")}"><label>Telefonszám</label><input name="phone" value="${esc(p.phone || "")}"><div class="error" id="form-error"></div><div class="buttons"><button type="button" onclick="$('#modal').close()">Mégse</button><button class="primary">Mentés</button></div></form>`,
-  );
-  RaeroUI.forms.bind($('#staff-form'),{submit:({data})=>id?api('/api/staff/'+id,'PATCH',data):api('/api/config','PUT',{staff:[...state.staff,{id:crypto.randomUUID(),...data}]}),success:async()=>{dialog.close();await refresh();toast('Munkatárs mentve');},error:error=>RaeroUI.forms.error($('#form-error'),error)});}
+
 async function archiveStaff(id) {
   if (
     !confirm(
@@ -629,28 +628,7 @@ async function connectionsForm() {
     if ($("#connections-form")) $("#connections-form").textContent = e.message;
   }
 }
-async function deliveryRows(page=1) {
-  const host=$("#delivery-table");if(!host)return;const ticket=host.deliveryPageTicket=(host.deliveryPageTicket||0)+1;
-  try {
-    const data=await api("/api/deliveries?page="+page),rows=data.items;
-    if(!host.isConnected||ticket!==host.deliveryPageTicket)return;
-    const labels = {
-      pending: "Várakozik",
-      blocked: "Kapcsolatra vár",
-      processing: "Küldés alatt",
-      sent: "Küldő átvette", waiting_balance:"SMS-egyenlegre vár",
-      unknown: "Ellenőrzést igényel",
-      on_hold: "SMS-csere: ellenőrzendő",
-      skipped: "Már nem aktuális",
-      failed: "Sikertelen",
-    };
-    $("#delivery-table").innerHTML =
-      `<table><thead><tr><th>#</th><th>Állapot</th><th>Esedékes</th><th></th></tr></thead><tbody>${rows.map((r) => `<tr><td>${r.id}</td><td>${labels[r.status] || r.status}${r.provider_reference?`<small> · ${esc(r.provider_reference)}</small>`:""}${r.error ? `<small class="muted"> · ${esc(r.error)}</small>` : ""}</td><td>${new Date(r.available_at).toLocaleString(window.raeroLocale?.()||"hu-HU")}</td><td>${r.status==='unknown'&&r.sms_wallet_status==='unknown'?`<button onclick="resolveSmsDelivery(${r.id})">SMS eredményének rendezése</button>`:["failed", "blocked", "unknown", "on_hold"].includes(r.status) ? `<button onclick="retryDelivery(${r.id},${['unknown','on_hold'].includes(r.status)})">Újrapróbálás</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="4">Nincs küldési feladat.</td></tr>'}</tbody></table>`;
-    historyPageControls(host.querySelector('table'),data.pagination,deliveryRows,'Küldési előzmények lapozása');
-  } catch (e) {
-    if(host.isConnected&&ticket===host.deliveryPageTicket)host.textContent=e.message;
-  }
-}
+
 async function runDeliveries() {
   try {
     const r = await api("/api/deliveries/run", "POST", {});
@@ -687,44 +665,7 @@ function paymentsPage() {
       '<tr><td colspan="5">Még nincs rögzített befizetés.</td></tr>'
     }</tbody></table></div><div class="notice">Kézi rögzítéskor a beérkezést te igazolod. Az online befizetést csak hiteles Stripe/SimplePay szerverértesítés írja jóvá. A számlázás külön művelet.</div>`;
 }
-function paymentForm(bookingId) {
-  const choices = state.bookings.filter(
-    (b) =>
-      bookingValue(b) >
-      (state.payments || [])
-        .filter((p) => p.bookingId === b.id)
-        .reduce((n, p) => n + paymentNet(p), 0),
-  );
-  showModal(
-    `<h2>Befizetés rögzítése</h2><form id="payment-form"><label>Foglalás</label><select name="bookingId" required>${choices.map((b) => `<option value="${b.id}" ${b.id === bookingId ? "selected" : ""}>${esc(b.name)} · ${new Date(b.start).toLocaleString(window.raeroLocale?.()||"hu-HU")} · ${money(bookingValue(b))}</option>`).join("")}</select><label>Összeg (Ft)</label><input name="amount" type="number" min="1" step="1" required><label>Fizetés módja</label><select name="method"><option value="cash">Készpénz</option><option value="card">Bankkártya</option><option value="transfer">Átutalás</option></select><label>Befizetés ideje</label><input name="paidAt" type="datetime-local" required value="${localdt(new Date())}"><label>Megjegyzés</label><input name="note"><div id="form-error" class="error"></div><div class="buttons"><button type="button" onclick="$('#modal').close()">Mégse</button><button class="primary">Mentés</button></div></form>`,
-  );
-  const update = () => {
-    const id = $("[name=bookingId]").value,
-      b = state.bookings.find((x) => x.id === id);
-    $("[name=amount]").value = b
-      ? bookingValue(b) -
-        (state.payments || [])
-          .filter((p) => p.bookingId === id)
-          .reduce((n, p) => n + paymentNet(p), 0)
-      : "";
-  };
-  $("[name=bookingId]").onchange = update;
-  update();
-  $("#payment-form").onsubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const f = Object.fromEntries(new FormData(e.target));
-      f.amount = Number(f.amount);
-      f.paidAt = new Date(f.paidAt).toISOString();
-      await api("/api/payments", "POST", f);
-      $("#modal").close();
-      await refresh();
-      toast("Befizetés rögzítve");
-    } catch (err) {
-      $("#form-error").textContent = err.message;
-    }
-  };
-}
+
 
 function invoiceForm(paymentId) {
   const p = state.payments.find((p) => p.id === paymentId),
@@ -835,11 +776,7 @@ function applyReports() {
   if($("#report-staff"))reportStaff=$("#report-staff").value;
   reportsPage();
 }
-function billingPage() {
-  const sub = state.subscription || {};
-  $("#content").innerHTML =
-    `<div class="entity-grid"><div class="card item"><span class="badge">ALAPCSOMAG</span><h2>4 000 Ft / hó</h2><p>A fizetendő végösszeg. 1 munkatárs, 1 naptár.</p><p>Tervezett indulási ajánlat: két hónap ingyen, kártyaadatok nélkül.</p><div class="notice">Előfizetés állapota: ${esc({ active: "Aktív", trialing: "Próbaidő", canceled: "Megszűnt", past_due: "Fizetésre vár" }[sub.status] || "Nincs aktív előfizetés")}</div><button class="primary" onclick="startSubscription()">Előfizetés bankkártyával</button><p class="hint">A gomb külön Stripe-fizetési oldalra visz. Automatikus terheléshez ott adsz jóváhagyást. A központi előfizetési kapcsolat külön szerverbeállítást igényel.</p></div><div class="card item"><h2>Számlázási adataid</h2><p>${esc(state.settings.billingName || "Még nincs megadva")}<br>${esc(state.settings.billingZip || "")} ${esc(state.settings.billingCity || "")}<br>${esc(state.settings.billingAddress || "")}<br>${esc(state.settings.billingTaxNumber || "")}</p><button onclick="view='settings';render()">Adatok szerkesztése</button><div class="notice">A több vállalkozást kiszolgáló regisztráció, a csomagkorlátozás és az átutalásos előfizetés központi kezelése még külön fejlesztés. A vendégek befizetései már a Befizetések menüben kezelhetők.</div></div></div>`;
-}
+
 async function startSubscription() {
   try {
     const r = await api("/api/subscription/checkout", "POST", {});

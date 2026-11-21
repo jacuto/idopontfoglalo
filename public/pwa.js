@@ -12,7 +12,7 @@ addEventListener('beforeinstallprompt',event=>{event.preventDefault();raeroInsta
 addEventListener('appinstalled',()=>{raeroInstallAccepted=true;raeroInstallPrompt=null;try{localStorage.setItem('raero-app-installed','yes');}catch{}paintRaeroInstall();installRaeroSettingsLink();toast('A Ráérő app telepítve.');});
 matchMedia('(display-mode: standalone)').addEventListener('change',()=>{paintRaeroInstall();installRaeroSettingsLink();});
 addEventListener('resize',paintRaeroInstall);
-const renderBeforePwa=render;render=function(){renderBeforePwa();paintRaeroInstall();const footer=document.querySelector('.site-footer nav');if(footer&&!footer.querySelector('.pwa-footer-link')){const link=document.createElement('a');link.className='pwa-footer-link';link.href='#raero-app';link.textContent='Ráérő app telepítése';link.onclick=e=>{e.preventDefault();installRaeroApp();};footer.append(link);}};
+RaeroUI.rendering.add('pwa:1',{after(){paintRaeroInstall();const footer=document.querySelector('.site-footer nav');if(footer&&!footer.querySelector('.pwa-footer-link')){const link=document.createElement('a');link.className='pwa-footer-link';link.href='#raero-app';link.textContent='Ráérő app telepítése';link.onclick=e=>{e.preventDefault();installRaeroApp();};footer.append(link);}}});
 const settingsNavBeforePwa=settingsNav;settingsNav=function(){settingsNavBeforePwa();installRaeroSettingsLink();};
 if('serviceWorker' in navigator&&isSecureContext)navigator.serviceWorker.register('/service-worker.js',{scope:'/',updateViaCache:'none'}).catch(()=>{});
 addEventListener('storage',event=>{if(['raero-app-later','raero-app-installed'].includes(event.key))paintRaeroInstall();});

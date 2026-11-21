@@ -70,7 +70,7 @@ bookingDetails = function(id) {
   extra.innerHTML = `<h3>Látogatás</h3><p>${attendanceName(b.attendance)}</p>${b.status==='confirmed' && end <= Date.now() && (!b.attendance || b.attendance==='unmarked') ? `<button onclick="markAttendance('${id}','attended')">✓ Megjelent</button>` : ''}${b.status==='confirmed'&&new Date(b.start)<=new Date()&&(!b.attendance||b.attendance==='unmarked')?`<button onclick="markAttendance('${id}','no_show')">Nem jelent meg</button>`:''}${b.status==='pending' && new Date(b.start)<new Date() ? '<p class="notice">Ez a függő időpont elmúlt. Adj meg új, jövőbeli időpontot, vagy utasítsd el.</p>' : ''}${b.attendance==='attended' ? `<button onclick="reviewForm('${id}',false)">Vendég értékelése (belső)</button>` : ''}${b.pricing ? `<p>Eredeti ár: ${money(b.pricing.original)} · Kedvezmény: ${money(b.pricing.discount)} · Fizetendő: ${money(b.pricing.payable)}</p>`:''}`;
   $('#modal').append(extra);
 };
-async function markAttendance(id,attendance) { try { await api('/api/bookings/'+id,'PATCH',{attendance}); await refresh(); bookingDetails(id); toast('Látogatás rögzítve.'); } catch(e) {toast(e.message);} }
+
 function reviewForm(id,guest,tenant) {
   showModal(`<h2>${guest?'Szolgáltató értékelése':'Vendég értékelése'}</h2><p>${guest?'Az értékelés a szolgáltató nyilvános oldalán jelenik meg.':'Ez belső értékelés, kizárólag ennek a vállalkozásnak a felületén látható.'}</p><form id="review-form"><label>Pontszám</label><select name="score">${[5,4,3,2,1].map(n=>`<option>${n}</option>`).join('')}</select><label>Szöveges értékelés</label><textarea name="text" required maxlength="3000"></textarea><p id="form-error" class="error"></p><div class="buttons"><button type="button" onclick="$('#modal').close()">Mégse</button><button class="primary">Értékelés mentése</button></div></form>`);
   $('#review-form').onsubmit = async e => {e.preventDefault(); try { const d=Object.fromEntries(new FormData(e.target));d.score=Number(d.score);await api('/api/'+(guest?'guest/':'')+'bookings/'+id+'/review','POST',d,tenant);$('#modal').close();toast('Értékelés mentve.');}catch(err){$('#form-error').textContent=err.message;}};
@@ -116,24 +116,8 @@ function assignPassForm() {
  $('#assign-form').onsubmit=async e=>{e.preventDefault();await saveOffer('/api/client-passes',Object.fromEntries(new FormData(e.target)));};
 }
 let messageGuest = null;
-async function messagesPage() {
- try {
-  const list=await api('/api/messages'); state.messages=list;
-  const people=state.clients.filter(c=>c.guestId);
-  $('#content').innerHTML=`<div class="card item"><h2>Belső üzenetek</h2><p>Az üzenet mentés után akkor is megmarad, ha az emailértesítőt nem sikerül kézbesíteni.</p><label>Beszélgetés vendéggel</label><div class="message-recipient-search"><input id="conversation-person" type="search" autocomplete="off" placeholder="Vendég neve, e-mail-címe vagy telefonszáma" aria-label="Beszélgetés vendéggel" aria-controls="message-recipient-results"><p class="hint">Írj be legalább 3 betűt vagy számjegyet.</p><div id="message-recipient-results" role="listbox" hidden></div></div>${!people.length?'<p>Bejelentkezve foglaló vendéggel indíthatsz beszélgetést. Az importált vendégből nem készül automatikusan fiók.</p>':''}<div id="conversation"></div></div>`;
- const input=$('#conversation-person'),results=$('#message-recipient-results');input.oninput=()=>{const q=input.value.trim().toLocaleLowerCase(),digits=q.replace(/\D/g,'');results.replaceChildren();results.hidden=q.length<3;if(results.hidden)return;const matches=people.filter(c=>[c.name,c.email].some(v=>String(v||'').toLocaleLowerCase().includes(q))||(digits.length>=3&&String(c.phone||'').replace(/\D/g,'').includes(digits))).slice(0,20);for(const c of matches){const b=document.createElement('button');b.type='button';b.setAttribute('role','option');b.textContent=c.name+' · '+(c.email||phoneFormatted(c.phone||''))+(list.some(m=>m.guestId===Number(c.guestId)&&m.sender==='guest'&&!m.readAt)?' · Olvasatlan':'');b.onclick=()=>{input.value=c.name;results.hidden=true;openConversation(Number(c.guestId));};results.append(b);}if(!matches.length)results.textContent='Nincs találat.';};input.onkeydown=e=>{if(e.key==='Escape')results.hidden=true;else if(e.key==='ArrowDown'){e.preventDefault();results.querySelector('button')?.focus();}};
- }catch(e){$('#content').textContent=e.message;}
-}
-async function openConversation(id, guestMode=false) {
- if(!id)return;messageGuest=id;
- try{
-  const list=await api('/api/messages');const messages=list.filter(m=>m.guestId===id);
-  $('#conversation').innerHTML=`<div class="message-list">${messages.map(m=>`<div class="notice"><strong>${m.sender==='guest'?'Vendég':'Szolgáltató'}</strong> · ${new Date(m.createdAt).toLocaleString(window.raeroLocale?.()||'hu-HU')}<p class="preserve-lines">${esc(m.text)}</p></div>`).join('')||'<p>Még nincs üzenet. Írd meg az elsőt.</p>'}</div><form id="message-form"><label>Üzenet</label><textarea name="text" required maxlength="5000"></textarea><p id="message-error" class="error"></p><button class="primary">Üzenet küldése</button></form>`;
-  const select=$('#conversation-person');if(select)select.value=String(id);
-  await api('/api/messages','PATCH',{guestId:id});
-  $('#message-form').onsubmit=async e=>{e.preventDefault();try{await api('/api/messages','POST',{guestId:id,text:new FormData(e.target).get('text')});await openConversation(id,guestMode);toast('Az üzenetet elmentettük. Az emailértesítés külön feldolgozásra vár.');}catch(err){$('#message-error').textContent=err.message;}};
- }catch(e){toast(e.message);}
-}
+
+
 const baseGuestPage=guestPage;
 guestPage=async function(){
  await baseGuestPage();
@@ -146,12 +130,12 @@ guestPage=async function(){
 
  }catch{}
 };
-const baseRender=render;
-render=function(){baseRender();if(isPublic)return;
+
+RaeroUI.rendering.add('features:1',{after(){if(isPublic)return;
  const unread=(state.messages||[]).filter(m=>m.sender==='guest'&&!m.readAt).length;
  const button=document.querySelector('[data-nav="messages"] span');if(button&&unread)button.textContent=`Üzenetek (${unread})`;
- if(new URLSearchParams(location.search).has('messages') && view==='calendar'){view='messages';baseRender();}
-};
+ if(new URLSearchParams(location.search).has('messages') && view==='calendar'){view='messages';renderWorkspaceBase();}
+}});
 async function platformPage() {
  try {
   const providers=await api('/api/platform/providers');const operator=await api('/api/platform/operator');const payments=await api('/api/platform/payments');
@@ -164,13 +148,9 @@ async function platformPage() {
   $('#platform-login').onsubmit=async e=>{e.preventDefault();try{await api('/api/platform/login','POST',Object.fromEntries(new FormData(e.target)));await platformPage();}catch(err){$('#platform-error').textContent=err.message;}};
  }
 }
-const oldBillingPage=billingPage;
-billingPage=async function(){oldBillingPage();try{const d=await api('/api/subscription/info');const sub=state.subscription||{},o=d.operator;$('#content').innerHTML=`<div class="entity-grid"><div class="card item"><h2>4 000 Ft / hó</h2><p>Fizetendő végösszeg. Alanyi adómentes.</p><p>Állapot: ${esc({trialing:'Próbaidő',active:'Aktív',past_due:'Fizetésre vár',canceled:'Megszűnt'}[sub.status]||'Nincs előfizetés')}</p>${sub.trialEndsAt?`<p>Próbaidő vége: ${new Date(sub.trialEndsAt).toLocaleDateString(window.raeroLocale?.()||'hu-HU')}</p>`:''}${sub.paidUntil?`<p>Rendezve eddig: ${new Date(sub.paidUntil).toLocaleDateString(window.raeroLocale?.()||'hu-HU')}</p>`:''}<button class="primary" onclick="startSubscription()">Előfizetés Stripe-pal</button><p class="hint">A próbaidőhöz nem kell bankkártya.</p></div><div class="card item"><h2>Átutalás</h2>${!o.account?'<p class="notice">Az üzemeltető még nem adta meg az átutalási bankadatokat. Kérj segítséget az Üzenet az üzemeltetőnek gombbal.</p>':''}<p>${esc(o.name)}<br>${esc(o.bank)}<br>${esc(o.account)}</p><p>IBAN: ${esc(o.iban)}<br>SWIFT/BIC: ${esc(o.bic)}</p><p>Közlemény: <strong>RAERO-${d.providerId}</strong><br>Összeg: <strong>4 000 Ft</strong></p><p>Az átutalást az üzemeltető a banki beérkezés után írja jóvá.</p></div></div><h2>Befizetéseim</h2>${d.payments.map(p=>`<p>${money(p.amount)} · ${esc(p.paid_at)} · ${esc(p.method)}</p>`).join('')||'<p>Még nincs előfizetési befizetés.</p>'}<h2>Előfizetési számláim</h2>${(d.invoices||[]).map(i=>`<p>${platformInvoiceDetails(i)}</p>`).join('')||'<p>Még nincs kiállított előfizetési számla. Az üzemeltető állítja ki a befizetésből.</p>'}`;}catch(e){toast(e.message);}};
-async function newsletterPage(){
- try{const d=await api('/api/platform/newsletters');
- showPlatformPage(`<h2>Főadmin hírlevelek</h2><p>SMTP-kapcsolat: ${d.configured?'Beállítva':'Nincs beállítva'}. Csak kifejezetten feliratkozott címzetteknek küldünk. Az „SMTP elfogadta” állapot nem igazolja a címzett postaládájába érkezést.</p><button class="primary" onclick="newsletterForm()">Új hírlevél</button>${d.campaigns.map(n=>`<div class="notice"><strong>${esc(n.subject)}</strong><p>${n.audience==='provider'?'Szolgáltatók':'Vendégek'} · ${esc(n.status)}</p><button onclick="newsletterPreview(${n.id})">Előnézet és küldés</button>${n.status==='draft'?`<button onclick="newsletterForm(${n.id})">Szerkesztés</button>`:''}</div>`).join('')||'<p>Még nincs hírlevél. Az Új hírlevél gombbal készíthetsz piszkozatot.</p>'}<h3>Kézbesítési állapotok</h3>${d.deliveries.map(j=>`<p>${esc(j.email)} · ${esc({pending:'Sorban',processing:'Küldés folyamatban',accepted:'SMTP elfogadta',skipped:'Kihagyva',unknown:'Ellenőrzést igényel'}[j.status]||j.status)} ${esc(j.error||'')}</p>`).join('')||'<p>Még nincs kiküldés.</p>'}<div class="buttons"><button onclick="$('#modal').close()">Bezárás</button></div>`);
- }catch(e){toast(e.message);}
-}
+
+
+
 async function newsletterForm(id){
  try{const d=await api('/api/platform/newsletters'),n=d.campaigns.find(n=>n.id===id)||{};
  showPlatformPage(`<h2>Hírlevélpiszkozat</h2><form id="newsletter-form"><label>Célcsoport</label><select name="audience"><option value="provider" ${n.audience==='provider'?'selected':''}>Szolgáltatók</option><option value="guest" ${n.audience==='guest'?'selected':''}>Vendégek</option></select><label>Tárgy</label><input name="subject" required maxlength="200" value="${esc(n.subject||'')}"><label>Levél szövege</label><textarea name="content" required maxlength="50000">${esc(n.content||'')}</textarea><p>A leiratkozási hivatkozást küldéskor hozzáadjuk.</p><p id="form-error" class="error"></p><div class="buttons"><button type="button" onclick="newsletterPage()">Vissza</button><button class="primary">Piszkozat mentése</button></div></form>`);
@@ -195,7 +175,7 @@ async function newsletterConsent(container){
 const guestWithMessages=guestPage;
 guestPage=async function(){await guestWithMessages();if($('#avatar-form'))await newsletterConsent($('.public'));};
 const providerSettings=settingsPage;
-settingsPage=function(){providerSettings();newsletterConsent($('#content'));};
+
 function platformInvoiceDetails(i,prefix='/api/subscription/invoices/'){
  const date=i.issued_on?String(i.issued_on).slice(0,10).replaceAll('-','.')+'.':'';
  return `${esc(i.number||'Még nincs számlaszám')} · ${esc({issued:'Kiállítva',unknown:'Ellenőrzést igényel',issuing:'Folyamatban',not_created:'Nem jött létre'}[i.status]||i.status)}${date?' · '+esc(date):''}${i.source==='manual'?' · Kézzel rögzítve':''} ${i.status==='issued'&&i.source!=='manual'&&i.reference?`<a href="${providerLink(prefix+i.id+'/pdf')}">PDF letöltése</a>`:''}`;
@@ -221,17 +201,13 @@ async function operatorConversation(platform=false){
 }
 const platformWithNews=platformPage;
 platformPage=async function(){await platformWithNews();if($('#provider-create')){for(const [label,action] of [['Előfizetési számlák',platformInvoicesPage],['Közvetlen levelezés',()=>operatorConversation(true)]]){const b=document.createElement('button');b.textContent=label;b.onclick=action;$('.public').prepend(b);}if(new URLSearchParams(location.search).has('platformMessages'))operatorConversation(true);}};
-const renderWithUnread=render;
-render=function(){renderWithUnread();if(!isPublic){const actions=$('.top-actions');if(actions){const b=document.createElement('button');b.textContent='Üzenet az üzemeltetőnek';b.onclick=()=>operatorConversation(false);actions.prepend(b);}}};
+
+RaeroUI.rendering.add('features:2',{after(){if(!isPublic){const actions=$('.top-actions');if(actions){const b=document.createElement('button');b.textContent='Üzenet az üzemeltetőnek';b.onclick=()=>operatorConversation(false);actions.prepend(b);}}}});
 
 const originalManage=managePage;
 managePage=async function(){try{await api('/api/guest');}catch{}await originalManage();};
 async function changeCalendarLimit(id){await providerSubscriptionPage(id);$('#provider-subscription-form [name=calendarLimit]')?.focus();}
-async function platformConnectionsForm(){
-try{const c=await api('/api/platform/connections');const fields=[['stripe_key','Saját Stripe titkos kulcs',true],['stripe_price','Stripe havi ár azonosítója (4 000 Ft)'],['stripe_webhook_secret','Stripe webhook aláírókulcs',true],['billingo_key','Saját Billingo API-kulcs',true],['billingo_block','Billingo számlatömb azonosító'],['smtp_host','Központi SMTP-kiszolgáló'],['smtp_port','SMTP-port'],['smtp_username','SMTP-felhasználónév'],['smtp_password','SMTP-jelszó',true],['mail_from','Feladó emailcíme'],['mail_name','Feladó neve']];
-showModal(`<h2>Üzemeltető külső kapcsolatai</h2><p>Ezek a kulcsok kizárólag a rendszer üzemeltetőjéhez tartoznak. A szolgáltatók nem férnek hozzájuk. A titkos mező üresen hagyva megőrzi a korábbi értéket.</p><form id="platform-connections-form">${fields.map(([key,label,secret])=>`<label>${label} · ${c[key+'_configured']?'Beállítva':'Nincs beállítva'}</label><input name="${key}" type="${secret?'password':'text'}" autocomplete="off" value="${secret?'':esc(c[key]||'')}">`).join('')}<p>Stripe webhook: ${esc(location.origin)}/api/platform-stripe/webhook</p><p id="form-error" class="error"></p><div class="buttons"><button type="button" onclick="$('#modal').close()">Mégse</button><button class="primary">Kapcsolatok mentése</button></div></form>`);
-$('#platform-connections-form').onsubmit=async e=>{e.preventDefault();try{await api('/api/platform/connections','PUT',Object.fromEntries(new FormData(e.target)));$('#modal').close();toast('Központi kapcsolatok mentve. Éles tranzakció még nem történt.');}catch(err){$('#form-error').textContent=err.message;}};
-}catch(e){toast(e.message);}}
+
 const platformWithBilling=platformPage;
 platformPage=async function(){await platformWithBilling();if($('#provider-create')){const b=document.createElement('button');b.textContent='Saját Billingo, Stripe és SMTP';b.onclick=platformConnectionsForm;$('.public').prepend(b);}};
 function reconcilePlatformInvoice(id){showPlatformPage(`<h2>Számla egyeztetése</h2><p>Előbb keresd meg a befizetést a Billingóban. Csak biztos eredményt rögzíts: egy téves „nem jött létre” jelölés után ismételt számla készülhet.</p><form id="reconcile-form" data-invoice-id="${id}"><label>Ellenőrzés eredménye</label><select name="decision"><option value="issued">A számla létrejött</option><option value="not_created">Biztosan nem jött létre</option></select><label>Számlaszám (ha létrejött)</label><input name="number"><label>Billingo bizonylatazonosító (ha létrejött)</label><input name="reference"><label class="check"><input type="checkbox" name="confirmed" required>A Billingóban ellenőriztem az eredményt.</label><p id="form-error" class="error"></p><button class="primary">Eredmény mentése</button></form>`);$('#reconcile-form').onsubmit=async e=>{e.preventDefault();try{const d=Object.fromEntries(new FormData(e.target));d.confirmed=true;await api('/api/platform/invoices/'+id+'/reconcile','PATCH',d);await platformInvoicesPage();toast('Egyeztetés rögzítve.');}catch(err){$('#form-error').textContent=err.message;}};}

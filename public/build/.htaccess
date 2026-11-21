@@ -1,0 +1,6 @@
+# Filenames change with content. Applies only to this generated-assets directory.
+<IfModule mod_headers.c>
+  <FilesMatch "^app\.[a-f0-9]{16}\.(js|css)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+</IfModule>

@@ -1,6 +1,17 @@
 /* Ráérő UI: business-independent shared primitives. No runtime CDN dependencies. */
 (()=>{'use strict';
  const UI=window.RaeroUI={};
+ UI.lifecycle={SKIP:Symbol('skip-inner-render'),create(){
+  const stages=[];
+  const run=(base,end=stages.length)=>{const contexts=new Array(end);let first=0,skip=false;for(let i=end-1;i>=0;i--){contexts[i]=stages[i].before?.();if(contexts[i]===UI.lifecycle.SKIP){first=i+1;skip=true;break;}}if(!skip)base();for(let i=first;i<end;i++)stages[i].after?.(contexts[i]);};
+  return {
+   add(name,stage){if(stages.some(entry=>entry.name===name))throw Error('Duplicate render stage: '+name);stages.push({name,...stage});},
+   run,
+   runBefore(name,base){const end=stages.findIndex(stage=>stage.name===name);if(end<0)throw Error('Unknown render stage: '+name);run(base,end);}
+  };
+ }};
+ UI.rendering=UI.lifecycle.create();
+ UI.calendarRendering=UI.lifecycle.create();
  UI.escapeHtml=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
  UI.text={fold:value=>String(value??'').normalize('NFD').replace(/\p{Diacritic}/gu,'').toLocaleLowerCase('hu'),collator:new Intl.Collator('hu',{numeric:true,sensitivity:'base'})};
  UI.page=(items,page,size)=>{const total=items.length,pages=Math.max(1,Math.ceil(total/size));page=Math.min(pages,Math.max(1,Number(page)||1));const start=(page-1)*size;return {items:items.slice(start,start+size),pagination:{page,perPage:size,total,pages,from:total?start+1:0,to:Math.min(start+size,total)}};};

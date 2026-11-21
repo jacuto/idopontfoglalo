@@ -2,7 +2,7 @@
 function modalCornerClose(){return RaeroUI.modal.closeButton(dialog,{removeLabels:true,toggleClass:'has-corner-close'});}
 
 const detailsBeforeTestFeedback=bookingDetails;bookingDetails=function(id){detailsBeforeTestFeedback(id);modalCornerClose();const payment=dialog.querySelector('.booking-payment-actions'),status=dialog.querySelector('.change-status-action');if(payment&&status)payment.append(status);else if(status){const row=document.createElement('div');row.className='booking-payment-actions';status.before(row);row.append(status);}};
-const paymentBeforeTestFeedback=paymentForm;paymentForm=function(id){paymentBeforeTestFeedback(id);modalCornerClose();};
+
 
 function compactAssignment(element,names,allLabel,all){
  if(!element)return;element.replaceChildren();element.classList.add('compact-assignment');
@@ -41,7 +41,7 @@ const publicBeforeTestFeedback=publicPage;publicPage=function(){
  const removeLogin=()=>{if(form.querySelector('.guest-autofill'))document.querySelectorAll('#public-form .guest-login-link,#public-form a[href*="/fiokom"]').forEach(node=>node.remove());};new MutationObserver(removeLogin).observe(form,{childList:true,subtree:true});removeLogin();
 };
 
-const calendarBeforeBulkSelection=calendarPage;calendarPage=function(){calendarBeforeBulkSelection();const picker=$('.calendar-picker');if(!picker)return;const list=picker.querySelector('summary+div'),bar=document.createElement('div');bar.className='calendar-bulk-selection';bar.innerHTML='<button type="button">Összes kijelölése</button><button type="button">Kijelölések törlése</button>';list.prepend(bar);const selected=picker.querySelectorAll('input:checked').length;picker.querySelector('summary').textContent='Naptárak ('+selected+')';bar.children[0].onclick=()=>{selectedCalendars=[];filter='';calendarPage();$('.calendar-picker').open=true;};bar.children[1].onclick=()=>{selectedCalendars=['__none__'];filter='';calendarPage();$('.calendar-picker').open=true;};if(!selected){const note=document.createElement('p');note.className='notice no-calendar-selected';note.textContent='Nincs kijelölt naptár. Válassz egyet a Naptárak menüben.';$('.calendar-card')?.before(note);}};
+RaeroUI.calendarRendering.add('interface-updates:1',{after(){const picker=$('.calendar-picker');if(!picker)return;const list=picker.querySelector('summary+div'),bar=document.createElement('div');bar.className='calendar-bulk-selection';bar.innerHTML='<button type="button">Összes kijelölése</button><button type="button">Kijelölések törlése</button>';list.prepend(bar);const selected=picker.querySelectorAll('input:checked').length;picker.querySelector('summary').textContent='Naptárak ('+selected+')';bar.children[0].onclick=()=>{selectedCalendars=[];filter='';calendarPage();$('.calendar-picker').open=true;};bar.children[1].onclick=()=>{selectedCalendars=['__none__'];filter='';calendarPage();$('.calendar-picker').open=true;};if(!selected){const note=document.createElement('p');note.className='notice no-calendar-selected';note.textContent='Nincs kijelölt naptár. Válassz egyet a Naptárak menüben.';$('.calendar-card')?.before(note);}}});
 
 async function deleteCatalogOffer(kind,id){if(!confirm('Törlöd a '+(kind==='coupons'?'kupont':'bérletsablont')+'? A korábbi felhasználások és a már kiadott bérletek megmaradnak.'))return;try{await api('/api/'+kind+'/'+encodeURIComponent(id),'DELETE',{});await refresh();toast('Törölve a kínálatból.');}catch(e){toast(e.message);}}
 

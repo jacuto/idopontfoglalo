@@ -1,0 +1,15 @@
+{
+  "name": "raero-frontend-tools",
+  "private": true,
+  "scripts": {
+    "build": "node tools/build-assets.cjs",
+    "test:assets": "node --test tests/asset-build.test.cjs",
+    "check:assets": "node tools/build-assets.cjs --check",
+    "test:frontend": "node --test tests/asset-build.test.cjs tests/api-csrf.test.cjs tests/render-pipeline.test.cjs"
+  },
+  "devDependencies": {
+    "acorn": "8.15.0",
+    "clean-css": "5.3.3",
+    "terser": "5.44.1"
+  }
+}

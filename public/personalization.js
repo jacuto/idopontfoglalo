@@ -21,8 +21,8 @@ serviceForm=function(id){
   const field=document.createElement('div');field.className='notice primary-professional';field.innerHTML=`<small>Elsődleges szakember</small><strong>${esc(state.staff.find(p=>p.id===s.primaryStaffId)?.name||'')}</strong><input type="hidden" name="staff" value="${esc(s.primaryStaffId)}">`;form.querySelector('#form-error').before(field);
  }
 };
-const calendarBeforePersonalization=calendarPage;
-calendarPage=function(){calendarBeforePersonalization();if(!state.settings.advancedBookingEnabled)document.querySelectorAll('[onclick="groupSessionsDialog()"] ').forEach(b=>b.hidden=true);};
+
+RaeroUI.calendarRendering.add('personalization:1',{after(){if(!state.settings.advancedBookingEnabled)document.querySelectorAll('[onclick="groupSessionsDialog()"] ').forEach(b=>b.hidden=true);}});
 const groupsBeforePersonalization=groupSessionsDialog;
 groupSessionsDialog=async function(){await groupsBeforePersonalization();if(!state.settings.advancedBookingEnabled)document.querySelector('#modal [onclick="groupSessionForm()"]')?.remove();};
 

@@ -1,16 +1,16 @@
 /* Keep workspace navigation, calendars and overlays predictable on small screens. */
 let lastWorkspaceView=null;
-const renderBeforeMobileFollowup=render;
-render=function(){const pageKey=view+(view==='settings'?':'+settingsTab:'');const changed=lastWorkspaceView!==pageKey;renderBeforeMobileFollowup();if(!isPublic){if(changed){window.scrollTo({top:0,left:0,behavior:'instant'});document.querySelector('.shell main')?.scrollTo(0,0);}lastWorkspaceView=pageKey;document.body.dataset.workspaceView=view;}placeCompactSidebarHandle();};
+
+RaeroUI.rendering.add('mobile-followup:1',{before(){const pageKey=view+(view==='settings'?':'+settingsTab:'');const changed=lastWorkspaceView!==pageKey;return {pageKey,changed};},after(context){const {pageKey,changed}=context;if(!isPublic){if(changed){window.scrollTo({top:0,left:0,behavior:'instant'});document.querySelector('.shell main')?.scrollTo(0,0);}lastWorkspaceView=pageKey;document.body.dataset.workspaceView=view;}placeCompactSidebarHandle();}});
 function placeCompactSidebarHandle(){const button=document.getElementById('sidebar-toggle'),side=document.querySelector('.sidebar');if(!button||!side)return;const compact=innerWidth<=650&&document.body.classList.contains('sidebar-collapsed');if(compact){const intro=document.querySelector('.shell .intro');if(intro)intro.prepend(button);}else if(button.parentElement!==side)side.append(button);}
 const sidebarBeforeMobileFollowup=toggleSidebar;toggleSidebar=function(){sidebarBeforeMobileFollowup();placeCompactSidebarHandle();};
 addEventListener('resize',placeCompactSidebarHandle);
-const calendarBeforeMobileFollowup=calendarPage;calendarPage=function(){try{localStorage.setItem('raero-calendar-mode',calendarMode);}catch{}calendarBeforeMobileFollowup();placeCompactSidebarHandle();};
+RaeroUI.calendarRendering.add('mobile-followup:1',{before(){try{localStorage.setItem('raero-calendar-mode',calendarMode);}catch{}},after(){placeCompactSidebarHandle();}});
 const clientsBeforeMobileFollowup=clientsPage;clientsPage=function(){clientsBeforeMobileFollowup();document.querySelector('#client-rows')?.closest('table')?.classList.add('mobile-client-table');};
 const activityBeforeMobileFollowup=activityPage;activityPage=function(){activityBeforeMobileFollowup();document.querySelector('#content table')?.classList.add('mobile-activity-table');};
 
 const publicBeforeMobileFollowup=publicPage;publicPage=function(){publicBeforeMobileFollowup();for(const title of document.querySelectorAll('.provider-profile h2')){if(!['Bérletek','Aktuális ajánlatok'].includes(title.textContent.trim()))continue;title.classList.add('public-offer-heading');const grid=title.nextElementSibling;if(!grid?.classList.contains('entity-grid'))continue;grid.classList.add('public-highlight-offers');grid.querySelectorAll('article').forEach(card=>{card.classList.add(title.textContent==='Bérletek'?'public-pass-card':'public-coupon-card');const price=[...card.children].find(el=>el.tagName==='P');price?.classList.add('public-offer-price');});}};
 function fitMobileCalendarActions(){const actions=document.querySelector('.intro-actions');if(!actions||view!=='calendar')return;const buttons=[...actions.querySelectorAll('button')].filter(b=>b.getClientRects().length),create=actions.querySelector('.calendar-create-last');if(!create)return;const gap=parseFloat(getComputedStyle(actions).columnGap)||8;const needed=buttons.filter(b=>b!==create).reduce((sum,b)=>sum+b.getBoundingClientRect().width,140)+Math.max(0,buttons.length-1)*gap;actions.classList.toggle('calendar-actions-stacked',innerWidth<=650&&needed>actions.clientWidth+1);}
-const renderBeforeCalendarActionFit=render;render=function(){renderBeforeCalendarActionFit();fitMobileCalendarActions();};
-const calendarBeforeActionFit=calendarPage;calendarPage=function(){calendarBeforeActionFit();fitMobileCalendarActions();};
+RaeroUI.rendering.add('mobile-followup:2',{after(){fitMobileCalendarActions();}});
+RaeroUI.calendarRendering.add('mobile-followup:2',{after(){fitMobileCalendarActions();}});
 addEventListener('resize',()=>requestAnimationFrame(fitMobileCalendarActions));
