@@ -9,7 +9,7 @@ final class ImportStaging
 {
  public static function key(Request $request,string $kind,string $id):string
  {
-  if(!in_array($kind,['contact-import','calendar-import'],true))throw new \InvalidArgumentException('Ismeretlen importtípus.');
+  if(!in_array($kind,['contact-import','calendar-import','record-import'],true))throw new \InvalidArgumentException('Ismeretlen importtípus.');
   $sessionKey=str_replace('-','_',$kind).'_nonce';$nonce=$request->session()->get($sessionKey);
   if(!is_string($nonce)||$nonce===''){$nonce=bin2hex(random_bytes(32));$request->session()->put($sessionKey,$nonce);}
   return $kind.':'.WorkspaceAccess::admin($request).':'.hash('sha256',$nonce).':'.$id;

@@ -80,6 +80,7 @@
 <script src="/calendar-import.js?v={{ filemtime(public_path('calendar-import.js')) }}" defer></script>
 <script src="/pwa.js?v={{ filemtime(public_path('pwa.js')) }}" defer></script>
 <script src="/import-draft.js?v={{ filemtime(public_path('import-draft.js')) }}" defer></script>
+<script src="/admin-navigation.js?v={{ filemtime(public_path('admin-navigation.js')) }}" defer></script>
 <script src="/boot.js?v={{ filemtime(public_path('boot.js')) }}" defer></script>
 @endif
   </body>

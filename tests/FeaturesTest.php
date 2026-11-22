@@ -76,7 +76,8 @@ class FeaturesTest extends TestCase {
   $this->getJson('/api/guest')->assertJsonCount(0,'bookings');
   $this->postJson('/api/bookings',$this->booking(['clientId'=>$b['clientId'],'start'=>'2035-03-13T09:00:00Z']))->assertCreated();
   $this->getJson('/api/guest')->assertJsonCount(1,'bookings');
-  $this->assertCount(2,app(SalonStore::class)->read()['clients']);
+  $this->assertCount(1,app(SalonStore::class)->read()['clients']);
+  $this->assertNull(app(SalonStore::class)->read()['bookings'][1]['clientId']);
  }
  public function test_expired_pending_has_actionable_error_and_never_attends_automatically():void {
   $b=$this->postJson('/api/bookings',$this->booking())->json();
@@ -536,9 +537,9 @@ class FeaturesTest extends TestCase {
  public function test_conflicting_contact_matches_are_never_silently_merged_on_booking_or_import():void {
   $this->provider();$clients=[['id'=>'first','name'=>'Első','phone'=>'+36301111111','email'=>'first@example.com'],['id'=>'second','name'=>'Második','phone'=>'+36202222222','email'=>'second@example.com']];
   $this->putJson('/api/config',['clients'=>$clients])->assertOk();
-  $this->postJson('/api/bookings',$this->booking(['name'=>'Más személy','phone'=>'+36301111111','email'=>'']))->assertUnprocessable();
+  $this->postJson('/api/bookings',$this->booking(['name'=>'Más személy','phone'=>'+36301111111','email'=>'']))->assertCreated();
   $this->postJson('/api/imports/clients',['records'=>[['id'=>'mixed','name'=>'Keveredés','phone'=>'+36301111111','email'=>'second@example.com']]])->assertUnprocessable();
-  $this->getJson('/api/state')->assertOk()->assertJsonCount(2,'clients')->assertJsonPath('clients.0.email','first@example.com');
-  $this->postJson('/api/imports/clients',['records'=>$clients])->assertOk();$this->getJson('/api/state')->assertJsonCount(2,'clients');
+  $this->getJson('/api/state')->assertOk()->assertJsonCount(3,'clients')->assertJsonPath('clients.0.email','first@example.com');
+  $this->postJson('/api/imports/clients',['records'=>$clients])->assertOk();$this->getJson('/api/state')->assertJsonCount(3,'clients');
  }
 }

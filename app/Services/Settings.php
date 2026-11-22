@@ -83,7 +83,7 @@ final class Settings
         // Legacy record association is local to the salon; it grants no account access.
         foreach ($state["bookings"] as &$booking) {
             if(($booking['attendance']??'')==='no_show'&&$booking['status']==='confirmed')$booking['status']='no_show';
-            if (!isset($booking["clientId"])) {
+            if (!array_key_exists("clientId",$booking)) {
                 $matches = array_values(array_filter($state["clients"], fn($c) =>
                     ($c["name"] ?? "") === ($booking["name"] ?? "") &&
                     Clients::phone($c["phone"] ?? "") === Clients::phone($booking["phone"] ?? "") &&

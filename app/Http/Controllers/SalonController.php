@@ -217,7 +217,7 @@ class SalonController
                     if(!empty($rule['startDate'])){$clock=CarbonImmutable::parse($data['start'])->setTimezone('Europe/Budapest')->format('H:i');$first=CarbonImmutable::parse($rule['startDate'].' '.$clock,'Europe/Budapest');if($first->format('H:i')!==$clock)throw new InvalidArgumentException('Az óraátállítás miatt nem létezik a kezdési idő.');$data['start']=$first->utc()->toISOString();}
                     if(!empty($rule['endDate'])&&$rule['endDate']<CarbonImmutable::parse($data['start'])->setTimezone('Europe/Budapest')->format('Y-m-d'))throw new InvalidArgumentException('A végdátum nem lehet a kezdőnap előtt.');
                     $series=(string)Str::uuid();$created=[];
-                    foreach(\App\Services\RecurringBookings::starts($data['start'],$rule) as $i=>$at){try{$next=$this->createBooking($s,array_replace($data,['start'=>$at]),$admin,$request);}catch(InvalidArgumentException $e){throw new InvalidArgumentException('A sorozat '.CarbonImmutable::parse($at)->setTimezone('Europe/Budapest')->format('Y.m.d. H:i').' alkalmát nem lehet menteni: '.$e->getMessage());}$n=count($s['bookings'])-1;$s['bookings'][$n]['seriesId']=$series;$s['bookings'][$n]['seriesIndex']=$i+1;$created[]=$s['bookings'][$n];}
+                    foreach(\App\Services\RecurringBookings::starts($data['start'],$rule) as $i=>$at){try{$next=$this->createBooking($s,array_replace($data,['start'=>$at]),$admin,$request);}catch(InvalidArgumentException $e){if($e instanceof \App\Services\ClientEmailConflict)throw $e;throw new InvalidArgumentException('A sorozat '.CarbonImmutable::parse($at)->setTimezone('Europe/Budapest')->format('Y.m.d. H:i').' alkalmát nem lehet menteni: '.$e->getMessage());}$n=count($s['bookings'])-1;$s['bookings'][$n]['seriesId']=$series;$s['bookings'][$n]['seriesIndex']=$i+1;$created[]=$s['bookings'][$n];}
                     $s['recurringSeries'][$series]=array_replace($rule,['start'=>$data['start'],'template'=>array_replace($data,['services'=>$created[0]['services'],'clientId'=>$created[0]['clientId']??null]),'nextIndex'=>count($created),'active'=>true,'error'=>null]);
                     return array_replace($created[0],['seriesCount'=>count($created),'createdIds'=>array_column($created,'id')]);
                 });
@@ -639,7 +639,7 @@ class SalonController
                         $oldClients = collect($s["clients"])->keyBy("id");
                         foreach ($data["clients"] as &$client) {
                             $previous=$oldClients->get($client['id'],[]);if(!$previous&&empty(trim($client['phone']??''))&&empty(trim($client['email']??'')))throw new InvalidArgumentException('Legalább egy telefonszámot vagy emailcímet adj meg.');$client=\App\Services\Contact::apply($client,$previous);\App\Services\Clients::editable($previous,$client);
-                            if(!$previous || ($previous['email']??'')!==($client['email']??'') || ($previous['phone']??'')!==($client['phone']??''))\App\Services\Clients::preventDuplicate(array_merge($s['clients'],$data['clients']),$client);
+                            if(!$previous || ($previous['email']??'')!==($client['email']??'') || ($previous['phone']??'')!==($client['phone']??''))\App\Services\Clients::preventDuplicate(array_merge($s['clients'],$data['clients']),$client,$previous?:null);
                             $client=array_replace($previous,array_intersect_key($client,array_flip(['id','name','phone','email'])));
                         }
                         foreach ($s["clients"] as $oldClient) if (!in_array($oldClient["id"], array_column($data["clients"], "id"), true)) $data["clients"][]=$oldClient;
@@ -706,6 +706,7 @@ class SalonController
             }
             return response()->json(["error" => "Ismeretlen végpont."], 404);
         } catch (InvalidArgumentException $e) {
+            if($e instanceof \App\Services\ClientEmailConflict){$payload=$e->payload();if(\App\Services\StaffAccess::editor($request)){$allowed=array_column(\App\Services\StaffAccess::projection($this->store->read(),$request)['clients'],'id');$payload['matches']=array_values(array_filter($payload['matches'],fn($c)=>in_array($c['id'],$allowed,true)));}return response()->json($payload,422);}
             return response()->json(["error" => $e->getMessage()], 422);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json(

@@ -31,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return response()->json(['error'=>'Túl sok próbálkozás. Próbáld újra '.$seconds.' másodperc múlva.','retryAfter'=>$seconds],429,array_replace($e->getHeaders(),['Retry-After'=>(string)$seconds]));
         });
         $exceptions->render(function (\InvalidArgumentException $e, Request $r) {
+            if($r->is('api/*')&&$e instanceof \App\Services\ClientEmailConflict)return response()->json($e->payload(),422);
             if ($r->is('api/*')) return response()->json(['error' => $e->getMessage()], 422);
         });
         $exceptions->shouldRenderJsonWhen(

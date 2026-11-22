@@ -130,7 +130,7 @@ class WorkspaceController
                     if ($row["id"] === $id) {
                         if ($kind === 'clients' && !\App\Services\Clients::visible($row)) { if($method==='DELETE') return ['ok'=>true]; abort(404,'A vendég nincs a saját listádban.'); }
                         if ($method === "PATCH") {
-                            if($kind==="clients") { \App\Services\Clients::editable($row,$data); if(($row['phone']??'')!==($data['phone']??'')||($row['email']??'')!==($data['email']??''))\App\Services\Clients::preventDuplicate($s['clients'],array_replace($row,$data)); }
+                            if($kind==="clients") { \App\Services\Clients::editable($row,$data); if(($row['phone']??'')!==($data['phone']??'')||($row['email']??'')!==($data['email']??''))\App\Services\Clients::preventDuplicate($s['clients'],array_replace($row,$data),$row); }
                             $data=\App\Services\Contact::apply($data,$row);if($kind==='staff'&&array_key_exists('email',$data))\App\Services\MemberEmails::sync($id,$data['email']??'');if(isset($data['description']))$data['description']=\App\Services\SafeHtml::clean($data['description']);
                             $row = array_replace($row, $data);
                             $row["phone"] = $row["phone"] ?? "";
@@ -208,143 +208,7 @@ class WorkspaceController
                 "records.*" => "required|array",
             ]);
             $kind = $m[1];
-            $result = $this->store->mutate(function (&$s) use ($kind, $data) {
-                $previousStaff = $s["staff"];
-                $added = 0;
-                $updated = 0;
-                foreach ($data["records"] as $index => $record) {
-                    $id = $record["id"] ?? "" ?: (string) Str::uuid();
-                    if (!preg_match('/^[a-zA-Z0-9_-]{1,80}$/', $id)) {
-                        throw new InvalidArgumentException(
-                            "Érvénytelen azonosító a(z) " .
-                                ($index + 2) .
-                                ". sorban.",
-                        );
-                    }
-                    if ($kind === "bookings") {
-                        $record = validator($record, [
-                            "name" => "required|string|max:150",
-                            "phone" => "nullable|string|max:40",
-                            "email" => "nullable|email|max:200",
-                            "start" => "required|date",
-                            "staff" => "required|string",
-                            "services" => "required|array|min:1|max:20",
-                            "services.*" => "required|string",
-                            "serviceSnapshot" => "sometimes|array|min:1|max:20",
-                            "serviceSnapshot.*.id" => "required|string",
-                            "serviceSnapshot.*.name" =>
-                                "required|string|max:150",
-                            "serviceSnapshot.*.price" =>
-                                "required|numeric|min:0|max:100000000",
-                            "serviceSnapshot.*.duration" =>
-                                "required|integer|between:5,1440",
-                            "serviceSnapshot.*.staff" => "sometimes|array",
-                            "serviceSnapshot.*.phases" =>
-                                "sometimes|array|size:3",
-                            "serviceSnapshot.*.phases.*" =>
-                                "required|integer|min:0",
-                            "status" =>
-                                "sometimes|in:pending,confirmed,cancelled,rejected,no_show",
-                            "groupSessionId"=>"sometimes|nullable|string|max:80", "anonymous"=>"sometimes|boolean", "noShowFee"=>"sometimes|integer|min:0|max:100000000",
-                            "serviceSnapshot.*.bookingMode"=>"sometimes|in:individual,parallel,group", "serviceSnapshot.*.capacity"=>"sometimes|integer|between:1,100",
-                        ])->validate();
-                        $old = collect($s["bookings"])->firstWhere("id", $id);
-                        if(!empty($old['groupSessionId'])&&empty($record['groupSessionId']))$record['groupSessionId']=$old['groupSessionId'];
-                        if(!empty($record['groupSessionId'])){ $g=collect($s['groupSessions'])->firstWhere('id',$record['groupSessionId']);if(!$g||$g['staff']!==$record['staff']||[$g['serviceId']]!==$record['services']||strtotime($g['start'])!==strtotime($record['start']))throw new InvalidArgumentException('A csoportos foglalás saját meghirdetett alkalma hiányzik vagy eltér az importban.');$record['serviceSnapshot']=[$g['serviceSnapshot']];}
-                        if(($record['status']??'')==='no_show')$record['attendance']='no_show';
-                        $record = array_merge($record, [
-                            "id" => $id,
-                            "phone" => $record["phone"] ?? "",
-                            "email" => $record["email"] ?? "",
-                            "status" => $record["status"] ?? "confirmed",
-                            "token" =>
-                                $old["token"] ?? bin2hex(random_bytes(24)),
-                            "createdAt" =>
-                                $old["createdAt"] ?? now()->toISOString(),
-                            "updatedAt" => now()->toISOString(),
-                        ]);
-                        if (
-                            !in_array(
-                                $record["status"],
-                                ["cancelled", "rejected"],
-                                true,
-                            )
-                        ) {
-                            $this->rules->validate($record, $s, $id, true);
-                        } else {
-                            foreach ($record["services"] as $v) {
-                                $this->rules->service($s["services"], $v);
-                            }
-                        }
-                        $record["serviceSnapshot"] =
-                            $record["serviceSnapshot"] ??
-                            array_map(
-                                fn($v) => $this->rules->service(
-                                    $s["services"],
-                                    $v,
-                                ),
-                                $record["services"],
-                            );
-                        if (
-                            array_column($record["serviceSnapshot"], "id") !==
-                            $record["services"]
-                        ) {
-                            throw new InvalidArgumentException(
-                                "A szolgáltatáspillanatkép azonosítói nem egyeznek.",
-                            );
-                        }
-                        foreach ($record["serviceSnapshot"] as $snap) {
-                            if (
-                                isset($snap["phases"]) &&
-                                array_sum($snap["phases"]) !== $snap["duration"]
-                            ) {
-                                throw new InvalidArgumentException(
-                                    "Érvénytelen szakaszidők az importban.",
-                                );
-                            }
-                        }
-                    } else {
-                        $record = validator($record, [
-                            "name" => "required|string|max:150",
-                            "phone" => "nullable|string|max:40",
-                            "email" => "nullable|email|max:200",
-                            "role" =>
-                                ($kind === "staff" ? "required" : "sometimes") .
-                                "|string|max:80",
-                        ])->validate();
-                        $record = array_merge($record, [
-                            "id" => $id,
-                            "phone" => $record["phone"] ?? "",
-                            "email" => $record["email"] ?? "",
-                        ]);
-                    }
-                    $record=\App\Services\Contact::apply($record);
-                    $match = null;
-                    if ($kind === 'clients') {
-                        foreach($s[$kind] as $i=>$old)if($old['id']===$id){$match=$i;break;}
-                        if($match===null){$matches=[];foreach($s[$kind] as $i=>$old)if(\App\Services\Clients::sameContact($old,$record))$matches[]=$i;
-                            if(count($matches)>1)throw new \InvalidArgumentException('Több egyező vendég van az importban. A megfelelő meglévő vendég azonosítójával importálj, vagy ellenőrizd az elérhetőségeket.');
-                            $match=$matches[0]??null;
-                        }
-                    } else foreach ($s[$kind] as $i => $old) {
-                        if ($old['id'] === $id || mb_strtolower($old['name']) === mb_strtolower($record['name'])) { $match=$i;break; }
-                    }
-                    if ($match === null) {
-                        $s[$kind][] = $record;
-                        $added++;
-                    } else {
-                        $record["id"] = $s[$kind][$match]["id"];
-                        if($kind==='clients'){\App\Services\Clients::editable($s[$kind][$match],$record);if(($s[$kind][$match]['email']??'')!==($record['email']??'')||($s[$kind][$match]['phone']??'')!==($record['phone']??''))\App\Services\Clients::preventDuplicate($s[$kind],$record);}
-                        $s[$kind][$match] = array_replace(
-                            $s[$kind][$match],
-                            $record,
-                        );
-                        $updated++;
-                    }
-                }
-                if ($kind === "staff") Settings::checkCalendars(array_replace($s,["staff"=>$previousStaff]),$s["staff"]);
-                return ["added" => $added, "updated" => $updated];
-            });
+            $result=$this->store->mutate(fn(&$s)=>\App\Services\RecordImport::apply($s,$kind,$data['records'],$request->input('policy','overwrite')));
             return response()->json($result);
         }
         if(preg_match('#^/api/payments/([a-zA-Z0-9_-]+)$#',$path,$match)&&in_array($method,['PATCH','DELETE'],true)){

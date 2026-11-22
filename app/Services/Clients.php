@@ -9,7 +9,8 @@ final class Clients
         $query = mb_strtolower(trim($query));
         if (mb_strlen($query) < 3) return [];
         $digits = self::phone($query);
-        $matches = array_values(array_filter($state['clients'], fn($c) => self::visible($c) && (str_contains(mb_strtolower($c['name']), $query) || (strlen($digits) >= 3 && str_contains(self::phone($c['phone'] ?? ''), $digits)))));
+        $words=preg_split('/\s+/',mb_strtolower(Str::ascii($query)),-1,PREG_SPLIT_NO_EMPTY);
+        $matches=array_values(array_filter($state['clients'],function($c)use($query,$digits,$words){$name=mb_strtolower(Str::ascii($c['name']));return self::visible($c)&&((count($words)>0&&count(array_filter($words,fn($word)=>str_contains($name,$word)))===count($words))||str_contains(mb_strtolower($c['email']??''),$query)||(strlen($digits)>=3&&str_contains(self::phone($c['phone']??''),$digits)));}));
         $counts = []; $last = [];
         foreach ($state['bookings'] as $booking) {
             $id = $booking['clientId'] ?? null;
@@ -37,8 +38,15 @@ final class Clients
         $email=mb_strtolower(trim($a['email']??''));$phone=self::phone($a['phone']??'');
         return ($email!=='' && $email===mb_strtolower(trim($b['email']??''))) || ($phone!=='' && $phone===self::phone($b['phone']??''));
     }
-    public static function preventDuplicate(array $clients,array $candidate):void {
-        foreach($clients as $client)if(self::visible($client)&&$client['id']!==($candidate['id']??null)&&self::sameContact($client,$candidate))throw new InvalidArgumentException('Ezzel az emailcímmel vagy telefonszámmal már van vendég a saját listádban. Keresd meg és válaszd ki a meglévő vendéget.');
+    public static function contactMatches(array $clients,array $input,?string $exclude=null):array {
+        $email=mb_strtolower(trim($input['email']??''));$phone=self::phone($input['phone']??'');$result=['email'=>[],'phone'=>[]];
+        foreach($clients as $c){if(!self::visible($c)||$c['id']===$exclude)continue;$item=array_intersect_key($c,array_flip(['id','name','phone','email']));if($email!==''&&$email===mb_strtolower(trim($c['email']??'')))$result['email'][]=$item;if($phone!==''&&$phone===self::phone($c['phone']??''))$result['phone'][]=$item;}
+        return $result;
+    }
+    public static function preventDuplicate(array $clients,array $candidate,?array $previous=null):void {
+        if($previous&&mb_strtolower(trim($previous['email']??''))===mb_strtolower(trim($candidate['email']??'')))return;
+        $matches=self::contactMatches($clients,$candidate,$candidate['id']??null)['email'];
+        if($matches)throw new ClientEmailConflict($matches);
     }
     public static function attach(array &$state, array &$booking, ?string $selected, bool $provider): void
     {
@@ -56,11 +64,7 @@ final class Clients
             }
             throw new InvalidArgumentException('A kiválasztott vendég nem található a saját vendégeid között.');
         }
-        if($provider){
-            $matches=array_values(array_filter($state['clients'],fn($c)=>self::visible($c)&&self::sameContact($c,$booking)));
-            if(count($matches)>1)throw new InvalidArgumentException('Több egyező vendég található. Válaszd ki a megfelelő vendéget a találati listából.');
-            if($matches){$c=$matches[0];$sameName=mb_strtolower(trim($c['name']))===mb_strtolower(trim($booking['name']));$both=!empty($booking['email'])&&!empty($booking['phone'])&&mb_strtolower(trim($booking['email']))===mb_strtolower(trim($c['email']??''))&&self::phone($booking['phone'])===self::phone($c['phone']??'');if(!$sameName&&!$both)throw new InvalidArgumentException('Ezzel az elérhetőséggel már van vendég, eltérő névvel vagy másik elérhetőséggel. Ellenőrizd az adatokat és válaszd ki a megfelelő vendéget.');$booking['clientId']=$c['id'];$booking['guestId']=$c['guestId']??null;foreach(['name','phone','email'] as $key)$booking[$key]=$c[$key]??'';return;}
-        }
+        if($provider){$matches=self::contactMatches($state['clients'],$booking)['email'];if(count($matches)===1){$c=$matches[0];$sameName=mb_strtolower(trim($c['name']))===mb_strtolower(trim($booking['name']));$samePhone=!empty($booking['phone'])&&self::phone($c['phone']??'')===self::phone($booking['phone']);if($samePhone||($sameName&&empty($booking['phone']))){$booking['clientId']=$c['id'];$full=collect($state['clients'])->firstWhere('id',$c['id']);$booking['guestId']=$full['guestId']??null;foreach(['name','phone','email'] as $k)$booking[$k]=$c[$k]??'';return;}}self::preventDuplicate($state['clients'],$booking);}
         // Only an authenticated guest identity may reuse its own linked record automatically.
         $guestId = $booking['guestId'] ?? null;
         if ($guestId && !$provider) {
@@ -72,6 +76,8 @@ final class Clients
                 }
             }
         }
+        // Unverified public input must not expose or claim an existing person's profile.
+        if(!$provider&&self::contactMatches($state['clients'],$booking)['email']){$booking['clientId']=null;return;}
         $client = ['id' => (string) Str::uuid(), 'name' => $booking['name'], 'phone' => $booking['phone'], 'email' => $booking['email']];
         if (!$provider && $guestId) $client['guestId'] = $guestId;
         $state['clients'][] = $client;

@@ -12,7 +12,7 @@ class ContactImportTest extends \Illuminate\Foundation\Testing\TestCase
     public function test_preview_is_read_only_and_matches_normalized_contacts_without_exposing_global_guest_data():void
     {
         DB::table('guest_accounts')->insert(['id'=>90,'provider'=>'email','subject'=>'ninety','email'=>'new@example.com','name'=>'Private account name','email_verified'=>true,'created_at'=>now(),'updated_at'=>now()]);
-        $before=app(SalonStore::class)->read();$data=$this->postJson('/api/contact-import/preview',['source'=>'phone','records'=>[
+        $before=app(SalonStore::class)->read();$data=$this->postJson('/api/contact-import/preview',['source'=>'phone','resolutions'=>['one'],'records'=>[
             ['name'=>'Phone nickname','phone'=>'+36 30 123 4567','email'=>'existing@example.com'],
             ['name'=>'New person','email'=>'new@example.com','phone'=>''],
             ['name'=>'Conflict','phone'=>'06301234567','email'=>'two@example.com'],

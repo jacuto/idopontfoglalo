@@ -44,6 +44,7 @@
     "calendar-import.js",
     "pwa.js",
     "import-draft.js",
+    "admin-navigation.js",
     "boot.js"
   ],
   "styles": [

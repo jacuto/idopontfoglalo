@@ -142,6 +142,14 @@ Route::match(['GET','PUT'],'/api/loyalty',[\App\Http\Controllers\LoyaltyControll
 Route::get('/api/clients/{id}/loyalty',[\App\Http\Controllers\LoyaltyController::class,'client']);
 Route::get('/api/guest/loyalty',[\App\Http\Controllers\LoyaltyController::class,'guest']);
 Route::get('/api/sms-wallet/history/{kind}',[\App\Http\Controllers\SmsWalletController::class,'history'])->whereIn('kind',['ledger','topups']);
+Route::get('/api/clients/matches',function(\Illuminate\Http\Request $r){
+ abort_unless($r->session()->get('admin')===true&&(int)$r->session()->get('provider_id',1)===app(\App\Services\Tenant::class)->id,403);
+ $v=$r->validate(['email'=>'nullable|string|max:200','phone'=>'nullable|string|max:80','exclude'=>'nullable|string|max:80']);
+ $s=\App\Services\StaffAccess::projection(app(\App\Services\SalonStore::class)->read(),$r);
+ return response()->json(\App\Services\Clients::contactMatches($s['clients'],$v,$v['exclude']??null))->header('Cache-Control','no-store');
+});
+Route::post('/api/imports/{kind}/preview',[\App\Http\Controllers\RecordImportController::class,'preview'])->whereIn('kind',['clients','staff','bookings']);
+Route::post('/api/imports/{kind}/commit',[\App\Http\Controllers\RecordImportController::class,'commit'])->whereIn('kind',['clients','staff','bookings']);
 Route::any("/api/{path}", [SalonController::class, "handle"])
     ->where("path", ".*")
     ->middleware(ApiHeaders::class);
@@ -155,3 +163,5 @@ foreach(['adatvedelem'=>'privacy','aszf'=>'terms','adattorles'=>'deletion','sugo
 Route::view('/foadmin/{section}','app')->where('section','hibanaplo|sms-egyenlegek|kapcsolatok|szamlak|szamla-rogzitese|szamla-egyeztetes|levelek|jogosultsagok|uzenetek|hirlevelek|jogi-oldalak|elofizetes|szolgaltatok|befizetesek|uzemelteto');
 
 Route::get('/gyik',fn()=>app(\App\Services\PublicDocuments::class)->page('help'));
+
+Route::view('/munkaterulet/{path?}','app')->where('path','.*');
