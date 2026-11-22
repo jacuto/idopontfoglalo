@@ -5,7 +5,7 @@
     "build": "node tools/build-assets.cjs",
     "test:assets": "node --test tests/asset-build.test.cjs",
     "check:assets": "node tools/build-assets.cjs --check",
-    "test:frontend": "node --test tests/asset-build.test.cjs tests/api-csrf.test.cjs tests/render-pipeline.test.cjs"
+    "test:frontend": "node --test tests/asset-build.test.cjs tests/api-csrf.test.cjs tests/render-pipeline.test.cjs tests/asset-gzip.test.cjs"
   },
   "devDependencies": {
     "acorn": "8.15.0",

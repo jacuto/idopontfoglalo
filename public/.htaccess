@@ -12,3 +12,11 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# Source-mode and small shared scripts: compress text when mod_deflate is enabled.
+# Binary media formats are intentionally excluded.
+<IfModule mod_filter.c>
+    <IfModule mod_deflate.c>
+        AddOutputFilterByType DEFLATE text/css text/javascript application/javascript application/x-javascript
+    </IfModule>
+</IfModule>

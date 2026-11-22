@@ -1,6 +1,27 @@
-# Filenames change with content. Applies only to this generated-assets directory.
+# Content-addressed public assets only; never applies to HTML or API responses.
 <IfModule mod_headers.c>
-  <FilesMatch "^app\.[a-f0-9]{16}\.(js|css)$">
+  <FilesMatch "^app\.[a-f0-9]{16}\.(js|css)(\.gz)?$">
     Header set Cache-Control "public, max-age=31536000, immutable"
+    Header merge Vary Accept-Encoding
+  </FilesMatch>
+
+  # Prefer checked-in gzip files, even when dynamic mod_deflate is unavailable.
+  <IfModule mod_rewrite.c>
+    RewriteEngine On
+    # A separate no-substitution rule preserves flags in per-directory rewrites.
+    RewriteRule ^app\.[a-f0-9]{16}\.(js|css)\.gz$ - [E=no-gzip:1,E=no-brotli:1]
+    RewriteCond %{HTTP:Accept-Encoding} "(^|,)\s*gzip\s*(;[^,]*)?(,|$)" [NC]
+    RewriteCond %{HTTP:Accept-Encoding} "!(^|,)\s*gzip\s*;\s*q=0(\.0*)?\s*(,|$)" [NC]
+    RewriteCond %{REQUEST_FILENAME}.gz -s
+    RewriteRule ^(app\.[a-f0-9]{16}\.(js|css))$ $1.gz [L]
+  </IfModule>
+
+  <FilesMatch "^app\.[a-f0-9]{16}\.js\.gz$">
+    ForceType application/javascript
+    Header set Content-Encoding gzip
+  </FilesMatch>
+  <FilesMatch "^app\.[a-f0-9]{16}\.css\.gz$">
+    ForceType text/css
+    Header set Content-Encoding gzip
   </FilesMatch>
 </IfModule>

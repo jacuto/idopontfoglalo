@@ -68,5 +68,9 @@
     "styleCount": 12,
     "sourceStyleBytes": 267783,
     "styleBytes": 262380
+  },
+  "gzip": {
+    "script": "build/app.baa287b00a5bd688.js.gz",
+    "style": "build/app.ffa411708b686547.css.gz"
   }
 }

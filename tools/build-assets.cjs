@@ -1,5 +1,5 @@
 /* Build-time only. Production needs PHP and the committed artifacts, never Node.js. */
-const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
+const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),zlib=require('node:zlib');
 const acorn=require('acorn'),terser=require('terser'),CleanCSS=require('clean-css');
 const root=path.resolve(__dirname,'..');
 const digest=data=>crypto.createHash('sha256').update(data).digest('hex');
@@ -32,13 +32,14 @@ async function build({check=false}={}){
  const jsPath='build/app.'+digest(jsContent).slice(0,16)+'.js',cssPath='build/app.'+digest(cssContent).slice(0,16)+'.css';
  const inputs={};for(const file of [...spec.scripts,...spec.styles])inputs[file]=digest(fs.readFileSync(path.join(root,'public',file)));
  const manifest={version:1,script:jsPath,style:cssPath,inputs,metrics:{scriptCount:scripts.length,sourceScriptBytes:scripts.reduce((n,x)=>n+Buffer.byteLength(x.source),0),scriptBytes:Buffer.byteLength(jsContent),styleCount:spec.styles.length,sourceStyleBytes:cssSources.reduce((n,s)=>n+Buffer.byteLength(s),0),styleBytes:Buffer.byteLength(cssContent)}};
- const outputs={[jsPath]:jsContent,[cssPath]:cssContent,'build/manifest.json':JSON.stringify(manifest,null,2)+'\n'};
+ manifest.gzip={script:jsPath+'.gz',style:cssPath+'.gz'};
+ const outputs={[jsPath]:jsContent,[cssPath]:cssContent,[jsPath+'.gz']:zlib.gzipSync(jsContent,{level:9}),[cssPath+'.gz']:zlib.gzipSync(cssContent,{level:9}),'build/manifest.json':JSON.stringify(manifest,null,2)+'\n'};
  for(const [file,content]of Object.entries(outputs)){
   const full=path.join(root,'public',file);
-  if(check){if(!fs.existsSync(full)||fs.readFileSync(full,'utf8')!==content)throw Error('Stale asset: '+file+'; run npm run build');}
+  if(check){if(!fs.existsSync(full)||!fs.readFileSync(full).equals(Buffer.isBuffer(content)?content:Buffer.from(content)))throw Error('Stale asset: '+file+'; run npm run build');}
   else{fs.mkdirSync(path.dirname(full),{recursive:true});fs.writeFileSync(full,content);}
  }
- if(!check)for(const file of fs.readdirSync(path.join(root,'public/build'))){if(/^app\.[a-f0-9]{16}\.(js|css)$/.test(file)&&!Object.hasOwn(outputs,'build/'+file))fs.unlinkSync(path.join(root,'public/build',file));}
+ if(!check)for(const file of fs.readdirSync(path.join(root,'public/build'))){if(/^app\.[a-f0-9]{16}\.(js|css)(\.gz)?$/.test(file)&&!Object.hasOwn(outputs,'build/'+file))fs.unlinkSync(path.join(root,'public/build',file));}
  return manifest.metrics;
 }
 module.exports={prepareClassicScript,build};
