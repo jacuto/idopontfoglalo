@@ -10,7 +10,7 @@ final class PlatformController {
    $key='platform-login:'.$r->ip();\App\Services\AttemptLimit::check($key,5);
    $hash=config('operator.password_hash');abort_unless($hash,503,'Előbb futtasd a szerveren: php artisan raero:platform-password');
    if(!Hash::check((string)$r->input('password'),$hash)){RateLimiter::hit($key,60);abort(401,'Hibás jelszó.');}
-   RateLimiter::clear($key);$r->session()->regenerate();$r->session()->put('platform_admin',true);return response()->json(['ok'=>true]);
+   RateLimiter::clear($key);\App\Services\StaffAccess::clear($r);$r->session()->forget(['guest_id','guest_password_account','guest_password_version','platform_support']);$r->session()->regenerate();$r->session()->put('platform_admin',true);return response()->json(['ok'=>true]);
   }
   abort_unless($r->session()->get('platform_admin')===true,401);
   if(preg_match('#^api/platform/invoices/([1-9][0-9]*)/pdf$#',$path,$m)&&$method==='GET')return app(\App\Services\PlatformInvoices::class)->download((int)$m[1]);
@@ -46,6 +46,7 @@ final class PlatformController {
    $v=$r->validate(['calendarLimit'=>'required|integer|between:1,100']);
    app(Tenant::class)->run((int)$m[1],fn()=>app(SalonStore::class)->mutate(function(&$s)use($v){$s['subscription']['calendarLimit']=$v['calendarLimit'];}));return response()->json(['ok'=>true]);
   }
+  if($path==='api/platform/recipients'&&$method==='GET'&&$r->has('q')){$v=$r->validate(['q'=>'nullable|string|max:150']);return response()->json(['items'=>\App\Services\PlatformRecipientSearch::search($v['q']??'')])->header('Cache-Control','no-store');}
   if($path==='api/platform/recipients'&&$method==='GET')return response()->json(['providers'=>DB::table('salon_state')->pluck('id'), 'guests'=>DB::table('guest_accounts')->select('id','name','email')->get()]);
   if($path==='api/platform/invoices'&&$method==='GET')return response()->json(DB::table('platform_invoices')->select('id','payment_id','provider_id','status','number','reference','source','issued_on','updated_at')->latest('id')->get());
   if($path==='api/platform/invoices'&&$method==='POST'){$v=$r->validate(['paymentId'=>'required|integer|min:1']);return response()->json(app(\App\Services\PlatformInvoices::class)->issue($v['paymentId']));}

@@ -6,9 +6,9 @@ function historyPageControls(anchor,meta,onPage,label='Lapozás'){
 function fixedHistoryList(host,nodes,size,label){
  if(!nodes.length)return;nodes.forEach(node=>node.remove());let page=1,control;const paint=()=>{const chunk=UI.page(nodes,page,size);page=chunk.pagination.page;host.replaceChildren(...chunk.items);control?.remove();control=historyPageControls(host,chunk.pagination,next=>{page=next;paint();},label);};paint();
 }
-async function remoteHistoryList(host,fetchPage,render,label){
+async function remoteHistoryList(host,fetchPage,render,label,{initialPage=1}={}){
  const rows=document.createElement('div'),status=document.createElement('p');status.setAttribute('role','status');host.replaceChildren(status,rows);let serial=0,control;
- const load=async page=>{const ticket=++serial;status.textContent='Betöltés…';try{const data=await fetchPage(page);if(ticket!==serial||!host.isConnected)return;rows.innerHTML=render(data.items);control?.remove();control=historyPageControls(rows,data.pagination,load,label);status.textContent='';}catch(e){if(ticket===serial&&host.isConnected){status.textContent=e.message+' ';const retry=document.createElement('button');retry.type='button';retry.textContent='Újrapróbálás';retry.onclick=()=>load(page);status.append(retry);}}};await load(1);
+ const load=async page=>{const ticket=++serial;status.textContent='Betöltés…';try{const data=await fetchPage(page);if(ticket!==serial||!host.isConnected)return;rows.innerHTML=render(data.items);control?.remove();control=historyPageControls(rows,data.pagination,load,label);status.textContent='';}catch(e){if(ticket===serial&&host.isConnected){status.textContent=e.message+' ';const retry=document.createElement('button');retry.type='button';retry.textContent='Újrapróbálás';retry.onclick=()=>load(page);status.append(retry);}}};await load(initialPage);
 }
 class WorkspaceList {
  constructor(key,host,entries,{sizes=[25,50,100],fields=[['name','Név']],initial='name',descending=false,search=true,searchInput=null,extra=null,columns=null}={}){

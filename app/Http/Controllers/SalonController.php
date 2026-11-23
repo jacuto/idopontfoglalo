@@ -167,7 +167,7 @@ class SalonController
                 \Illuminate\Support\Facades\Cache::forget(\App\Http\Controllers\ProviderDirectoryController::CACHE_KEY);return response()->json(['ok'=>true]);
             }
             if ($path === "/api/state" && $method === "GET") {
-                $state=$this->store->read();$state['prepaymentSetup']=['enabled'=>\App\Services\BookingPrepayments::enabled($state),'ready'=>\App\Services\BookingPrepayments::ready($state)];$state['messages']=array_values(array_filter($state['messages'],fn($m)=>empty($m['providerDeletedAt'])));$state['paymentDues']=\App\Services\PaymentDues::rows($state);$state['clients']=array_values(array_filter($state['clients'],fn($c)=>\App\Services\Clients::visible($c)));
+                $state=$this->store->read();if($request->session()->get('platform_admin')===true&&($support=$request->session()->get('platform_support')))$state['_support']=array_intersect_key($support,array_flip(['providerId','providerName','startedAt']));$state['prepaymentSetup']=['enabled'=>\App\Services\BookingPrepayments::enabled($state),'ready'=>\App\Services\BookingPrepayments::ready($state)];$state['messages']=array_values(array_filter($state['messages'],fn($m)=>empty($m['providerDeletedAt'])));$state['paymentDues']=\App\Services\PaymentDues::rows($state);$state['clients']=array_values(array_filter($state['clients'],fn($c)=>\App\Services\Clients::visible($c)));
                 return response()->json(\App\Services\StaffAccess::projection($state,$request));
             }
             if ($path === "/api/slots/next" && $method === "GET") return response()->json($this->nextSlots($request));

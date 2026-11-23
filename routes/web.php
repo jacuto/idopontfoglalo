@@ -108,6 +108,13 @@ foreach(['/api/marketing','/api/platform/marketing'] as $prefix){
 }
 Route::match(['GET','PUT'],'/api/guest/marketing-consent',[\App\Http\Controllers\MarketingController::class,'guestConsent']);
 Route::match(['GET','POST'],'/api/marketing/webhook/{providerId}/{engine}/{token}',fn(\Illuminate\Http\Request $r,int $providerId,string $engine,string $token)=>app(\App\Http\Controllers\MarketingController::class)->webhook($r,$providerId,$engine,$token))->whereNumber('providerId')->whereIn('engine',['brevo','mailchimp'])->where('token','[a-f0-9]{64}');
+Route::match(['GET','POST','DELETE'],'/api/platform/support',[\App\Http\Controllers\PlatformSupportController::class,'support']);
+Route::post('/api/platform/support/stop',[\App\Http\Controllers\PlatformSupportController::class,'support']);
+Route::get('/api/platform/security-audit',[\App\Http\Controllers\PlatformSupportController::class,'audit']);
+Route::get('/api/platform/guests',[\App\Http\Controllers\PlatformGuestsController::class,'index']);
+Route::match(['GET','PATCH','DELETE'],'/api/platform/guests/account/{id}',[\App\Http\Controllers\PlatformGuestsController::class,'account'])->whereNumber('id');
+Route::match(['GET','PATCH','DELETE'],'/api/platform/guests/client/{provider}/{id}',[\App\Http\Controllers\PlatformGuestsController::class,'client'])->whereNumber('provider')->where('id','[a-zA-Z0-9_-]{1,80}');
+Route::patch('/api/platform/guests/client/{provider}/{id}/blacklist',[\App\Http\Controllers\PlatformGuestsController::class,'blacklist'])->whereNumber('provider')->where('id','[a-zA-Z0-9_-]{1,80}');
 Route::any("/api/platform/{path}", [\App\Http\Controllers\PlatformController::class, "handle"])->where("path", ".*");
 Route::post('/api/barion/callback',fn(\Illuminate\Http\Request $r)=>app(\App\Services\Barion::class)->callback($r))->middleware('throttle:60,1');
 Route::post('/api/simplepay/szep-ipn',fn(\Illuminate\Http\Request $r)=>app(\App\Services\SimplePay::class)->ipn($r,true));
@@ -160,7 +167,7 @@ Route::view("/modositas", "app");
 foreach(['/szolgaltatok','/szolgaltato','/belepes','/arak','/kapcsolat'] as $page)Route::view($page,'app');
 
 foreach(['adatvedelem'=>'privacy','aszf'=>'terms','adattorles'=>'deletion','sugo'=>'help'] as $slug=>$document)Route::get('/'.$slug,fn()=>app(\App\Services\PublicDocuments::class)->page($document));
-Route::view('/foadmin/{section}','app')->where('section','hibanaplo|sms-egyenlegek|kapcsolatok|szamlak|szamla-rogzitese|szamla-egyeztetes|levelek|jogosultsagok|uzenetek|hirlevelek|jogi-oldalak|elofizetes|szolgaltatok|befizetesek|uzemelteto');
+Route::view('/foadmin/{section}','app')->where('section','vendegek|belepesi-naplo|hibanaplo|sms-egyenlegek|kapcsolatok|szamlak|szamla-rogzitese|szamla-egyeztetes|levelek|jogosultsagok|uzenetek|hirlevelek|jogi-oldalak|elofizetes|szolgaltatok|befizetesek|uzemelteto');
 
 Route::get('/gyik',fn()=>app(\App\Services\PublicDocuments::class)->page('help'));
 

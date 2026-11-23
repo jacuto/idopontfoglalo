@@ -45,6 +45,8 @@
     "pwa.js",
     "import-draft.js",
     "admin-navigation.js",
+    "platform-guests.js",
+    "platform-security.js",
     "boot.js"
   ],
   "styles": [

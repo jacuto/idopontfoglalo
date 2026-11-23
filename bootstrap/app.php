@@ -10,7 +10,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: "/up",
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->web(append: [\App\Http\Middleware\TenantContext::class,\App\Http\Middleware\MemberPermissions::class,\App\Http\Middleware\ApiHeaders::class]);
+        $middleware->web(append: [\App\Http\Middleware\TenantContext::class,\App\Http\Middleware\LoginAudit::class,\App\Http\Middleware\MemberPermissions::class,\App\Http\Middleware\ApiHeaders::class]);
         $middleware->prepend(\App\Http\Middleware\EmbedCors::class);
         // Public booking and secret-link management also work in embedded frames.
         $middleware->validateCsrfTokens(

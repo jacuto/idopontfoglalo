@@ -161,3 +161,7 @@ A képekhez, Excelhez, Google Naptárhoz és központi HTML levelekhez lásd: [b
 Újabb foglalási módok, név nélküli szalonfoglalás és vendégoldali naptárajánló: [használati útmutató](docs/FOGLALASI_MODOK.md). A `raero:upgrade` az új, additív vendégfiók-migrációt is futtatja.
 
 A legújabb gyors felvitel, legközelebbi szabad nap, minimumlétszám és fizetendő tételek használata: [GYORS_HASZNALAT.md](docs/GYORS_HASZNALAT.md). A percenkénti meglévő cron a minimumellenőrzést is futtatja; a lábléc adatait nem kell újra importálni.
+
+## Főadmin-bővítés – 2026. november 23.
+
+A vendégkezeléshez, segítségnyújtási belépéshez és belépési naplóhoz új adatbázistábla szükséges. A teljes fájl- és SQL-mentés, majd a fájlok frissítése után a szerveren, a projekt mappájában futtasd: `php artisan migrate --force`, majd `php artisan optimize:clear`. A saját `.env`, APP_KEY, `storage`, `vendor` és a meglévő cron maradjon meg. Részletek és a törlési műveletek pontos hatóköre: [FOADMIN_2026_11_23.md](docs/FOADMIN_2026_11_23.md).

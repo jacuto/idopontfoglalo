@@ -81,6 +81,8 @@
 <script src="/pwa.js?v={{ filemtime(public_path('pwa.js')) }}" defer></script>
 <script src="/import-draft.js?v={{ filemtime(public_path('import-draft.js')) }}" defer></script>
 <script src="/admin-navigation.js?v={{ filemtime(public_path('admin-navigation.js')) }}" defer></script>
+<script src="/platform-guests.js?v={{ filemtime(public_path('platform-guests.js')) }}" defer></script>
+<script src="/platform-security.js?v={{ filemtime(public_path('platform-security.js')) }}" defer></script>
 <script src="/boot.js?v={{ filemtime(public_path('boot.js')) }}" defer></script>
 @endif
   </body>

@@ -198,3 +198,5 @@ Artisan::command('raero:contact-import-cleanup',function(){$this->info((string)\
 
 Artisan::command('raero:newsletter-status',function(){$this->info((string)\App\Services\MarketingCampaigns::reconcile());})->purpose('Késleltetett hírlevélküldések utólagos, csak olvasási állapotellenőrzése');
 \Illuminate\Support\Facades\Schedule::command('raero:newsletter-status')->everyMinute()->withoutOverlapping();
+
+\Illuminate\Support\Facades\Schedule::call(function(){if(\Illuminate\Support\Facades\Schema::hasTable('security_audit_events'))\Illuminate\Support\Facades\DB::table('security_audit_events')->where('created_at','<',now()->subDays(90))->delete();})->name('raero-security-audit-retention')->daily()->withoutOverlapping();

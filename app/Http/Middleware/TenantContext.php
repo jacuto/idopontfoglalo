@@ -10,9 +10,11 @@ final class TenantContext
     public function handle(Request $r, Closure $next)
     {
         if(in_array($r->header('X-App-Language'),['hu','en','de'],true))app()->setLocale($r->header('X-App-Language'));
+        if(($guestId=(int)$r->session()->get('guest_id',0))&&!DB::table('guest_accounts')->where('id',$guestId)->exists())$r->session()->forget(['guest_id','guest_password_account','guest_password_version']);
         if($r->session()->get('guest_password_account')){$c=DB::table('guest_credentials')->where('guest_id',$r->session()->get('guest_password_account'))->first();if(!$c||(int)$c->version!==(int)$r->session()->get('guest_password_version'))$r->session()->forget(['guest_id','guest_password_account','guest_password_version']);}
         \App\Services\StaffAccess::refresh($r);
         if(!$r->session()->get('provider_member_id')&&$r->session()->get('admin')===true&&$r->session()->get('provider_auth_method')!=='social'&&(int)$r->session()->get('provider_password_version',1)!==\App\Services\ProviderPasswords::version((int)$r->session()->get('provider_id',1)))$r->session()->forget(['admin','provider_id','provider_auth_method','provider_password_version']);
+        if($r->session()->get('platform_admin')===true&&$r->session()->has('platform_support')&&in_array($r->path(),['api/platform/support/stop','api/csrf'],true)){app(Tenant::class)->id=1;return $next($r);}
         $selector = $r->query('provider', $r->input('provider', 1));
         abort_unless(is_scalar($selector) && preg_match('/^[1-9][0-9]{0,8}$/', (string) $selector), 404);
         $id = (int) $selector;
